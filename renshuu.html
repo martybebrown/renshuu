@@ -1,0 +1,1704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>練習 — Renshuu</title>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;700&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/wanakana@5/umd/wanakana.min.js"></script>
+<style>
+:root {
+  --bg: #f6f2eb;
+  --surface: #ffffff;
+  --surface2: #ede8df;
+  --border: #d5cfc5;
+  --text: #2a2318;
+  --muted: #8a7d6e;
+  --red: #c94f3c;
+  --blue: #2e72a0;
+  --green: #3d8850;
+  --gold: #a86e1a;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+header {
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.logo { font-family: 'Shippori Mincho', serif; font-size: 18px; letter-spacing: 0.08em; }
+.logo em { color: var(--red); font-style: normal; }
+.status { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink:0; }
+.dot.on { background: var(--green); }
+.dot.err { background: var(--red); }
+
+.layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  overflow: hidden;
+  height: calc(100vh - 49px);
+}
+aside {
+  border-right: 1px solid var(--border);
+  padding: 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
+}
+.label {
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 7px;
+}
+.counts { display: flex; flex-direction: column; gap: 5px; }
+.count-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--surface);
+  border-radius: 3px;
+  border-left: 2px solid transparent;
+}
+.count-row.n { border-color: var(--red); }
+.count-row.y { border-color: var(--blue); }
+.count-row.m { border-color: var(--green); }
+.count-label { display: flex; align-items: center; gap: 7px; }
+.kanji { font-family: 'Shippori Mincho', serif; font-size: 15px; }
+.count-num { font-size: 17px; font-weight: 500; }
+.count-row.n .count-num { color: var(--red); }
+.count-row.y .count-num { color: var(--blue); }
+.count-row.m .count-num { color: var(--green); }
+
+input.field {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 7px 10px;
+  border-radius: 3px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s;
+}
+input.field:focus { border-color: var(--muted); }
+input.field::placeholder { color: var(--muted); }
+select.field {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 7px 10px;
+  border-radius: 3px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  width: 100%;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%238a7d6e'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  padding-right: 24px;
+}
+select.field:focus { border-color: var(--muted); }
+
+.btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  transition: all 0.15s;
+  text-align: center;
+}
+.btn:hover { border-color: var(--muted); }
+.btn.red { background: var(--red); border-color: var(--red); color: #fff; }
+.btn.red:hover { opacity: 0.85; }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn.w100 { width: 100%; }
+
+.tabs { display: flex; gap: 4px; }
+.tab {
+  flex: 1;
+  padding: 7px 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  text-align: center;
+  transition: all 0.15s;
+}
+.tab.active { background: var(--surface2); color: var(--text); border-color: var(--muted); }
+
+.words-preview { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.chip {
+  padding: 2px 7px;
+  border-radius: 2px;
+  font-size: 11px;
+  font-family: 'Shippori Mincho', serif;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+.chip.n { border-color: rgba(201,79,60,0.35); }
+
+/* Furigana tooltip */
+[data-rt] { position: relative; cursor: pointer; display: inline-block; }
+[data-rt]::before {
+  content: attr(data-rt);
+  position: absolute;
+  bottom: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  padding: 2px 7px;
+  border-radius: 2px;
+  font-size: 0.62em;
+  white-space: nowrap;
+  color: var(--gold);
+  font-family: 'DM Mono', monospace;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 11;
+}
+[data-rt]:hover::before { opacity: 1; }
+/* Click-to-reveal translation */
+[data-rt][data-en].active::after {
+  content: attr(data-en);
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface2);
+  border: 1px solid var(--muted);
+  padding: 3px 9px;
+  border-radius: 2px;
+  font-size: 0.6em;
+  white-space: nowrap;
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  pointer-events: none;
+  z-index: 11;
+}
+
+/* Story Time: all annotated kanji get a subtle underline so they look interactive */
+.story-body [data-rt],
+.story-title [data-rt] {
+  text-decoration: underline dotted var(--gold);
+  text-underline-offset: 3px;
+}
+/* New words override with blue */
+.story-body [data-new],
+.story-title [data-new],
+[data-new] {
+  text-decoration: underline dotted var(--blue);
+  text-underline-offset: 3px;
+}
+
+/* Story Time */
+.story-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 28px;
+}
+.story-topic {
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.story-title {
+  font-family: 'Shippori Mincho', serif;
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  line-height: 1.4;
+}
+.story-body {
+  font-family: 'Shippori Mincho', serif;
+  font-size: 18px;
+  line-height: 2.2;
+  color: var(--text);
+}
+.story-legend {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.story-legend-item { display: flex; align-items: center; gap: 6px; }
+
+/* Story quiz */
+.quiz-section {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.quiz-label {
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.quiz-item {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.quiz-q-text { font-size: 12px; line-height: 1.6; margin-bottom: 8px; }
+.quiz-reveal {
+  font-size: 10px;
+  padding: 4px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  cursor: pointer;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  transition: all 0.15s;
+}
+.quiz-reveal:hover { border-color: var(--muted); color: var(--text); }
+.quiz-answer {
+  display: none;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--green);
+  line-height: 1.6;
+}
+.quiz-answer.shown { display: block; }
+
+/* Main content */
+main {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 20px 24px;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+/* Empty */
+.empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--muted);
+}
+.empty-kanji { font-family: 'Shippori Mincho', serif; font-size: 48px; opacity: 0.12; }
+
+/* Notice */
+.notice {
+  background: rgba(201,79,60,0.07);
+  border: 1px solid rgba(201,79,60,0.2);
+  border-radius: 3px;
+  padding: 12px 14px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.notice strong { color: var(--red); }
+pre.code {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 7px 10px;
+  font-size: 10px;
+  margin-top: 6px;
+  color: var(--gold);
+  overflow-x: auto;
+}
+
+/* Drills */
+.drill-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 20px;
+  transition: border-color 0.2s;
+}
+.drill-card.correct-card { border-color: rgba(90,158,106,0.4); }
+.drill-card.wrong-card { border-color: rgba(201,79,60,0.4); }
+.drill-card.partial-card { border-color: rgba(168,110,26,0.4); }
+.drill-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 2px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+.tier-badge.n { background: rgba(201,79,60,0.12); color: var(--red); border: 1px solid rgba(201,79,60,0.25); }
+.tier-badge.y { background: rgba(74,144,184,0.12); color: var(--blue); border: 1px solid rgba(74,144,184,0.25); }
+.tier-badge.m { background: rgba(90,158,106,0.12); color: var(--green); border: 1px solid rgba(90,158,106,0.25); }
+.num { font-size: 11px; color: var(--muted); }
+.jp-sentence { font-family: 'Shippori Mincho', serif; font-size: 21px; line-height: 1.7; margin-bottom: 10px; }
+.blank-span { border-bottom: 2px solid var(--red); display: inline-block; min-width: 50px; text-align: center; }
+.blank-revealed { color: var(--green); border-bottom-color: var(--green); }
+.hint-text { color: var(--muted); font-size: 11px; margin-bottom: 14px; }
+.answer-row { display: flex; gap: 8px; }
+.answer-input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px 12px;
+  border-radius: 3px;
+  font-family: 'Shippori Mincho', serif;
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.answer-input:focus { border-color: var(--red); }
+.answer-input:disabled { opacity: 0.5; }
+.feedback {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 3px;
+  background: var(--surface2);
+  font-size: 12px;
+  line-height: 1.6;
+  border-left: 2px solid transparent;
+}
+.feedback.ok { border-color: var(--green); }
+.feedback.no { border-color: var(--red); }
+.feedback.partial { border-color: var(--gold); }
+.tl { color: var(--muted); margin-top: 4px; font-size: 11px; }
+
+/* Roleplay */
+.scenario-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.scenario-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 14px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.scenario-card:hover { border-color: var(--muted); }
+.scenario-card.sel { border-color: var(--red); background: rgba(201,79,60,0.07); }
+.sc-icon { font-size: 18px; margin-bottom: 5px; }
+.sc-jp { font-family: 'Shippori Mincho', serif; font-size: 15px; margin-bottom: 2px; }
+.sc-en { color: var(--muted); font-size: 10px; }
+
+.chat-wrap { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; }
+.chat-head { display: flex; justify-content: space-between; align-items: center; }
+.chat-window {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  flex: 1;
+  min-height: 300px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scroll-behavior: smooth;
+}
+.msg { max-width: 82%; display: flex; flex-direction: column; gap: 3px; }
+.msg.user { align-self: flex-end; text-align: right; }
+.msg.assistant { align-self: flex-start; }
+.msg-body {
+  padding: 10px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.msg.assistant .msg-body {
+  background: var(--surface2);
+  font-family: 'Shippori Mincho', serif;
+  font-size: 15px;
+}
+.msg.user .msg-body {
+  background: rgba(201,79,60,0.12);
+  border: 1px solid rgba(201,79,60,0.2);
+}
+.msg-correction { font-size: 10px; color: var(--red); padding: 0 4px; }
+.msg-foot { display: flex; align-items: center; gap: 6px; padding: 0 2px; }
+.speak-btn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 2px 6px;
+  line-height: 1;
+  transition: all 0.15s;
+}
+.speak-btn:hover { border-color: var(--border); color: var(--text); }
+.speak-btn.speaking { color: var(--blue); border-color: var(--blue); }
+.chat-foot { display: flex; gap: 8px; align-items: flex-end; }
+.chat-input {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px 12px;
+  border-radius: 3px;
+  font-family: 'Shippori Mincho', serif;
+  font-size: 14px;
+  outline: none;
+  resize: none;
+  transition: border-color 0.15s;
+  min-height: 40px;
+}
+.chat-input:focus { border-color: var(--red); }
+.send-btn {
+  background: var(--red);
+  border: none;
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+.send-btn:hover { opacity: 0.85; }
+.send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.chat-tip { font-size: 10px; color: var(--muted); }
+
+/* Spinner */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin {
+  width: 13px; height: 13px;
+  border: 1px solid var(--border);
+  border-top-color: var(--red);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+}
+.loading-row { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; padding: 6px 0; }
+
+.row-between { display: flex; justify-content: space-between; align-items: center; }
+
+/* Settings panel */
+.settings-btn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--muted);
+  padding: 4px 7px;
+  line-height: 1;
+  transition: all 0.15s;
+}
+.settings-btn:hover { border-color: var(--border); color: var(--text); }
+.settings-panel {
+  position: fixed;
+  top: 49px;
+  right: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 14px;
+  width: 230px;
+  z-index: 200;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+
+/* Hamburger — hidden on desktop */
+.menu-btn {
+  display: none;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 18px;
+  color: var(--muted);
+  padding: 2px 6px;
+  line-height: 1;
+  transition: all 0.15s;
+}
+.menu-btn:hover { border-color: var(--border); color: var(--text); }
+
+/* ── Mobile (< 768px) ──────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* Show hamburger */
+  .menu-btn { display: inline-flex; }
+
+  /* Header compact */
+  header { padding: 12px 14px; }
+
+  /* Layout: single column, no sidebar by default */
+  .layout {
+    grid-template-columns: 1fr;
+    height: calc(100vh - 45px);
+  }
+
+  /* Sidebar → full-screen overlay drawer, hidden by default */
+  aside {
+    display: none;
+    position: fixed;
+    top: 45px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 150;
+    background: var(--bg);
+    border-right: none;
+    padding: 20px 18px;
+    overflow-y: auto;
+  }
+  aside.sidebar-open { display: flex; }
+
+  /* Main content */
+  main { padding: 14px 12px; gap: 12px; }
+
+  /* Settings panel spans viewport */
+  .settings-panel {
+    left: 12px;
+    right: 12px;
+    width: auto;
+  }
+
+  /* Drill cards */
+  .drill-card { padding: 14px; }
+  .jp-sentence { font-size: 18px; }
+  .answer-row { gap: 6px; }
+
+  /* Scenario grid → 2 columns */
+  .scenario-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Chat window */
+  .chat-window { max-height: none; min-height: 200px; }
+  .msg { max-width: 92%; }
+
+  /* Story card */
+  .story-card { padding: 16px; }
+  .story-title { font-size: 19px; }
+  .story-body { font-size: 16px; line-height: 2; }
+  .story-legend { gap: 10px; font-size: 9px; }
+
+  /* Empty state */
+  .empty-kanji { font-size: 36px; }
+}
+
+/* ── Small phones (< 400px) ────────────────────────────────────────────────── */
+@media (max-width: 399px) {
+  header { padding: 10px 10px; }
+  main { padding: 12px 8px; }
+  .scenario-grid { grid-template-columns: 1fr; }
+  .story-card { padding: 12px; }
+  .drill-card { padding: 12px; }
+  .story-title { font-size: 17px; }
+  .jp-sentence { font-size: 16px; }
+  .logo { font-size: 15px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex;align-items:center;gap:10px">
+    <button class="menu-btn" id="menuBtn" onclick="toggleMenu()" title="Menu">☰</button>
+    <div class="logo">練<em>習</em> · Renshuu</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="status">
+      <div class="dot" id="dot"></div>
+      <span id="statusText">not connected</span>
+    </div>
+    <button class="settings-btn" id="settingsBtn" onclick="toggleSettings()" title="Settings">⚙</button>
+  </div>
+</header>
+<div class="settings-panel" id="settingsPanel" style="display:none">
+  <div class="label">Claude API Key</div>
+  <input class="field" id="apiKey" type="password" placeholder="sk-ant-…" oninput="localStorage.setItem('renshuu_api_key',this.value)" />
+</div>
+
+<div class="layout">
+  <aside>
+    <!-- Deck filter -->
+    <div>
+      <div class="label">Deck</div>
+      <select class="field" id="deckFilter">
+        <option value="">All decks</option>
+      </select>
+    </div>
+
+    <!-- Counts -->
+    <div>
+      <div class="label">Vocabulary</div>
+      <div class="counts">
+        <div class="count-row n">
+          <div class="count-label">
+            <span class="kanji" style="color:var(--red)">新</span><span>New</span>
+          </div>
+          <span class="count-num" id="cntNew">—</span>
+        </div>
+        <div class="count-row y">
+          <div class="count-label">
+            <span class="kanji" style="color:var(--blue)">若</span><span>Young</span>
+          </div>
+          <span class="count-num" id="cntYoung">—</span>
+        </div>
+        <div class="count-row m">
+          <div class="count-label">
+            <span class="kanji" style="color:var(--green)">熟</span><span>Mature</span>
+          </div>
+          <span class="count-num" id="cntMature">—</span>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn red w100" id="loadBtn" onclick="loadCards()">Load from Anki</button>
+
+    <!-- Mode -->
+    <div>
+      <div class="label">Mode</div>
+      <div class="tabs">
+        <button class="tab active" id="tab-drill" onclick="switchMode('drill')">Drills</button>
+        <button class="tab" id="tab-roleplay" onclick="switchMode('roleplay')">Roleplay</button>
+        <button class="tab" id="tab-story" onclick="switchMode('story')">Story</button>
+      </div>
+    </div>
+
+    <!-- Focus -->
+    <div>
+      <div class="label">Focus</div>
+      <div class="tabs">
+        <button class="tab active" id="focus-mix" onclick="setFocus('mix')">Mix</button>
+        <button class="tab" id="focus-n" onclick="setFocus('n')" title="New words only">新</button>
+        <button class="tab" id="focus-y" onclick="setFocus('y')" title="Young words only">若</button>
+        <button class="tab" id="focus-m" onclick="setFocus('m')" title="Mature words only">熟</button>
+      </div>
+    </div>
+
+  </aside>
+
+  <main id="mainContent">
+    <div class="empty">
+      <div class="empty-kanji">言</div>
+      <span>Load your Anki vocabulary to begin</span>
+    </div>
+    <div class="notice" id="corsNotice">
+      <strong>AnkiConnect CORS required.</strong><br>
+      In Anki: Tools → Add-ons → AnkiConnect → Config<br>
+      Add <code style="color:var(--gold)">claude.ai</code> (or <code style="color:var(--gold)">"*"</code>) to <code style="color:var(--gold)">webCorsOriginList</code>, then restart Anki.
+      <pre class="code">"webCorsOriginList": ["https://claude.ai"]</pre>
+    </div>
+  </main>
+</div>
+
+<script>
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('renshuu_api_key');
+  if (saved) document.getElementById('apiKey').value = saved;
+  loadCards();
+});
+
+document.addEventListener('click', e => {
+  // Close settings panel when clicking outside it
+  if (!e.target.closest('#settingsBtn') && !e.target.closest('#settingsPanel')) {
+    const sp = document.getElementById('settingsPanel');
+    if (sp && sp.style.display !== 'none') sp.style.display = 'none';
+  }
+
+  // Close mobile sidebar when clicking main content, or after tab/focus clicks
+  if (!e.target.closest('aside') && !e.target.closest('#menuBtn')) {
+    closeMenu();
+  }
+
+  // Drill submit button
+  const btn = e.target.closest('.drill-submit[data-di]');
+  if (btn) { checkDrill(parseInt(btn.dataset.di, 10)); return; }
+
+  // Quiz answer reveal
+  const revBtn = e.target.closest('.quiz-reveal');
+  if (revBtn) {
+    revBtn.style.display = 'none';
+    revBtn.nextElementSibling.classList.add('shown');
+    return;
+  }
+
+  // Speak message aloud
+  const speakBtn = e.target.closest('.speak-btn[data-mi]');
+  if (speakBtn) {
+    const msg = S.convo[parseInt(speakBtn.dataset.mi, 10)];
+    if (msg) speakJapanese(msg.content, speakBtn);
+    return;
+  }
+
+  // Furigana click-to-reveal
+  const el = e.target.closest('[data-rt][data-en]');
+  const wasActive = el?.classList.contains('active');
+  document.querySelectorAll('[data-rt].active').forEach(x => x.classList.remove('active'));
+  if (el && !wasActive) el.classList.add('active');
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const inp = e.target.closest('.answer-input[data-di]');
+  if (!inp) return;
+  e.preventDefault();
+  checkDrill(parseInt(inp.dataset.di, 10));
+});
+
+// ── State ─────────────────────────────────────────────────────────────────────
+const S = {
+  mode: 'drill',
+  focus: 'mix',
+  cards: { new: [], young: [], mature: [] },
+  drills: [],
+  scenario: null,
+  convo: [],
+  sysPrompt: '',
+  sessionWords: [],
+  story: null,
+};
+
+// ── AnkiConnect ───────────────────────────────────────────────────────────────
+async function anki(action, params = {}) {
+  const r = await fetch('http://localhost:8765', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, version: 6, params }),
+  });
+  const j = await r.json();
+  if (j.error) throw new Error(j.error);
+  return j.result;
+}
+
+function stripHtml(s) {
+  const d = document.createElement('div');
+  d.innerHTML = s || '';
+  return d.textContent.trim();
+}
+
+function parseCard(info) {
+  const f = info.fields;
+  const keys = Object.keys(f);
+  const JP = ['Expression','Front','Word','Japanese','表現','語句','単語'];
+  const EN = ['Meaning','Back','Definition','English','意味','訳'];
+  const RD = ['Reading','Kana','Furigana','読み','読み方'];
+  const jk = JP.find(k => f[k]?.value) || keys[0];
+  const ek = EN.find(k => f[k]?.value) || keys[Math.min(1, keys.length - 1)];
+  const rk = RD.find(k => f[k]?.value);
+  return {
+    id: info.cardId,
+    jp: stripHtml(f[jk]?.value),
+    en: stripHtml(f[ek]?.value),
+    rd: rk ? stripHtml(f[rk]?.value) : '',
+  };
+}
+
+async function fetchBatch(ids) {
+  if (!ids.length) return [];
+  const out = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const batch = await anki('cardsInfo', { cards: ids.slice(i, i + 50) });
+    out.push(...batch.map(parseCard).filter(c => c.jp));
+  }
+  return out;
+}
+
+async function loadCards() {
+  const btn = document.getElementById('loadBtn');
+  btn.disabled = true; btn.textContent = 'Loading…';
+  setDot('', 'connecting…');
+
+  try {
+    // Populate deck dropdown (preserve current selection if any)
+    const deckSel = document.getElementById('deckFilter');
+    const savedDeck = deckSel.value;
+    try {
+      const names = await anki('deckNames');
+      names.sort((a, b) => a.localeCompare(b));
+      deckSel.innerHTML = '<option value="">All decks</option>' +
+        names.map(n => `<option value="${escHtml(n)}"${n === savedDeck ? ' selected' : ''}>${escHtml(n)}</option>`).join('');
+    } catch (_) {}
+
+    const df = document.getElementById('deckFilter').value.trim();
+    const pfx = df ? `deck:"${df}" ` : '';
+
+    const [nIds, lIds, yIds, mIds] = await Promise.all([
+      anki('findCards', { query: `${pfx}is:new` }),
+      anki('findCards', { query: `${pfx}is:learn` }),
+      anki('findCards', { query: `${pfx}is:review prop:ivl<21` }),
+      anki('findCards', { query: `${pfx}is:review prop:ivl>=21` }),
+    ]);
+
+    const youngAll = [...new Set([...lIds, ...yIds])];
+
+    const [nc, yc, mc] = await Promise.all([
+      fetchBatch(nIds),
+      fetchBatch(youngAll),
+      fetchBatch(mIds),
+    ]);
+
+    S.cards = { new: nc, young: yc, mature: mc };
+    document.getElementById('cntNew').textContent = nc.length;
+    document.getElementById('cntYoung').textContent = yc.length;
+    document.getElementById('cntMature').textContent = mc.length;
+
+    document.getElementById('corsNotice').style.display = 'none';
+
+    setDot('on', 'anki connected');
+    renderMode();
+  } catch (e) {
+    setDot('err', 'error');
+    showBanner(e.message.includes('fetch')
+      ? 'Cannot reach AnkiConnect. Is Anki running? Check CORS config.'
+      : e.message);
+  }
+
+  btn.disabled = false; btn.textContent = 'Reload from Anki';
+}
+
+function setDot(cls, txt) {
+  document.getElementById('dot').className = `dot ${cls}`;
+  document.getElementById('statusText').textContent = txt;
+}
+
+function showBanner(msg) {
+  const el = document.getElementById('corsNotice');
+  el.style.display = 'block';
+  el.innerHTML = `<strong>Error:</strong> ${msg}`;
+}
+
+// ── Util ──────────────────────────────────────────────────────────────────────
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// ── Romaji helpers (fallback if wanakana CDN is unavailable) ──────────────────
+const _H2R2 = {
+  'きゃ':'kya','きゅ':'kyu','きょ':'kyo','しゃ':'sha','しゅ':'shu','しょ':'sho',
+  'ちゃ':'cha','ちゅ':'chu','ちょ':'cho','にゃ':'nya','にゅ':'nyu','にょ':'nyo',
+  'ひゃ':'hya','ひゅ':'hyu','ひょ':'hyo','みゃ':'mya','みゅ':'myu','みょ':'myo',
+  'りゃ':'rya','りゅ':'ryu','りょ':'ryo','ぎゃ':'gya','ぎゅ':'gyu','ぎょ':'gyo',
+  'じゃ':'ja','じゅ':'ju','じょ':'jo','びゃ':'bya','びゅ':'byu','びょ':'byo',
+  'ぴゃ':'pya','ぴゅ':'pyu','ぴょ':'pyo',
+};
+const _H2R1 = {
+  'あ':'a','い':'i','う':'u','え':'e','お':'o',
+  'か':'ka','き':'ki','く':'ku','け':'ke','こ':'ko',
+  'が':'ga','ぎ':'gi','ぐ':'gu','げ':'ge','ご':'go',
+  'さ':'sa','し':'shi','す':'su','せ':'se','そ':'so',
+  'ざ':'za','じ':'ji','ず':'zu','ぜ':'ze','ぞ':'zo',
+  'た':'ta','ち':'chi','つ':'tsu','て':'te','と':'to',
+  'だ':'da','で':'de','ど':'do',
+  'な':'na','に':'ni','ぬ':'nu','ね':'ne','の':'no',
+  'は':'ha','ひ':'hi','ふ':'fu','へ':'he','ほ':'ho',
+  'ば':'ba','び':'bi','ぶ':'bu','べ':'be','ぼ':'bo',
+  'ぱ':'pa','ぴ':'pi','ぷ':'pu','ぺ':'pe','ぽ':'po',
+  'ま':'ma','み':'mi','む':'mu','め':'me','も':'mo',
+  'や':'ya','ゆ':'yu','よ':'yo',
+  'ら':'ra','り':'ri','る':'ru','れ':'re','ろ':'ro',
+  'わ':'wa','を':'wo','ん':'n','ー':'',
+};
+function hiraToRomaji(str) {
+  let out = '', i = 0;
+  while (i < str.length) {
+    const two = str.slice(i, i + 2);
+    if (_H2R2[two]) { out += _H2R2[two]; i += 2; continue; }
+    if (str[i] === 'っ') {
+      const nxt = _H2R1[str[i + 1]] || _H2R2[str.slice(i + 1, i + 3)] || '';
+      out += nxt ? nxt[0] : 'tt'; i++; continue;
+    }
+    out += _H2R1[str[i]] || str[i]; i++;
+  }
+  return out;
+}
+function readingToRomaji(hira) {
+  try { return wanakana.toRomaji(hira).toLowerCase(); } catch (_) {}
+  return hiraToRomaji(hira).toLowerCase();
+}
+function inputToHira(romaji) {
+  try { return wanakana.toHiragana(romaji, { passRomaji: false }); } catch (_) {}
+  return romaji; // can't convert without wanakana; romaji comparison covers it
+}
+
+// Levenshtein edit distance — used for fuzzy drill answer matching
+function levenshtein(a, b) {
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const row = [...Array(b.length + 1).keys()];
+  for (let i = 0; i < a.length; i++) {
+    let prev = i + 1;
+    for (let j = 0; j < b.length; j++) {
+      const next = a[i] === b[j] ? row[j] : 1 + Math.min(row[j], row[j + 1], prev);
+      row[j] = prev; prev = next;
+    }
+    row[b.length] = prev;
+  }
+  return row[b.length];
+}
+
+function toggleSettings() {
+  const p = document.getElementById('settingsPanel');
+  if (!p) return;
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleMenu() {
+  document.querySelector('aside').classList.toggle('sidebar-open');
+}
+function closeMenu() {
+  document.querySelector('aside')?.classList.remove('sidebar-open');
+}
+
+// Strip all HTML except <span data-rt="...">, preserving data-en and data-new
+function safeAnnotated(html) {
+  const div = document.createElement('div');
+  div.innerHTML = html || '';
+  div.querySelectorAll('*').forEach(el => {
+    if (el.tagName === 'SPAN' && (el.hasAttribute('data-rt') || el.hasAttribute('data-new'))) {
+      [...el.attributes].forEach(a => {
+        if (!['data-rt', 'data-en', 'data-new'].includes(a.name)) el.removeAttribute(a.name);
+      });
+    } else {
+      el.replaceWith(...el.childNodes);
+    }
+  });
+  return div.innerHTML;
+}
+
+// Convert [[word|reading|english]] or [[word|reading|english|0or1]] markers → spans.
+// The 4th pipe field (new flag) is optional — drills/roleplay use 3-pipe, story uses 4-pipe.
+function buildAnnotated(body) {
+  return (body || '').replace(
+    /\[\[([^\[\]|]+)\|([^\[\]|]+)\|([^\[\]|]+)(?:\|([01]))?\]\]/g,
+    (_, word, rt, en, isNew) => {
+      const newAttr = isNew === '1' ? ' data-new="1"' : '';
+      return `<span data-rt="${rt.trim()}" data-en="${en.trim()}"${newAttr}>${word.trim()}</span>`;
+    }
+  );
+}
+
+// Strip [[word|reading|english]] markers, keeping just the surface word
+function stripMarkers(text) {
+  return (text || '').replace(/\[\[([^\[\]|]+)\|[^\[\]]+\]\]/g, '$1');
+}
+
+// Cancel any in-progress speech
+function cancelSpeech() {
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  document.querySelectorAll('.speak-btn.speaking').forEach(b => b.classList.remove('speaking'));
+}
+
+function speakJapanese(rawText, btn) {
+  cancelSpeech();
+  const text = stripMarkers(rawText);
+  if (!text.trim()) return;
+
+  // ── Web Speech — pick the best available Japanese voice ─────────────────
+  if (!window.speechSynthesis) return;
+  const trySpeak = () => {
+    const voices = speechSynthesis.getVoices();
+    const jpVoice =
+      voices.find(v => v.lang === 'ja-JP' && v.localService && /kyoko|o-ren|otoya/i.test(v.name)) ||
+      voices.find(v => v.lang === 'ja-JP' && v.localService) ||
+      voices.find(v => v.lang === 'ja-JP') ||
+      voices.find(v => v.lang.startsWith('ja'));
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = 'ja-JP';
+    utt.rate = 0.85;
+    if (jpVoice) utt.voice = jpVoice;
+    btn?.classList.add('speaking');
+    utt.onend = utt.onerror = () => btn?.classList.remove('speaking');
+    speechSynthesis.speak(utt);
+  };
+  // Voices may not be loaded yet on first call
+  if (speechSynthesis.getVoices().length) trySpeak();
+  else { speechSynthesis.onvoiceschanged = () => { speechSynthesis.onvoiceschanged = null; trySpeak(); }; }
+}
+
+function shuffle(a) {
+  const b = [...a];
+  for (let i = b.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [b[i], b[j]] = [b[j], b[i]];
+  }
+  return b;
+}
+
+function pickWords(n = 10) {
+  const { new: nw, young: yw, mature: mw } = S.cards;
+  const f = S.focus;
+  let pool;
+  if (f === 'n')    pool = shuffle(nw).map(c => ({ ...c, tier: 'n' }));
+  else if (f === 'y') pool = shuffle(yw).map(c => ({ ...c, tier: 'y' }));
+  else if (f === 'm') pool = shuffle(mw).map(c => ({ ...c, tier: 'm' }));
+  else pool = shuffle([
+    ...shuffle(nw).slice(0, Math.ceil(n * 0.55)).map(c => ({ ...c, tier: 'n' })),
+    ...shuffle(yw).slice(0, Math.ceil(n * 0.28)).map(c => ({ ...c, tier: 'y' })),
+    ...shuffle(mw).slice(0, Math.ceil(n * 0.17)).map(c => ({ ...c, tier: 'm' })),
+  ]);
+  return pool.slice(0, n);
+}
+
+function setFocus(f) {
+  closeMenu();
+  S.focus = f;
+  document.querySelectorAll('[id^="focus-"]').forEach(t => t.classList.remove('active'));
+  document.getElementById(`focus-${f}`).classList.add('active');
+  // Reset session so next gen uses new focus
+  S.drills = [];
+  S.convo = [];
+  S.story = null;
+  if (total() > 0) renderMode();
+}
+
+function total() { return S.cards.new.length + S.cards.young.length + S.cards.mature.length; }
+
+// ── Mode ──────────────────────────────────────────────────────────────────────
+function switchMode(m) {
+  closeMenu();
+  S.mode = m;
+  document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.remove('active'));
+  document.getElementById(`tab-${m}`).classList.add('active');
+  if (total() > 0) renderMode();
+}
+
+function renderMode() {
+  if (S.mode === 'drill') renderDrills();
+  else if (S.mode === 'roleplay') renderRoleplay();
+  else if (S.mode === 'story') renderStory();
+}
+
+// ── Claude ────────────────────────────────────────────────────────────────────
+async function claude(messages, system = '', maxTokens = 1000) {
+  const key = document.getElementById('apiKey').value.trim();
+  if (!key) throw new Error('Enter your Claude API key (tap ⚙ in the header).');
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-5',
+      max_tokens: maxTokens,
+      system,
+      messages,
+    }),
+  });
+  const d = await r.json();
+  if (d.error) throw new Error(d.error.message);
+  return d.content[0].text;
+}
+
+// ── DRILL MODE ────────────────────────────────────────────────────────────────
+function renderDrills() {
+  const m = document.getElementById('mainContent');
+  m.innerHTML = `
+    <div class="row-between">
+      <div>
+        <div class="label">Vocabulary Drills</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:2px">Fill in the blank. New words (新) prioritised.</div>
+      </div>
+      <button class="btn" onclick="genDrills()" id="genBtn">New set →</button>
+    </div>
+    <div id="drillZone"><div class="loading-row"><span class="spin"></span> generating from your vocab…</div></div>
+  `;
+  if (S.drills.length > 0) {
+    paintDrills();
+  } else {
+    genDrills();
+  }
+}
+
+async function genDrills() {
+  const zone = document.getElementById('drillZone');
+  const btn = document.getElementById('genBtn');
+  if (btn) btn.disabled = true;
+  zone.innerHTML = '<div class="loading-row"><span class="spin"></span> building sentences…</div>';
+
+  const words = pickWords(9);
+  S.sessionWords = words;
+
+  const wordBlock = words.map(w =>
+    `${w.jp}${w.rd ? `（${w.rd}）` : ''} = ${w.en} [${w.tier === 'n' ? 'NEW' : w.tier === 'y' ? 'young' : 'mature'}]`
+  ).join('\n');
+
+  const sys = `You are a Japanese language teacher creating fill-in-the-blank sentences.
+Return ONLY valid JSON, no markdown fences, no preamble.
+
+For "annotated_sentence": write the sentence using [[word|reading|english]] pipe markers for every kanji word/compound (including okurigana). Leave hiragana/katakana-only segments unmarked.
+Example: [[日本語|にほんご|Japanese]]の[[勉強|べんきょう|study]]をしています。
+
+Schema:
+{
+  "drills": [
+    {
+      "sentence": "full Japanese sentence, plain text no markup",
+      "annotated_sentence": "same sentence with [[word|reading|english]] markers on every kanji segment",
+      "target": "exact word/phrase as it appears in sentence",
+      "reading": "hiragana reading",
+      "meaning": "English meaning",
+      "translation": "full English translation of sentence",
+      "hint": "brief usage note or grammar point (max 8 words)",
+      "tier": "n|y|m"
+    }
+  ]
+}
+Rules:
+- Generate exactly 5 drills
+- Each drill uses ONE word from the list as the target (to be blanked)
+- Prioritise NEW words — use as many as possible
+- Sentences should be natural, N4-N3 level, 8-20 characters
+- 'target' must appear verbatim in 'sentence'
+- In annotated_sentence the target word must also be wrapped with a [[word|reading|english]] marker (it will be replaced by the blank in the UI)`;
+
+  try {
+    const raw = await claude(
+      [{ role: 'user', content: `Generate 5 drills from this vocab list. Prioritise [NEW] words:\n\n${wordBlock}` }],
+      sys
+    );
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const { drills } = JSON.parse(clean);
+    S.drills = drills.map((d, i) => ({ ...d, i, answered: false, correct: null, input: '' }));
+    paintDrills();
+  } catch (e) {
+    zone.innerHTML = `<div style="color:var(--red);font-size:12px">Error: ${e.message}</div>`;
+  }
+  if (btn) btn.disabled = false;
+}
+
+function paintDrills() {
+  const zone = document.getElementById('drillZone');
+  zone.innerHTML = S.drills.map(d => drillHTML(d)).join('');
+}
+
+function drillHTML(d) {
+  const tierMap = { n: ['新 new', 'n'], y: ['若 young', 'y'], m: ['熟 mature', 'm'] };
+  const [tLabel, tClass] = tierMap[d.tier] || ['?', 'n'];
+
+  // Convert [[word|reading|english]] markers → spans, then sanitise
+  const annotated = safeAnnotated(buildAnnotated(d.annotated_sentence || d.sentence));
+  // Pattern matches the target whether wrapped in a span or plain
+  const targetPat = new RegExp(`<span[^>]*data-rt[^>]*>${escapeRegex(d.target)}<\\/span>|${escapeRegex(d.target)}`);
+
+  let displaySentence;
+  if (d.answered) {
+    const clr = d.correct ? 'var(--green)' : 'var(--red)';
+    displaySentence = annotated.replace(
+      targetPat,
+      `<span class="blank-span blank-revealed" style="color:${clr};border-bottom-color:${clr}" data-rt="${d.reading}">${d.target}</span>`
+    );
+  } else {
+    displaySentence = annotated.replace(
+      targetPat,
+      `<span class="blank-span">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>`
+    );
+  }
+
+  const cardClass = d.answered ? (d.partial ? ' partial-card' : d.correct ? ' correct-card' : ' wrong-card') : '';
+
+  return `
+    <div class="drill-card${cardClass}" id="dc-${d.i}">
+      <div class="drill-head">
+        <span class="tier-badge ${tClass}">${tLabel}</span>
+        <span class="num">${d.i + 1} / ${S.drills.length}</span>
+      </div>
+      <div class="jp-sentence">${displaySentence}</div>
+      <div class="hint-text">Fill in: ${d.meaning}${d.hint ? ` · ${d.hint}` : ''}</div>
+      <div class="answer-row">
+        <input
+          class="answer-input"
+          id="ai-${d.i}"
+          data-di="${d.i}"
+          placeholder="answer…"
+          value="${d.input}"
+          ${d.answered ? 'disabled' : ''}
+        />
+        <button class="btn drill-submit" data-di="${d.i}" ${d.answered ? 'disabled' : ''}>→</button>
+      </div>
+      ${d.answered ? `
+        <div class="feedback ${d.partial ? 'partial' : d.correct ? 'ok' : 'no'}">
+          ${d.correct
+            ? d.partial
+              ? `△ &nbsp;Close! &nbsp;→&nbsp; ${d.target}（${d.reading}）`
+              : `✓ Correct`
+            : `✗ &nbsp;${d.target}（${d.reading}）`}
+          <div class="tl">${d.translation}</div>
+        </div>` : ''}
+    </div>
+  `;
+}
+
+function checkDrill(i) {
+  const d = S.drills[i];
+  if (!d || d.answered) return;
+  const inputEl = document.getElementById(`ai-${i}`);
+  const ans = (inputEl ? inputEl.value : d.input).trim();
+  if (!ans) return;
+  d.input = ans;
+
+  const ansLow     = ans.toLowerCase();
+  const ansHira    = inputToHira(ans);
+  const rdRomaji   = readingToRomaji(d.reading);
+
+  const exact = (
+    ans    === d.target  ||
+    ans    === d.reading ||
+    ansLow === (d.meaning || '').toLowerCase() ||
+    ansHira === d.reading ||
+    (rdRomaji && ansLow === rdRomaji)
+  );
+  // Partial credit: one-character typo on any matching field (min 3 chars)
+  const close = (a, b) => a.length >= 3 && b.length >= 3 && levenshtein(a, b) === 1;
+  const almost = !exact && (
+    close(ans,    d.target)  ||
+    close(ansLow, d.reading) ||
+    close(ansHira, d.reading) ||
+    (rdRomaji && close(ansLow, rdRomaji))
+  );
+  d.correct  = exact || almost;
+  d.partial  = almost;
+  d.answered = true;
+  paintDrills();   // repaint all cards so answered state is consistent
+}
+
+// ── ROLEPLAY MODE ─────────────────────────────────────────────────────────────
+const SCENARIOS = [
+  { jp: 'カフェ',   en: 'At a café',         icon: '☕', ctx: 'You are ordering coffee and chatting with the barista.' },
+  { jp: '道案内',   en: 'Giving directions',  icon: '🗺️', ctx: 'A tourist asks you how to get to a nearby landmark.' },
+  { jp: '道場',     en: 'BJJ dojo',           icon: '🥋', ctx: 'Small talk with a training partner before or after class.' },
+  { jp: 'コンビニ', en: 'At the konbini',     icon: '🏪', ctx: 'Chatting with the cashier while buying things.' },
+  { jp: '近所',     en: 'Neighbour chat',     icon: '🏡', ctx: 'A casual morning chat with your neighbour.' },
+  { jp: '職場',     en: 'Before a meeting',   icon: '💼', ctx: 'Friendly small talk before a work meeting starts.' },
+];
+
+function renderRoleplay() {
+  const m = document.getElementById('mainContent');
+  const si = S.scenario;
+
+  m.innerHTML = `
+    <div>
+      <div class="label">Choose a Scenario</div>
+      <div style="color:var(--muted);font-size:11px;margin-top:2px;margin-bottom:12px">
+        Claude plays the scene using your vocab — especially new words. It corrects gently.
+      </div>
+      <div class="scenario-grid">
+        ${SCENARIOS.map((sc, i) => `
+          <div class="scenario-card ${si === i ? 'sel' : ''}" onclick="pickScenario(${i})">
+            <div class="sc-icon">${sc.icon}</div>
+            <div class="sc-jp">${sc.jp}</div>
+            <div class="sc-en">${sc.en}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    ${si !== null ? `
+      <div class="chat-wrap">
+        <div class="chat-head">
+          <div class="label">${SCENARIOS[si].jp} — ${SCENARIOS[si].en}</div>
+          <button class="btn" onclick="resetChat()">Reset chat</button>
+        </div>
+        <div class="chat-window" id="chatWin">${renderMessages()}</div>
+        <div class="chat-foot">
+          <textarea class="chat-input" id="chatIn" rows="1"
+            placeholder="日本語か romaji で…"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"
+          ></textarea>
+          <button class="send-btn" id="sendBtn" onclick="sendMsg()">→</button>
+        </div>
+        <div class="chat-tip">Enter to send · Shift+Enter for new line · romaji auto-converted</div>
+      </div>
+    ` : ''}
+  `;
+
+  scrollChat();
+}
+
+function renderMessages() {
+  if (!S.convo.length) return '<div style="color:var(--muted);font-size:12px;margin:auto;text-align:center">Starting…</div>';
+  return S.convo.map((msg, i) => {
+    const isReal = msg.role === 'assistant' && msg.content && msg.content !== '…';
+    const body = msg.role === 'assistant'
+      ? (msg.display || safeAnnotated(buildAnnotated(msg.content)))
+      : (msg.display || escHtml(msg.content));
+    return `
+      <div class="msg ${msg.role}">
+        <div class="msg-body">${body}</div>
+        ${isReal ? `
+        <div class="msg-foot">
+          <button class="speak-btn" data-mi="${i}" title="Speak aloud">🔊</button>
+          ${msg.correction ? `<div class="msg-correction">↳ ${escHtml(msg.correction)}</div>` : ''}
+        </div>` : (msg.correction ? `<div class="msg-correction">↳ ${escHtml(msg.correction)}</div>` : '')}
+      </div>
+    `;
+  }).join('');
+}
+
+function escHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function pickScenario(i) {
+  S.scenario = i;
+  S.convo = [];
+  renderRoleplay();
+  startChat();
+}
+
+function resetChat() {
+  S.convo = [];
+  renderRoleplay();
+  startChat();
+}
+
+async function startChat() {
+  const chatWin = document.getElementById('chatWin');
+  if (!chatWin) return;
+  chatWin.innerHTML = '<div class="loading-row"><span class="spin"></span> setting the scene…</div>';
+
+  const sc = SCENARIOS[S.scenario];
+  const words = pickWords(12);
+  S.sessionWords = words;
+
+  const newList  = words.filter(w => w.tier === 'n').map(w => `${w.jp}（${w.en}）`).join('、');
+  const allList  = words.map(w => `${w.jp} = ${w.en}`).join(', ');
+
+  S.sysPrompt = `You are a Japanese conversation partner in this scenario: ${sc.en}. ${sc.ctx}
+
+VOCABULARY TO USE NATURALLY: ${allList}
+PRIORITY — embed these NEW words whenever natural: ${newList || '(none this session)'}
+
+Rules:
+1. Respond in Japanese only. Keep replies to 2–3 sentences.
+2. Weave in vocab from the list, especially the priority new words.
+3. Stay in character. Ask a natural follow-up question each turn.
+4. After your Japanese, if the student made a grammar or vocab error, add: [Correction: short note in English]
+5. Aim for N4–N3 level.
+6. Mark every kanji word/compound (including okurigana) with [[word|reading|english]] pipe markers. Leave hiragana/katakana-only text unmarked. Example: [[日本語|にほんご|Japanese]]は[[面白い|おもしろい|interesting]]です。
+7. The student may write in rōmaji (e.g. "watashi wa gakusei desu") — understand it as Japanese and respond naturally. Only correct it if there is an actual grammar or vocab mistake, not just for using romaji.`;
+
+  try {
+    const opening = await claude(
+      [{ role: 'user', content: '[Open the scenario with a natural, brief Japanese greeting or question — 1–2 sentences only.]' }],
+      S.sysPrompt
+    );
+    S.convo = [{ role: 'assistant', content: opening }];
+    updateChat();
+  } catch (e) {
+    chatWin.innerHTML = `<div style="color:var(--red);font-size:12px">Error: ${e.message}</div>`;
+  }
+}
+
+function updateChat() {
+  const chatWin = document.getElementById('chatWin');
+  if (!chatWin) return;
+  chatWin.innerHTML = renderMessages();
+  scrollChat();
+}
+
+async function sendMsg() {
+  const inp = document.getElementById('chatIn');
+  const sendBtn = document.getElementById('sendBtn');
+  const raw = inp?.value.trim();
+  if (!raw) return;
+
+  // Convert romaji → hiragana when the input contains no Japanese characters
+  let text = raw;
+  if (!/[\u3040-\u30ff\u4e00-\u9fff]/.test(raw)) {
+    try { text = wanakana.toHiragana(raw, { passRomaji: false }); } catch (_) {}
+  }
+
+  inp.value = '';
+  if (sendBtn) sendBtn.disabled = true;
+
+  S.convo.push({ role: 'user', content: text, display: escHtml(text) });
+  S.convo.push({ role: 'assistant', content: '…', display: '<span class="spin"></span>' });
+  updateChat();
+
+  try {
+    const msgs = S.convo
+      .filter(m => m.content !== '…')
+      .map(m => ({ role: m.role, content: m.content }));
+
+    const reply = await claude(msgs, S.sysPrompt);
+
+    // parse optional [Correction: ...]
+    const corrRx = /\[Correction:\s*([\s\S]*?)\]/i;
+    const corrMatch = reply.match(corrRx);
+    const clean = reply.replace(corrRx, '').trim();
+    const correction = corrMatch ? corrMatch[1].trim() : null;
+
+    // replace spinner
+    S.convo.pop();
+    S.convo.push({ role: 'assistant', content: clean, correction });
+    updateChat();
+  } catch (e) {
+    S.convo.pop();
+    S.convo.push({ role: 'assistant', content: `Error: ${e.message}`, display: `<span style="color:var(--red)">${escHtml(e.message)}</span>` });
+    updateChat();
+  }
+
+  const newSend = document.getElementById('sendBtn');
+  if (newSend) newSend.disabled = false;
+  const newInp = document.getElementById('chatIn');
+  if (newInp) newInp.focus();
+}
+
+function scrollChat() {
+  const w = document.getElementById('chatWin');
+  if (w) setTimeout(() => w.scrollTop = w.scrollHeight, 60);
+}
+
+// ── STORY TIME MODE ────────────────────────────────────────────────────────────
+
+// Cache endwalker links for the session so we only fetch the archive once
+let _endwalkerLinks = null;
+
+async function tryEndwalker(onStatus) {
+  if (!_endwalkerLinks) {
+    onStatus('browsing endwalker archive…');
+    const res = await fetch('https://endwalker.com/archive.html');
+    if (!res.ok) throw new Error('endwalker not ok');
+    const html = await res.text();
+    const dom  = new DOMParser().parseFromString(html, 'text/html');
+    _endwalkerLinks = [...dom.querySelectorAll('a[href*="en.wikipedia.org/wiki/"]')]
+      .map(a => a.getAttribute('href'))
+      .filter(Boolean);
+    if (!_endwalkerLinks.length) throw new Error('no endwalker links');
+  }
+  const url      = _endwalkerLinks[Math.floor(Math.random() * _endwalkerLinks.length)];
+  const wikiSlug = decodeURIComponent(url.split('/wiki/')[1].split('#')[0].split('?')[0]);
+  onStatus('fetching article…');
+  const wr = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(wikiSlug)}`);
+  const wiki = await wr.json();
+  if (!wiki.title) throw new Error('bad wiki response');
+  return { wiki, source: 'endwalker.com' };
+}
+
+async function tryReddit(onStatus) {
+  onStatus('browsing r/wikipedia…');
+  const res = await fetch('https://www.reddit.com/r/wikipedia/hot.json?limit=50', {
+    headers: { 'Accept': 'application/json' },
+  });
+  if (!res.ok) throw new Error('reddit not ok');
+  const data  = await res.json();
+  const posts = data.data.children
+    .map(p => p.data)
+    .filter(p => p.url && p.url.includes('en.wikipedia.org/wiki/'));
+  if (!posts.length) throw new Error('no posts');
+  const post     = posts[Math.floor(Math.random() * posts.length)];
+  const wikiSlug = decodeURIComponent(post.url.split('/wiki/')[1].split('#')[0].split('?')[0]);
+  onStatus('fetching article…');
+  const wr   = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(wikiSlug)}`);
+  const wiki = await wr.json();
+  if (!wiki.title) throw new Error('bad wiki response');
+  return { wiki, source: 'r/wikipedia' };
+}
+
+async function fetchArticle(onStatus) {
+  // Try endwalker and Reddit in random order; fall back to Wikipedia random
+  const sources = [tryEndwalker, tryReddit];
+  if (Math.random() < 0.5) sources.reverse();
+  for (const fn of sources) {
+    try { return await fn(onStatus); } catch (_) {}
+  }
+  onStatus('picking a random article…');
+  const wr = await fetch('https://en.wikipedia.org/api/rest_v1/page/random/summary');
+  return { wiki: await wr.json(), source: 'Wikipedia' };
+}
+
+function renderStory() {
+  const m = document.getElementById('mainContent');
+  m.innerHTML = `
+    <div class="row-between">
+      <div>
+        <div class="label">Story Time</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:2px">Wikipedia facts explained in Japanese using your vocabulary.</div>
+      </div>
+      <button class="btn" onclick="genStory()" id="storyBtn">New story →</button>
+    </div>
+    <div id="storyZone">
+      <div class="loading-row"><span class="spin"></span> fetching a story…</div>
+    </div>
+  `;
+  if (S.story) {
+    document.getElementById('storyZone').innerHTML = renderStoryCard();
+  } else {
+    genStory();
+  }
+}
+
+async function genStory() {
+  const zone = document.getElementById('storyZone');
+  const btn  = document.getElementById('storyBtn');
+  if (btn) btn.disabled = true;
+
+  const MAX_TRIES = 4;
+  for (let attempt = 0; attempt < MAX_TRIES; attempt++) {
+    try {
+      // ── Step 1: fetch an article ─────────────────────────────────────────
+      const onStatus = msg => {
+        const prefix = attempt > 0 ? `(skipped — trying again) ` : '';
+        zone.innerHTML = `<div class="loading-row"><span class="spin"></span> ${prefix}${msg}</div>`;
+      };
+      const { wiki, source } = await fetchArticle(onStatus);
+      const extract = (wiki.extract || wiki.description || '').slice(0, 1400);
+
+      // ── Step 2: ask Claude to write the story ────────────────────────────
+      zone.innerHTML = `<div class="loading-row"><span class="spin"></span> writing in Japanese…</div>`;
+
+      const words     = pickWords(15);
+      const vocabList = words.map(w => `${w.jp}${w.rd ? `（${w.rd}）` : ''} = ${w.en}`).join('\n');
+
+      const sys = `You are a Japanese reading teacher who writes vivid, casual short texts for learners.
+Return ONLY valid JSON — no markdown fences, no preamble.
+
+LANGUAGE: Write in casual, conversational Japanese — plain/dictionary form (だ・だった・じゃない etc.), NOT polite です/ます. Sound like a friend explaining something fascinating over coffee.
+
+SKIP RULE: If the topic is highly technical, dry, or domain-specific in a way that cannot be expressed naturally using mostly simple vocabulary (e.g. obscure maths theorems, niche biochemistry, specialist legal jargon), set "skip": true and leave all other fields as empty strings. The app will automatically fetch a different article.
+
+ANNOTATION FORMAT for "body" — mark every word/compound containing kanji:
+  [[word|reading|english|new]]
+  • word = kanji/word exactly as written
+  • reading = hiragana reading
+  • english = brief English gloss (no quotes, no pipes)
+  • new = 1 if NOT in student vocab list, 0 if it IS
+  Mark EVERY kanji-containing segment — do not skip any. Leave pure hiragana/katakana unmarked.
+  Example: [[日本語|にほんご|Japanese|0]]の[[勉強|べんきょう|study|1]]って[[楽しい|たのしい|fun|1]]よな。
+
+Schema:
+{
+  "skip": false,
+  "title_jp": "Casual Japanese title (8–16 chars, punchy)",
+  "title_en": "English title (brief)",
+  "body": "3–5 casual Japanese sentences. EVERY kanji word must have a [[marker]].",
+  "quiz": [
+    { "q": "Question 1 in English?", "a": "Answer in English." },
+    { "q": "Question 2 in English?", "a": "Answer in English." },
+    { "q": "Question 3 in English?", "a": "Answer in English." }
+  ]
+}
+Quiz: test understanding of the Japanese text. Vary types (what/why/how/who). 1–2 sentences per answer.`;
+
+      const prompt = `Topic: ${wiki.title}
+Wikipedia extract: ${extract}
+
+Student's vocabulary — use naturally and mark with new=0:
+${vocabList}
+
+TASK: Find the single most surprising, counterintuitive, or little-known fact about this topic. Lead with that. Do NOT just restate the opening paragraph — look for what is genuinely fascinating. If the topic is too technical or dry to explain in simple Japanese, set skip: true.
+
+Write 3–5 casual Japanese sentences around that insight (annotate every kanji word), then 3 English comprehension questions.`;
+
+      const raw    = await claude([{ role: 'user', content: prompt }], sys, 1800);
+      const clean  = raw.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(clean);
+
+      if (parsed.skip) continue;   // topic too dry — loop and try a new article
+
+      S.story = { topic: wiki.title, source, ...parsed };
+      zone.innerHTML = renderStoryCard();
+      if (btn) btn.disabled = false;
+      return;
+
+    } catch (e) {
+      if (attempt === MAX_TRIES - 1) {
+        zone.innerHTML = `<div style="color:var(--red);font-size:12px">Error: ${e.message}</div>`;
+      }
+      // else silently try again
+    }
+  }
+
+  if (btn) btn.disabled = false;
+}
+
+function renderStoryCard() {
+  const s = S.story;
+  if (!s) return '';
+  const safeBody = safeAnnotated(buildAnnotated(s.body || ''));
+
+  const quizHtml = (s.quiz || []).map((item, i) => `
+    <div class="quiz-item">
+      <div class="quiz-q-text">${i + 1}. ${escHtml(item.q)}</div>
+      <button class="quiz-reveal">Show answer</button>
+      <div class="quiz-answer">${escHtml(item.a)}</div>
+    </div>
+  `).join('');
+
+  return `
+    <div class="story-card">
+      <div class="story-topic">
+        <span>📖</span>
+        <span>${escHtml(s.source || 'Wikipedia')}</span>
+        <span style="opacity:0.4">·</span>
+        <span>${escHtml(s.topic)}</span>
+      </div>
+      <div class="story-title">
+        ${safeAnnotated(buildAnnotated(s.title_jp || ''))}
+        <span style="font-size:0.5em;color:var(--muted);font-family:'DM Mono',monospace;font-weight:400;margin-left:8px">${escHtml(s.title_en)}</span>
+      </div>
+      <div class="story-body">${safeBody}</div>
+      <div class="story-legend">
+        <div class="story-legend-item">
+          <span style="display:inline-block;width:20px;border-bottom:2px dotted var(--gold);vertical-align:middle"></span>
+          <span>known vocab — hover for reading, click for meaning</span>
+        </div>
+        <div class="story-legend-item">
+          <span style="display:inline-block;width:20px;border-bottom:2px dotted var(--blue);vertical-align:middle"></span>
+          <span>new word — hover for reading, click for meaning</span>
+        </div>
+      </div>
+      ${quizHtml ? `
+      <div class="quiz-section">
+        <div class="quiz-label">Comprehension check</div>
+        ${quizHtml}
+      </div>` : ''}
+    </div>
+  `;
+}
+</script>
+</body>
+</html>
