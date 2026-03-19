@@ -884,9 +884,32 @@ async function loadCards() {
 
     document.getElementById('corsNotice').style.display = 'none';
 
+    // Persist for offline / mobile use
+    try {
+      localStorage.setItem('renshuu_cards', JSON.stringify(S.cards));
+      localStorage.setItem('renshuu_cards_saved', new Date().toISOString());
+    } catch (_) {}
+
     setDot('on', 'anki connected');
     renderMode();
   } catch (e) {
+    // Fall back to cached wordlist (e.g. on mobile without Anki running)
+    const cached = localStorage.getItem('renshuu_cards');
+    if (cached) {
+      try {
+        S.cards = JSON.parse(cached);
+        document.getElementById('cntNew').textContent = S.cards.new.length;
+        document.getElementById('cntYoung').textContent = S.cards.young.length;
+        document.getElementById('cntMature').textContent = S.cards.mature.length;
+        document.getElementById('corsNotice').style.display = 'none';
+        const savedAt = localStorage.getItem('renshuu_cards_saved');
+        const when = savedAt ? ` (cached ${new Date(savedAt).toLocaleDateString()})` : ' (cached)';
+        setDot('on', 'offline' + when);
+        renderMode();
+        btn.disabled = false; btn.textContent = 'Reload from Anki';
+        return;
+      } catch (_) {}
+    }
     setDot('err', 'error');
     showBanner(e.message.includes('fetch')
       ? 'Cannot reach AnkiConnect. Is Anki running? Check CORS config.'
