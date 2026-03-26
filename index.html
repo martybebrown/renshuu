@@ -654,6 +654,8 @@ pre.code {
 <div class="settings-panel" id="settingsPanel" style="display:none">
   <div class="label">Claude API Key</div>
   <input class="field" id="apiKey" type="password" placeholder="sk-ant-…" oninput="localStorage.setItem('renshuu_api_key',this.value)" />
+  <div class="label" style="margin-top:12px">GitHub Token <span style="font-size:9px;color:var(--muted)">(gist scope — syncs cards across devices)</span></div>
+  <input class="field" id="ghToken" type="password" placeholder="ghp_…" oninput="localStorage.setItem('renshuu_gh_token',this.value)" />
 </div>
 
 <div class="layout">
@@ -736,6 +738,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const saved = localStorage.getItem('renshuu_api_key');
   if (saved) document.getElementById('apiKey').value = saved;
   else toggleSettings(); // prompt on first visit
+  const ghToken = localStorage.getItem('renshuu_gh_token');
+  if (ghToken) document.getElementById('ghToken').value = ghToken;
   loadCards();
 });
 
@@ -780,6 +784,7 @@ document.addEventListener('click', e => {
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
+  if (e.target.id === 'apiKey') { e.preventDefault(); toggleSettings(); return; }
   const inp = e.target.closest('.answer-input[data-di]');
   if (!inp) return;
   e.preventDefault();
@@ -891,32 +896,39 @@ async function loadCards() {
     document.getElementById('cntYoung').textContent = yc.length;
     document.getElementById('cntMature').textContent = mc.length;
 
-    localStorage.setItem('renshuu_cards', JSON.stringify({ cards: S.cards, timestamp: Date.now() }));
+    const cachePayload = JSON.stringify({ cards: S.cards, timestamp: Date.now() });
+    localStorage.setItem('renshuu_cards', cachePayload);
+    gistPush(S.cards); // fire-and-forget — sync to gist in background
 
     document.getElementById('corsNotice').style.display = 'none';
-
-    // Persist for offline / mobile use
-    try {
-      localStorage.setItem('renshuu_cards', JSON.stringify(S.cards));
-      localStorage.setItem('renshuu_cards_saved', new Date().toISOString());
-    } catch (_) {}
-
     setDot('on', 'anki connected');
     renderMode();
   } catch (e) {
-    // Fall back to cached wordlist (e.g. on mobile without Anki running)
+    // Try gist first, then local cache
+    const loadFromData = ({ cards, timestamp }) => {
+      S.cards = cards;
+      document.getElementById('cntNew').textContent = cards.new.length;
+      document.getElementById('cntYoung').textContent = cards.young.length;
+      document.getElementById('cntMature').textContent = cards.mature.length;
+      document.getElementById('corsNotice').style.display = 'none';
+      const mins = Math.round((Date.now() - timestamp) / 60000);
+      const age = mins < 60 ? `${mins}m ago` : mins < 1440 ? `${Math.round(mins / 60)}h ago` : `${Math.round(mins / 1440)}d ago`;
+      setDot('', `cached · synced ${age}`);
+      renderMode();
+    };
+    try {
+      const gistData = await gistFetch();
+      if (gistData?.cards) {
+        localStorage.setItem('renshuu_cards', JSON.stringify(gistData));
+        loadFromData(gistData);
+        btn.disabled = false; btn.textContent = 'Reload from Anki';
+        return;
+      }
+    } catch (_) {}
     const cached = localStorage.getItem('renshuu_cards');
     if (cached) {
       try {
-        S.cards = JSON.parse(cached);
-        document.getElementById('cntNew').textContent = S.cards.new.length;
-        document.getElementById('cntYoung').textContent = S.cards.young.length;
-        document.getElementById('cntMature').textContent = S.cards.mature.length;
-        document.getElementById('corsNotice').style.display = 'none';
-        const savedAt = localStorage.getItem('renshuu_cards_saved');
-        const when = savedAt ? ` (cached ${new Date(savedAt).toLocaleDateString()})` : ' (cached)';
-        setDot('on', 'offline' + when);
-        renderMode();
+        loadFromData(JSON.parse(cached));
         btn.disabled = false; btn.textContent = 'Reload from Anki';
         return;
       } catch (_) {}
@@ -939,6 +951,55 @@ function showBanner(msg) {
   const el = document.getElementById('corsNotice');
   el.style.display = 'block';
   el.innerHTML = `<strong>Error:</strong> ${msg}`;
+}
+
+// ── Gist sync ─────────────────────────────────────────────────────────────────
+const GIST_FILE = 'renshuu-cards.json';
+const GIST_DESC = 'renshuu-cards';
+
+async function gistGetId(token) {
+  let id = localStorage.getItem('renshuu_gist_id');
+  if (id) return id;
+  const list = await fetch('https://api.github.com/gists', {
+    headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' },
+  }).then(r => r.json());
+  if (!Array.isArray(list)) return null;
+  const found = list.find(g => g.description === GIST_DESC && g.files?.[GIST_FILE]);
+  if (found) { localStorage.setItem('renshuu_gist_id', found.id); return found.id; }
+  return null;
+}
+
+async function gistPush(cards) {
+  const token = localStorage.getItem('renshuu_gh_token');
+  if (!token) return;
+  const content = JSON.stringify({ cards, timestamp: Date.now() });
+  let id = await gistGetId(token);
+  if (id) {
+    await fetch(`https://api.github.com/gists/${id}`, {
+      method: 'PATCH',
+      headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: { [GIST_FILE]: { content } } }),
+    });
+  } else {
+    const r = await fetch('https://api.github.com/gists', {
+      method: 'POST',
+      headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description: GIST_DESC, public: false, files: { [GIST_FILE]: { content } } }),
+    }).then(r => r.json());
+    if (r.id) localStorage.setItem('renshuu_gist_id', r.id);
+  }
+}
+
+async function gistFetch() {
+  const token = localStorage.getItem('renshuu_gh_token');
+  if (!token) return null;
+  const id = await gistGetId(token);
+  if (!id) return null;
+  const gist = await fetch(`https://api.github.com/gists/${id}`, {
+    headers: { Authorization: `token ${token}` },
+  }).then(r => r.json());
+  const raw = gist.files?.[GIST_FILE]?.content;
+  return raw ? JSON.parse(raw) : null;
 }
 
 // ── Util ──────────────────────────────────────────────────────────────────────
