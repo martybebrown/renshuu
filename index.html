@@ -1309,25 +1309,24 @@ function checkDrill(i) {
 
 async function getWrongFeedback(i) {
   const d = S.drills[i];
-  const sys = `You are a concise Japanese tutor giving feedback on fill-in-the-blank drill answers.
-Rules:
-- If the student's answer is just a spelling/romaji typo of the correct answer, respond with JSON: {"correct": true, "feedback": "Just a typo — close enough!"}
-- Otherwise explain in one short sentence what the mistake is (e.g. wrong word, wrong form, wrong reading).
-- Always respond with valid JSON: {"correct": boolean, "feedback": "..."}
-- Keep feedback under 15 words.`;
+  const sys = `You are a concise Japanese tutor giving feedback on fill-in-the-blank drill answers. Respond with ONLY a JSON object, no other text.
+If the student's answer is just a spelling/romaji typo of the correct answer, respond: {"correct":true,"feedback":"Just a typo — close enough!"}
+Otherwise explain in one short sentence what's wrong. Example: {"correct":false,"feedback":"おそく is the adverbial form; the adjective form おそい is needed here."}`;
   const msg = `Sentence: ${d.sentence}
 Target: ${d.target}（${d.reading}）= ${d.meaning}
 Student answered: "${d.input}"`;
   try {
     const raw = await claude([{ role: 'user', content: msg }], sys, 150);
-    const result = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    // Extract JSON even if Claude wraps it in backticks or adds surrounding text
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    const result = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
     if (result.correct) {
       d.correct = true;
       d.partial = true;
     }
     d.aiFeedback = result.feedback;
   } catch(e) {
-    d.aiFeedback = `${d.target}（${d.reading}）`;
+    d.aiFeedback = `Correct answer: ${d.target}（${d.reading}）`;
   }
   // Update just this card's feedback div
   const fb = document.getElementById(`fb-${i}`);
