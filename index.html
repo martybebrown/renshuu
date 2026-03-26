@@ -486,8 +486,32 @@ pre.code {
   line-height: 1;
   transition: all 0.15s;
 }
-.speak-btn:hover { border-color: var(--border); color: var(--text); }
+.speak-btn:hover, .breakdown-btn:hover { border-color: var(--border); color: var(--text); }
 .speak-btn.speaking { color: var(--blue); border-color: var(--blue); }
+.breakdown-btn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 2px 6px;
+  line-height: 1;
+  transition: all 0.15s;
+}
+.breakdown-btn.active { color: var(--blue); border-color: var(--blue); }
+.msg-breakdown {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text);
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-top: 6px;
+}
+.msg-breakdown .bd-line { margin-bottom: 6px; }
+.msg-breakdown .bd-label { font-weight: 600; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
 .chat-foot { display: flex; gap: 8px; align-items: flex-end; }
 .chat-input {
   flex: 1;
@@ -798,6 +822,15 @@ document.addEventListener('click', e => {
   if (speakBtn) {
     const msg = S.convo[parseInt(speakBtn.dataset.mi, 10)];
     if (msg) speakJapanese(msg.content, speakBtn);
+    return;
+  }
+
+  // Break down message
+  const bdBtn = e.target.closest('.breakdown-btn[data-mi]');
+  if (bdBtn) {
+    const mi = parseInt(bdBtn.dataset.mi, 10);
+    const msg = S.convo[mi];
+    if (msg) breakdownMessage(mi, msg, bdBtn);
     return;
   }
 
@@ -1199,6 +1232,42 @@ function speakJapanese(rawText, btn) {
   // Voices may not be loaded yet on first call
   if (speechSynthesis.getVoices().length) trySpeak();
   else { speechSynthesis.onvoiceschanged = () => { speechSynthesis.onvoiceschanged = null; trySpeak(); }; }
+}
+
+async function breakdownMessage(mi, msg, btn) {
+  // Toggle off if already shown
+  if (msg.breakdown) {
+    delete msg.breakdown;
+    updateChat();
+    return;
+  }
+
+  btn.classList.add('active');
+  btn.textContent = '⏳';
+
+  const plain = stripMarkers(msg.content);
+  try {
+    const reply = await claude([
+      { role: 'user', content: `Break down this Japanese message for an N4–N3 learner. For each sentence:
+1. Show the full sentence in Japanese
+2. Give a natural English translation
+3. List each word/phrase with reading (in hiragana) and meaning
+4. Explain the grammar patterns used (particles, verb forms, conjugations, sentence-ending patterns)
+
+Keep it concise but thorough. Use plain text, no markdown.
+
+Message to break down:
+${plain}` }
+    ], 'You are a Japanese language teacher. Give clear, structured breakdowns.', 1500);
+
+    // Convert plain text reply to HTML
+    const html = escHtml(reply).replace(/\n/g, '<br>');
+    msg.breakdown = html;
+  } catch (err) {
+    msg.breakdown = `<span style="color:var(--red)">Failed to get breakdown: ${escHtml(err.message)}</span>`;
+  }
+
+  updateChat();
 }
 
 function shuffle(a) {
@@ -1625,8 +1694,10 @@ function renderMessages() {
         ${isReal ? `
         <div class="msg-foot">
           <button class="speak-btn" data-mi="${i}" title="Speak aloud">🔊</button>
+          <button class="breakdown-btn" data-mi="${i}" title="Break down this message">📖</button>
           ${msg.correction ? `<div class="msg-correction">↳ ${escHtml(msg.correction)}</div>` : ''}
-        </div>` : (msg.correction ? `<div class="msg-correction">↳ ${escHtml(msg.correction)}</div>` : '')}
+        </div>
+        ${msg.breakdown ? `<div class="msg-breakdown">${msg.breakdown}</div>` : ''}` : (msg.correction ? `<div class="msg-correction">↳ ${escHtml(msg.correction)}</div>` : '')}
       </div>
     `;
   }).join('');
