@@ -895,21 +895,27 @@ async function loadCards() {
 
     document.getElementById('corsNotice').style.display = 'none';
 
+    // Persist for offline / mobile use
+    try {
+      localStorage.setItem('renshuu_cards', JSON.stringify(S.cards));
+      localStorage.setItem('renshuu_cards_saved', new Date().toISOString());
+    } catch (_) {}
+
     setDot('on', 'anki connected');
     renderMode();
   } catch (e) {
+    // Fall back to cached wordlist (e.g. on mobile without Anki running)
     const cached = localStorage.getItem('renshuu_cards');
     if (cached) {
       try {
-        const { cards, timestamp } = JSON.parse(cached);
-        S.cards = cards;
-        document.getElementById('cntNew').textContent = cards.new.length;
-        document.getElementById('cntYoung').textContent = cards.young.length;
-        document.getElementById('cntMature').textContent = cards.mature.length;
+        S.cards = JSON.parse(cached);
+        document.getElementById('cntNew').textContent = S.cards.new.length;
+        document.getElementById('cntYoung').textContent = S.cards.young.length;
+        document.getElementById('cntMature').textContent = S.cards.mature.length;
         document.getElementById('corsNotice').style.display = 'none';
-        const mins = Math.round((Date.now() - timestamp) / 60000);
-        const age = mins < 60 ? `${mins}m ago` : mins < 1440 ? `${Math.round(mins / 60)}h ago` : `${Math.round(mins / 1440)}d ago`;
-        setDot('', `cached · synced ${age}`);
+        const savedAt = localStorage.getItem('renshuu_cards_saved');
+        const when = savedAt ? ` (cached ${new Date(savedAt).toLocaleDateString()})` : ' (cached)';
+        setDot('on', 'offline' + when);
         renderMode();
         btn.disabled = false; btn.textContent = 'Reload from Anki';
         return;
@@ -1287,12 +1293,14 @@ function drillHTML(d) {
         <button class="btn drill-submit" data-di="${d.i}" ${d.answered ? 'disabled' : ''}>→</button>
       </div>
       ${d.answered ? `
-        <div class="feedback ${d.partial ? 'partial' : d.correct ? 'ok' : 'no'}">
+        <div class="feedback ${d.partial ? 'partial' : d.correct ? 'ok' : 'no'}" id="fb-${d.i}">
           ${d.correct
             ? d.partial
               ? `△ &nbsp;Close! &nbsp;→&nbsp; ${d.target}（${d.reading}）`
               : `✓ Correct`
-            : `✗ &nbsp;${d.target}（${d.reading}）`}
+            : d.aiFeedback
+              ? `✗ &nbsp;${d.aiFeedback}`
+              : `<span class="spin"></span>`}
           <div class="tl">${d.translation}</div>
         </div>` : ''}
     </div>
@@ -1330,6 +1338,42 @@ function checkDrill(i) {
   d.partial  = almost;
   d.answered = true;
   paintDrills();   // repaint all cards so answered state is consistent
+  if (!d.correct) getWrongFeedback(i);
+}
+
+async function getWrongFeedback(i) {
+  const d = S.drills[i];
+  const sys = `You are a concise Japanese tutor giving feedback on fill-in-the-blank drill answers. Respond with ONLY a JSON object, no other text.
+If the student's answer is just a spelling/romaji typo of the correct answer, respond: {"correct":true,"feedback":"Just a typo — close enough!"}
+Otherwise explain in one short sentence what's wrong. Example: {"correct":false,"feedback":"おそく is the adverbial form; the adjective form おそい is needed here."}`;
+  const msg = `Sentence: ${d.sentence}
+Target: ${d.target}（${d.reading}）= ${d.meaning}
+Student answered: "${d.input}"`;
+  try {
+    const raw = await claude([{ role: 'user', content: msg }], sys, 150);
+    // Extract JSON even if Claude wraps it in backticks or adds surrounding text
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    const result = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
+    if (result.correct) {
+      d.correct = true;
+      d.partial = true;
+    }
+    d.aiFeedback = result.feedback;
+  } catch(e) {
+    d.aiFeedback = `Correct answer: ${d.target}（${d.reading}）`;
+  }
+  // Update just this card's feedback div
+  const fb = document.getElementById(`fb-${i}`);
+  if (fb) {
+    fb.className = `feedback ${d.partial ? 'partial' : d.correct ? 'ok' : 'no'}`;
+    fb.innerHTML = (d.correct
+      ? `△ &nbsp;${d.aiFeedback}`
+      : `✗ &nbsp;${d.aiFeedback}`) + `<div class="tl">${d.translation}</div>`;
+    const card = document.getElementById(`dc-${i}`);
+    if (card) {
+      card.className = `drill-card ${d.partial ? 'partial-card' : d.correct ? 'correct-card' : 'wrong-card'}`;
+    }
+  }
 }
 
 // ── ROLEPLAY MODE ─────────────────────────────────────────────────────────────
