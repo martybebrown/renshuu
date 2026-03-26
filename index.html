@@ -780,6 +780,7 @@ document.addEventListener('click', e => {
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
+  if (e.target.id === 'apiKey') { e.preventDefault(); toggleSettings(); return; }
   const inp = e.target.closest('.answer-input[data-di]');
   if (!inp) return;
   e.preventDefault();
