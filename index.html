@@ -1248,11 +1248,15 @@ async function breakdownMessage(mi, msg, btn) {
   const plain = stripMarkers(msg.content);
   try {
     const reply = await claude([
-      { role: 'user', content: `Break down this Japanese message for an N4–N3 learner. For each sentence:
-1. Show the full sentence in Japanese
-2. Give a natural English translation
-3. List each word/phrase with reading (in hiragana) and meaning
-4. Explain the grammar patterns used (particles, verb forms, conjugations, sentence-ending patterns)
+      { role: 'user', content: `Break down this Japanese message for an N4–N3 learner.
+
+First, give a complete natural English translation of the full message.
+
+Then break it down sentence by sentence. For each sentence:
+1. Show the sentence in Japanese
+2. Translate it
+3. List key words/phrases with reading (hiragana) and meaning
+4. Explain grammar patterns (particles, verb forms, conjugations, sentence-ending patterns)
 
 Keep it concise but thorough. Use plain text, no markdown.
 
@@ -1688,16 +1692,20 @@ function renderMessages() {
     const body = msg.role === 'assistant'
       ? (msg.display || safeAnnotated(buildAnnotated(msg.content)))
       : (msg.display || escHtml(msg.content));
+    // Show correction under the user message (correction lives on the next assistant msg)
+    const nextMsg = S.convo[i + 1];
+    const correctionHere = msg.role === 'user' && nextMsg?.correction
+      ? `<div class="msg-correction">↳ ${escHtml(nextMsg.correction)}</div>` : '';
     return `
       <div class="msg ${msg.role}">
         <div class="msg-body">${body}</div>
+        ${correctionHere}
         ${isReal ? `
         <div class="msg-foot">
           <button class="speak-btn" data-mi="${i}" title="Speak aloud">🔊</button>
           <button class="breakdown-btn" data-mi="${i}" title="Break down this message">📖</button>
-          ${msg.correction ? `<div class="msg-correction">↳ ${escHtml(msg.correction)}</div>` : ''}
         </div>
-        ${msg.breakdown ? `<div class="msg-breakdown">${msg.breakdown}</div>` : ''}` : (msg.correction ? `<div class="msg-correction">↳ ${escHtml(msg.correction)}</div>` : '')}
+        ${msg.breakdown ? `<div class="msg-breakdown">${msg.breakdown}</div>` : ''}` : ''}
       </div>
     `;
   }).join('');
