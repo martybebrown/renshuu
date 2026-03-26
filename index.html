@@ -652,10 +652,12 @@ pre.code {
   </div>
 </header>
 <div class="settings-panel" id="settingsPanel" style="display:none">
-  <div class="label">Claude API Key</div>
-  <input class="field" id="apiKey" type="password" placeholder="sk-ant-…" oninput="localStorage.setItem('renshuu_api_key',this.value)" />
-  <div class="label" style="margin-top:12px">GitHub Token <span style="font-size:9px;color:var(--muted)">(gist scope — syncs cards across devices)</span></div>
-  <input class="field" id="ghToken" type="password" placeholder="ghp_…" oninput="localStorage.setItem('renshuu_gh_token',this.value)" />
+  <form onsubmit="toggleSettings(); return false;">
+    <div class="label">Claude API Key</div>
+    <input class="field" id="apiKey" type="password" placeholder="sk-ant-…" enterkeyhint="done" oninput="localStorage.setItem('renshuu_api_key',this.value)" />
+    <div class="label" style="margin-top:12px">GitHub Token <span style="font-size:9px;color:var(--muted)">(gist scope — syncs cards across devices)</span></div>
+    <input class="field" id="ghToken" type="password" placeholder="ghp_…" enterkeyhint="done" oninput="localStorage.setItem('renshuu_gh_token',this.value)" />
+  </form>
 </div>
 
 <div class="layout">
