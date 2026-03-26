@@ -735,6 +735,7 @@ pre.code {
 document.addEventListener('DOMContentLoaded', () => {
   const saved = localStorage.getItem('renshuu_api_key');
   if (saved) document.getElementById('apiKey').value = saved;
+  else toggleSettings(); // prompt on first visit
   loadCards();
 });
 
@@ -857,7 +858,15 @@ async function loadCards() {
       names.sort((a, b) => a.localeCompare(b));
       deckSel.innerHTML = '<option value="">All decks</option>' +
         names.map(n => `<option value="${escHtml(n)}"${n === savedDeck ? ' selected' : ''}>${escHtml(n)}</option>`).join('');
-    } catch (_) {}
+      localStorage.setItem('renshuu_decks', JSON.stringify(names));
+    } catch (_) {
+      const cd = localStorage.getItem('renshuu_decks');
+      if (cd) {
+        const names = JSON.parse(cd);
+        deckSel.innerHTML = '<option value="">All decks</option>' +
+          names.map(n => `<option value="${escHtml(n)}"${n === savedDeck ? ' selected' : ''}>${escHtml(n)}</option>`).join('');
+      }
+    }
 
     const df = document.getElementById('deckFilter').value.trim();
     const pfx = df ? `deck:"${df}" ` : '';
@@ -881,6 +890,8 @@ async function loadCards() {
     document.getElementById('cntNew').textContent = nc.length;
     document.getElementById('cntYoung').textContent = yc.length;
     document.getElementById('cntMature').textContent = mc.length;
+
+    localStorage.setItem('renshuu_cards', JSON.stringify({ cards: S.cards, timestamp: Date.now() }));
 
     document.getElementById('corsNotice').style.display = 'none';
 
