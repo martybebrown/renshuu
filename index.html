@@ -1282,12 +1282,14 @@ function drillHTML(d) {
         <button class="btn drill-submit" data-di="${d.i}" ${d.answered ? 'disabled' : ''}>→</button>
       </div>
       ${d.answered ? `
-        <div class="feedback ${d.partial ? 'partial' : d.correct ? 'ok' : 'no'}">
+        <div class="feedback ${d.partial ? 'partial' : d.correct ? 'ok' : 'no'}" id="fb-${d.i}">
           ${d.correct
             ? d.partial
               ? `△ &nbsp;Close! &nbsp;→&nbsp; ${d.target}（${d.reading}）`
               : `✓ Correct`
-            : `✗ &nbsp;${d.target}（${d.reading}）`}
+            : d.aiFeedback
+              ? `✗ &nbsp;${d.aiFeedback}`
+              : `<span class="spin"></span>`}
           <div class="tl">${d.translation}</div>
         </div>` : ''}
     </div>
@@ -1325,6 +1327,43 @@ function checkDrill(i) {
   d.partial  = almost;
   d.answered = true;
   paintDrills();   // repaint all cards so answered state is consistent
+  if (!d.correct) getWrongFeedback(i);
+}
+
+async function getWrongFeedback(i) {
+  const d = S.drills[i];
+  const sys = `You are a concise Japanese tutor giving feedback on fill-in-the-blank drill answers.
+Rules:
+- If the student's answer is just a spelling/romaji typo of the correct answer, respond with JSON: {"correct": true, "feedback": "Just a typo — close enough!"}
+- Otherwise explain in one short sentence what the mistake is (e.g. wrong word, wrong form, wrong reading).
+- Always respond with valid JSON: {"correct": boolean, "feedback": "..."}
+- Keep feedback under 15 words.`;
+  const msg = `Sentence: ${d.sentence}
+Target: ${d.target}（${d.reading}）= ${d.meaning}
+Student answered: "${d.input}"`;
+  try {
+    const raw = await claude([{ role: 'user', content: msg }], sys, 150);
+    const result = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    if (result.correct) {
+      d.correct = true;
+      d.partial = true;
+    }
+    d.aiFeedback = result.feedback;
+  } catch(e) {
+    d.aiFeedback = `${d.target}（${d.reading}）`;
+  }
+  // Update just this card's feedback div
+  const fb = document.getElementById(`fb-${i}`);
+  if (fb) {
+    fb.className = `feedback ${d.partial ? 'partial' : d.correct ? 'ok' : 'no'}`;
+    fb.innerHTML = (d.correct
+      ? `△ &nbsp;${d.aiFeedback}`
+      : `✗ &nbsp;${d.aiFeedback}`) + `<div class="tl">${d.translation}</div>`;
+    const card = document.getElementById(`dc-${i}`);
+    if (card) {
+      card.className = `drill-card ${d.partial ? 'partial-card' : d.correct ? 'correct-card' : 'wrong-card'}`;
+    }
+  }
 }
 
 // ── ROLEPLAY MODE ─────────────────────────────────────────────────────────────
