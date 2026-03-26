@@ -654,9 +654,11 @@ pre.code {
 <div class="settings-panel" id="settingsPanel" style="display:none">
   <form onsubmit="submitSettings(); return false;">
     <div class="label">Claude API Key</div>
-    <input class="field" id="apiKey" type="password" placeholder="sk-ant-…" enterkeyhint="done" oninput="localStorage.setItem('renshuu_api_key',this.value)" />
+    <input class="field" id="apiKey" type="password" placeholder="sk-ant-…" enterkeyhint="next" oninput="localStorage.setItem('renshuu_api_key',this.value)" />
     <div class="label" style="margin-top:12px">GitHub Token <span style="font-size:9px;color:var(--muted)">(gist scope — syncs cards across devices)</span></div>
     <input class="field" id="ghToken" type="password" placeholder="ghp_…" enterkeyhint="done" oninput="localStorage.setItem('renshuu_gh_token',this.value)" />
+    <button type="submit" class="btn w100" style="margin-top:10px">Save</button>
+    <div id="settingsFeedback" style="font-size:10px;color:var(--muted);margin-top:6px;min-height:14px;line-height:1.4"></div>
   </form>
 </div>
 
@@ -1080,10 +1082,25 @@ function toggleSettings() {
 }
 
 function submitSettings() {
-  toggleSettings();
-  // If a GitHub token was just entered and cards haven't loaded yet, retry
+  const fb = document.getElementById('settingsFeedback');
+  const hasApiKey = !!document.getElementById('apiKey').value.trim();
+  const hasGhToken = !!document.getElementById('ghToken').value.trim();
+
+  if (!hasApiKey) { fb.style.color = 'var(--red)'; fb.textContent = 'Claude API key is required.'; return; }
+
+  fb.style.color = 'var(--muted)';
+  fb.textContent = hasGhToken ? 'Saved. Connecting to Gist…' : 'Saved.';
+
   const noCards = !S.cards.new.length && !S.cards.young.length && !S.cards.mature.length;
-  if (localStorage.getItem('renshuu_gh_token') && noCards) loadCards();
+  if (hasGhToken && noCards) {
+    loadCards().then(() => {
+      const stillNoCards = !S.cards.new.length && !S.cards.young.length && !S.cards.mature.length;
+      fb.style.color = stillNoCards ? 'var(--red)' : 'var(--green)';
+      fb.textContent = stillNoCards ? 'Could not load cards. Check your GitHub token.' : 'Cards loaded from Gist.';
+    });
+  } else {
+    setTimeout(() => toggleSettings(), 600);
+  }
 }
 
 function toggleMenu() {
