@@ -6,6 +6,7 @@
 <title>練習 — Renshuu</title>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;700&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/wanakana@5/umd/wanakana.min.js"></script>
+<script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
 <style>
 :root {
   --bg: #f6f2eb;
@@ -696,6 +697,11 @@ pre.code {
     <input class="field" id="apiKey" type="password" placeholder="sk-ant-…" enterkeyhint="next" oninput="localStorage.setItem('renshuu_api_key',this.value)" />
     <div class="label" style="margin-top:12px">GitHub Token <span style="font-size:9px;color:var(--muted)">(gist scope — syncs cards across devices)</span></div>
     <input class="field" id="ghToken" type="password" placeholder="ghp_…" enterkeyhint="done" oninput="localStorage.setItem('renshuu_gh_token',this.value)" />
+    <div class="label" style="margin-top:12px">Azure Speech <span style="font-size:9px;color:var(--muted)">(optional — premium Japanese TTS)</span></div>
+    <div style="display:flex;gap:6px">
+      <input class="field" id="azureKey" type="password" placeholder="Key" style="flex:2" oninput="localStorage.setItem('renshuu_azure_key',this.value)" />
+      <input class="field" id="azureRegion" type="text" placeholder="Region (e.g. eastus)" style="flex:1" oninput="localStorage.setItem('renshuu_azure_region',this.value)" />
+    </div>
     <button type="submit" class="btn w100" style="margin-top:10px">Save</button>
     <div id="settingsFeedback" style="font-size:10px;color:var(--muted);margin-top:6px;min-height:14px;line-height:1.4"></div>
   </form>
@@ -783,6 +789,10 @@ document.addEventListener('DOMContentLoaded', () => {
   else toggleSettings(); // prompt on first visit
   const ghToken = localStorage.getItem('renshuu_gh_token');
   if (ghToken) document.getElementById('ghToken').value = ghToken;
+  const azKey = localStorage.getItem('renshuu_azure_key');
+  if (azKey) document.getElementById('azureKey').value = azKey;
+  const azRegion = localStorage.getItem('renshuu_azure_region');
+  if (azRegion) document.getElementById('azureRegion').value = azRegion;
   // Restore or randomise scenarios (must run after SCENARIO_POOL is defined)
   const savedSc = sessionStorage.getItem('renshuu_scenarios');
   if (savedSc) {
@@ -1202,8 +1212,12 @@ function stripMarkers(text) {
 }
 
 // Cancel any in-progress speech
+let _azureSynth = null;
+let _currentAudio = null;
 function cancelSpeech() {
   if (window.speechSynthesis) speechSynthesis.cancel();
+  if (_azureSynth) { _azureSynth.close(); _azureSynth = null; }
+  if (_currentAudio) { _currentAudio.pause(); _currentAudio = null; }
   document.querySelectorAll('.speak-btn.speaking').forEach(b => b.classList.remove('speaking'));
 }
 
@@ -1212,7 +1226,51 @@ function speakJapanese(rawText, btn) {
   const text = stripMarkers(rawText);
   if (!text.trim()) return;
 
-  // ── Web Speech — pick the best available Japanese voice ─────────────────
+  const azKey = localStorage.getItem('renshuu_azure_key');
+  const azRegion = localStorage.getItem('renshuu_azure_region');
+
+  // ── Azure Speech (premium) ──────────────────────────────────────────────
+  if (azKey && azRegion && window.SpeechSDK) {
+    btn?.classList.add('speaking');
+    try {
+      const cfg = SpeechSDK.SpeechConfig.fromSubscription(azKey, azRegion);
+      cfg.speechSynthesisVoiceName = 'ja-JP-NanamiNeural';
+      cfg.speechSynthesisLanguage = 'ja-JP';
+      const synth = new SpeechSDK.SpeechSynthesizer(cfg, null);
+      _azureSynth = synth;
+      synth.speakTextAsync(text,
+        result => {
+          if (result.reason === SpeechSDK.ResultReason.SynthesizingAudioCompleted && result.audioData) {
+            const blob = new Blob([result.audioData], { type: 'audio/wav' });
+            const audio = new Audio(URL.createObjectURL(blob));
+            _currentAudio = audio;
+            audio.onended = audio.onerror = () => { btn?.classList.remove('speaking'); _currentAudio = null; };
+            audio.play();
+          } else {
+            btn?.classList.remove('speaking');
+          }
+          synth.close();
+          _azureSynth = null;
+        },
+        err => {
+          console.warn('Azure TTS failed, falling back to Web Speech:', err);
+          synth.close();
+          _azureSynth = null;
+          speakWebSpeech(text, btn);
+        }
+      );
+    } catch (e) {
+      console.warn('Azure TTS error, falling back to Web Speech:', e);
+      speakWebSpeech(text, btn);
+    }
+    return;
+  }
+
+  // ── Web Speech (fallback) ───────────────────────────────────────────────
+  speakWebSpeech(text, btn);
+}
+
+function speakWebSpeech(text, btn) {
   if (!window.speechSynthesis) return;
   const trySpeak = () => {
     const voices = speechSynthesis.getVoices();
@@ -1229,7 +1287,6 @@ function speakJapanese(rawText, btn) {
     utt.onend = utt.onerror = () => btn?.classList.remove('speaking');
     speechSynthesis.speak(utt);
   };
-  // Voices may not be loaded yet on first call
   if (speechSynthesis.getVoices().length) trySpeak();
   else { speechSynthesis.onvoiceschanged = () => { speechSynthesis.onvoiceschanged = null; trySpeak(); }; }
 }
