@@ -735,6 +735,7 @@ pre.code {
 document.addEventListener('DOMContentLoaded', () => {
   const saved = localStorage.getItem('renshuu_api_key');
   if (saved) document.getElementById('apiKey').value = saved;
+  else toggleSettings(); // prompt on first visit
   loadCards();
 });
 
@@ -857,7 +858,15 @@ async function loadCards() {
       names.sort((a, b) => a.localeCompare(b));
       deckSel.innerHTML = '<option value="">All decks</option>' +
         names.map(n => `<option value="${escHtml(n)}"${n === savedDeck ? ' selected' : ''}>${escHtml(n)}</option>`).join('');
-    } catch (_) {}
+      localStorage.setItem('renshuu_decks', JSON.stringify(names));
+    } catch (_) {
+      const cd = localStorage.getItem('renshuu_decks');
+      if (cd) {
+        const names = JSON.parse(cd);
+        deckSel.innerHTML = '<option value="">All decks</option>' +
+          names.map(n => `<option value="${escHtml(n)}"${n === savedDeck ? ' selected' : ''}>${escHtml(n)}</option>`).join('');
+      }
+    }
 
     const df = document.getElementById('deckFilter').value.trim();
     const pfx = df ? `deck:"${df}" ` : '';
@@ -882,11 +891,30 @@ async function loadCards() {
     document.getElementById('cntYoung').textContent = yc.length;
     document.getElementById('cntMature').textContent = mc.length;
 
+    localStorage.setItem('renshuu_cards', JSON.stringify({ cards: S.cards, timestamp: Date.now() }));
+
     document.getElementById('corsNotice').style.display = 'none';
 
     setDot('on', 'anki connected');
     renderMode();
   } catch (e) {
+    const cached = localStorage.getItem('renshuu_cards');
+    if (cached) {
+      try {
+        const { cards, timestamp } = JSON.parse(cached);
+        S.cards = cards;
+        document.getElementById('cntNew').textContent = cards.new.length;
+        document.getElementById('cntYoung').textContent = cards.young.length;
+        document.getElementById('cntMature').textContent = cards.mature.length;
+        document.getElementById('corsNotice').style.display = 'none';
+        const mins = Math.round((Date.now() - timestamp) / 60000);
+        const age = mins < 60 ? `${mins}m ago` : mins < 1440 ? `${Math.round(mins / 60)}h ago` : `${Math.round(mins / 1440)}d ago`;
+        setDot('', `cached · synced ${age}`);
+        renderMode();
+        btn.disabled = false; btn.textContent = 'Reload from Anki';
+        return;
+      } catch (_) {}
+    }
     setDot('err', 'error');
     showBanner(e.message.includes('fetch')
       ? 'Cannot reach AnkiConnect. Is Anki running? Check CORS config.'
