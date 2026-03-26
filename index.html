@@ -652,7 +652,7 @@ pre.code {
   </div>
 </header>
 <div class="settings-panel" id="settingsPanel" style="display:none">
-  <form onsubmit="toggleSettings(); return false;">
+  <form onsubmit="submitSettings(); return false;">
     <div class="label">Claude API Key</div>
     <input class="field" id="apiKey" type="password" placeholder="sk-ant-…" enterkeyhint="done" oninput="localStorage.setItem('renshuu_api_key',this.value)" />
     <div class="label" style="margin-top:12px">GitHub Token <span style="font-size:9px;color:var(--muted)">(gist scope — syncs cards across devices)</span></div>
@@ -786,7 +786,7 @@ document.addEventListener('click', e => {
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
-  if (e.target.id === 'apiKey') { e.preventDefault(); toggleSettings(); return; }
+  if (e.target.id === 'apiKey' || e.target.id === 'ghToken') { e.preventDefault(); submitSettings(); return; }
   const inp = e.target.closest('.answer-input[data-di]');
   if (!inp) return;
   e.preventDefault();
@@ -1077,6 +1077,13 @@ function toggleSettings() {
   const p = document.getElementById('settingsPanel');
   if (!p) return;
   p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+function submitSettings() {
+  toggleSettings();
+  // If a GitHub token was just entered and cards haven't loaded yet, retry
+  const noCards = !S.cards.new.length && !S.cards.young.length && !S.cards.mature.length;
+  if (localStorage.getItem('renshuu_gh_token') && noCards) loadCards();
 }
 
 function toggleMenu() {
