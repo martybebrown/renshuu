@@ -414,15 +414,30 @@ pre.code {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 14px 12px;
+  padding: 14px 12px 12px;
   cursor: pointer;
   transition: all 0.15s;
+  position: relative;
 }
 .scenario-card:hover { border-color: var(--muted); }
 .scenario-card.sel { border-color: var(--red); background: rgba(201,79,60,0.07); }
+.scenario-card.fav-card { border-color: rgba(168,110,26,0.35); }
 .sc-icon { font-size: 18px; margin-bottom: 5px; }
 .sc-jp { font-family: 'Shippori Mincho', serif; font-size: 15px; margin-bottom: 2px; }
 .sc-en { color: var(--muted); font-size: 10px; }
+.sc-char { color: var(--muted); font-size: 9px; margin-top: 4px; line-height: 1.35; font-style: italic; }
+.sc-fav {
+  position: absolute; top: 6px; right: 7px;
+  background: none; border: none; cursor: pointer;
+  font-size: 13px; color: var(--border); padding: 0; line-height: 1;
+  transition: color 0.15s;
+}
+.sc-fav:hover { color: var(--gold); }
+.sc-fav.active { color: var(--gold); }
+.sc-section-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px;
+}
 
 .chat-wrap { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; }
 .chat-head { display: flex; justify-content: space-between; align-items: center; }
@@ -744,6 +759,13 @@ document.addEventListener('DOMContentLoaded', () => {
   else toggleSettings(); // prompt on first visit
   const ghToken = localStorage.getItem('renshuu_gh_token');
   if (ghToken) document.getElementById('ghToken').value = ghToken;
+  // Restore or randomise scenarios (must run after SCENARIO_POOL is defined)
+  const savedSc = sessionStorage.getItem('renshuu_scenarios');
+  if (savedSc) {
+    const ids = JSON.parse(savedSc);
+    S.scenarios = ids.map(id => SCENARIO_POOL.find(s => s.id === id)).filter(Boolean);
+  }
+  if (!S.scenarios.length) randomScenarios();
   loadCards();
 });
 
@@ -802,11 +824,14 @@ const S = {
   cards: { new: [], young: [], mature: [] },
   drills: [],
   scenario: null,
+  scenarios: [],
+  favorites: JSON.parse(localStorage.getItem('renshuu_favorites') || '[]'),
   convo: [],
   sysPrompt: '',
   sessionWords: [],
   story: null,
 };
+
 
 // ── AnkiConnect ───────────────────────────────────────────────────────────────
 async function anki(action, params = {}) {
@@ -1464,40 +1489,111 @@ Student answered: "${d.input}"`;
 }
 
 // ── ROLEPLAY MODE ─────────────────────────────────────────────────────────────
-const SCENARIOS = [
-  { jp: 'カフェ',   en: 'At a café',         icon: '☕', ctx: 'You are ordering coffee and chatting with the barista.' },
-  { jp: '道案内',   en: 'Giving directions',  icon: '🗺️', ctx: 'A tourist asks you how to get to a nearby landmark.' },
-  { jp: '道場',     en: 'BJJ dojo',           icon: '🥋', ctx: 'Small talk with a training partner before or after class.' },
-  { jp: 'コンビニ', en: 'At the konbini',     icon: '🏪', ctx: 'Chatting with the cashier while buying things.' },
-  { jp: '近所',     en: 'Neighbour chat',     icon: '🏡', ctx: 'A casual morning chat with your neighbour.' },
-  { jp: '職場',     en: 'Before a meeting',   icon: '💼', ctx: 'Friendly small talk before a work meeting starts.' },
+const SCENARIO_POOL = [
+  { id: 'sento',      jp: '銭湯',         en: 'Neighborhood bathhouse',    icon: '♨️',  char: 'Tanaka-san, a retired postman in his 70s',              ctx: 'You\'re soaking in the local bathhouse. Tanaka-san, who\'s lived nearby for 40 years, settles in beside you and starts narrating the neighborhood\'s gossip — whether you asked or not.' },
+  { id: 'ramen_ichi', jp: '深夜ラーメン', en: 'Late-night ramen stall',    icon: '🍜',  char: 'Goto-san, a taciturn chef who decides to talk tonight',  ctx: 'It\'s 1am and you\'re the only customer at a tiny counter. Chef Goto-san is famous for refusing to say more than three sentences to anyone — but tonight he seems to want to talk.' },
+  { id: 'taxi',       jp: 'タクシー',     en: 'Opinionated taxi ride',     icon: '🚕',  char: 'Mori-san, a driver with strong opinions on everything',  ctx: 'You\'ve hailed a taxi for a 20-minute ride. Mori-san immediately shares his views on Japanese society, the weather, and — unprompted — your hairstyle.' },
+  { id: 'koban',      jp: '交番',         en: 'Lost at the police box',    icon: '🚔',  char: 'Yamamoto-kun, a very earnest young officer',            ctx: 'You\'ve come to report a lost umbrella — your third this month. Officer Yamamoto-kun is deeply serious about filling out the paperwork correctly.' },
+  { id: 'hanami',     jp: '花見',         en: 'Cherry blossom party',      icon: '🌸',  char: 'Sato-san, who brought way too much food',               ctx: 'You\'ve been invited to a hanami. Sato-san has set up an enormous spread and is anxiously making sure everyone eats enough. There is no escape from the rice balls.' },
+  { id: 'kissa',      jp: '喫茶店',       en: 'Old-school coffee shop',    icon: '☕',  char: 'The Master, who opened this kissaten in 1972',          ctx: 'You\'ve wandered into a tiny kissaten unchanged since the 70s. The Master makes your coffee with extreme deliberate slowness, then asks — in detail — where you\'re from.' },
+  { id: 'furuhon',    jp: '古本屋',       en: 'Dusty old bookshop',        icon: '📚',  char: 'Ikeda-san, who knows where every single book is',      ctx: 'Floor-to-ceiling shelves. No apparent system. Yet Ikeda-san can find any book in under 10 seconds and is very curious what you\'re looking for today.' },
+  { id: 'izakaya',    jp: '居酒屋',       en: 'After-work confession',     icon: '🍺',  char: 'Nakamura-san, a coworker hiding a secret',             ctx: 'Two beers in at an izakaya, Nakamura-san leans across the table and says there\'s something they\'ve been wanting to tell you for months.' },
+  { id: 'onsen',      jp: '露天風呂',     en: 'Outdoor hot spring',        icon: '🛁',  char: 'An innkeeper who thinks you need life advice',         ctx: 'You\'re soaking in an outdoor hot spring at a mountain inn. The elderly innkeeper joins you and, unprompted, begins sharing wisdom about life, marriage, and the importance of breakfast.' },
+  { id: 'shogi',      jp: '公園将棋',     en: 'Park shogi match',          icon: '♟️',  char: 'Oyaji-san, a retired salaryman who plays every day',   ctx: 'You\'ve sat at a public shogi board in the park. The old man immediately challenges you. He\'s played here every day for 15 years and has a story for every single move.' },
+  { id: 'tachigui',   jp: '立ち食いそば', en: 'Standing soba bar',         icon: '🍱',  char: 'A salaryman who finishes his meal in 90 seconds',      ctx: 'Lunchtime standing soba. The man next to you demolishes his bowl in 90 seconds then — inexplicably — stays to discuss the regional differences in soba culture.' },
+  { id: 'ufo',        jp: 'UFOキャッチャー', en: 'Crane game at the arcade', icon: '🕹️', char: 'A teenager who considers themselves an expert',        ctx: 'You\'re at a crane machine in a game center when a teenager materializes beside you. They have very specific opinions about your technique and insist on demonstrating the correct approach.' },
+  { id: 'konbini3',   jp: 'コンビニ深夜', en: 'Konbini at 3am',            icon: '🏪',  char: 'A fellow night owl with a mysterious purchase',        ctx: 'It\'s 3am. You and another customer keep reaching for the same thing on the shelf. They explain what they\'re buying and it raises far more questions than it answers.' },
+  { id: 'temple',     jp: '寺の掃除',     en: 'Temple cleanup duty',       icon: '⛩️',  char: 'A young monk who is bad at being serene',              ctx: 'You\'ve volunteered to sweep a temple. The young monk assigned to work with you keeps interrupting the silence to ask for advice about completely non-spiritual problems.' },
+  { id: 'recycle',    jp: 'リサイクル',   en: 'Recycle shop appraisal',    icon: '♻️',  char: 'Fujii-san, a brutally honest appraiser',               ctx: 'You\'ve brought items to sell. Fujii-san gives a long, detailed, and very candid assessment of everything you\'ve brought — including what it says about your taste.' },
+  { id: 'ekiben',     jp: '駅弁選び',     en: 'Choosing a station bento',  icon: '🚂',  char: 'A vendor with fierce regional pride',                  ctx: 'You\'re at a shinkansen station staring at bento options. The vendor — originally from a different prefecture — passionately explains why their regional box is superior to everything else.' },
+  { id: 'vet',        jp: '動物病院',     en: 'Waiting at the vet',        icon: '🐱',  char: 'An owner treating a minor issue as a full crisis',     ctx: 'You\'re in the waiting room. The person next to you has brought their cat for what turns out to be an extremely minor thing, but they are treating it as a medical emergency.' },
+  { id: 'karaoke',    jp: 'カラオケ',     en: 'Karaoke box showdown',      icon: '🎤',  char: 'A friend who takes karaoke far too seriously',         ctx: 'Your friend is warm and relaxed in everyday life — but inside a karaoke box they become intensely strategic about song selection. The queue is filling up and tensions are rising.' },
+  { id: 'tofu',       jp: '豆腐屋',       en: 'Early morning tofu shop',   icon: '🌅',  char: 'A tofu maker who\'s been at it since 4am',            ctx: 'You\'ve come to buy fresh tofu at 6am. The maker, up since 4am, is in a philosophical mood and wants to discuss the parallels between making good tofu and living a good life.' },
+  { id: 'rakugo',     jp: '落語の後',     en: 'After the rakugo show',     icon: '🎭',  char: 'A young apprentice who just did their debut',          ctx: 'You\'re backstage after a rakugo performance. The apprentice is still in full costume, visibly anxious — it was their debut tonight and they desperately want honest feedback.' },
+  { id: 'tsuri',      jp: '釣り',         en: 'Fishing off the pier',      icon: '🎣',  char: 'An old fisherman who measures time differently',       ctx: 'You\'ve rented a rod at the pier. The old man next to you has fished this exact spot every morning for 30 years. He has a deeply unusual relationship with the concept of urgency.' },
+  { id: 'curry',      jp: 'カレーの行列', en: 'Queuing for famous curry',  icon: '🍛',  char: 'A curry devotee who\'s been here 47 times',            ctx: 'You\'re in a long queue outside a legendary curry shop. The person in front has eaten here 47 times and will explain — in full — what makes the 90-minute wait worthwhile.' },
+  { id: 'taiko',      jp: '太鼓',         en: 'Taiko drum trial lesson',   icon: '🥁',  char: 'A sensei who believes in one strike, one soul',        ctx: 'You\'ve signed up for a trial taiko lesson. The sensei is warm but utterly exacting — your first 45 minutes involve only one drumstroke, repeated, until it is correct.' },
+  { id: 'machiya',    jp: '町屋カフェ',   en: 'Converted machiya café',    icon: '🏮',  char: 'The owner who turned their ancestral home into a café', ctx: 'You\'re in a beautiful old townhouse turned café. The owner explains the provenance of every object in the room. Some of it is 200 years old. More tea is poured than requested.' },
+  { id: 'parrot',     jp: 'ペットカフェ', en: 'Pet café with a parrot',    icon: '🦜',  char: 'Jiro the parrot, who has opinions',                    ctx: 'A large grey parrot named Jiro has memorized phrases from past customers. He keeps interrupting your conversation with the staff in ways that are confusing but contextually relevant.' },
+  { id: 'gokon',      jp: '合コン',       en: 'Group date (gokon)',        icon: '🥂',  char: 'Someone who was also dragged here against their will', ctx: 'You\'ve been brought to a gokon by a friend. The person next to you leans over and whispers that they were also dragged here against their will. You have found each other.' },
+  { id: 'dojo',       jp: '道場',         en: 'After training at the dojo', icon: '🥋', char: 'A training partner who gets very philosophical post-session', ctx: 'Training is over and you\'re stretching. Your training partner seems relaxed and happy — and wants to talk about what martial arts is actually for.' },
+  { id: 'omiyage',    jp: 'お土産選び',   en: 'Choosing souvenirs',        icon: '🎁',  char: 'A shop assistant who knows everyone\'s preferences',   ctx: 'You\'re at a souvenir shop trying to find the right gifts. The assistant remembers what previous customers liked and starts confidently directing you toward things you didn\'t know you needed.' },
+  { id: 'yakkyoku',   jp: '薬局',         en: 'At the pharmacy',           icon: '💊',  char: 'A pharmacist who needs to know everything first',      ctx: 'You\'ve come in for basic cold medicine. The pharmacist wants your full medical history, sleeping patterns, and diet before recommending anything. She is thorough. Very thorough.' },
+  { id: 'sentou_furo',jp: 'ジム更衣室',  en: 'Gym changing room chat',    icon: '🏋️',  char: 'A gym regular who gives unsolicited training advice',  ctx: 'You\'re getting changed after a workout. A regular who\'s been coming here for years sizes you up immediately and starts offering very specific advice about your fitness routine.' },
 ];
+
+function randomScenarios() {
+  const pool = SCENARIO_POOL.filter(s => !S.favorites.includes(s.id));
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const picked = pool.slice(0, 6);
+  S.scenarios = picked;
+  sessionStorage.setItem('renshuu_scenarios', JSON.stringify(picked.map(s => s.id)));
+}
+
+function refreshScenarios() {
+  randomScenarios();
+  if (S.scenario && !S.scenarios.find(s => s.id === S.scenario.id) && !S.favorites.includes(S.scenario.id)) {
+    S.scenario = null;
+    S.convo = [];
+  }
+  renderRoleplay();
+}
+
+function toggleFavorite(id) {
+  const idx = S.favorites.indexOf(id);
+  if (idx === -1) S.favorites.push(id);
+  else S.favorites.splice(idx, 1);
+  localStorage.setItem('renshuu_favorites', JSON.stringify(S.favorites));
+  renderRoleplay();
+  if (S.scenario) scrollChat();
+}
+
+function scCard(sc) {
+  const isFav = S.favorites.includes(sc.id);
+  const isSel = S.scenario?.id === sc.id;
+  return `
+    <div class="scenario-card ${isSel ? 'sel' : ''} ${isFav && !isSel ? 'fav-card' : ''}" onclick="pickScenario('${sc.id}')">
+      <button class="sc-fav ${isFav ? 'active' : ''}" onclick="toggleFavorite('${sc.id}');event.stopPropagation()" title="${isFav ? 'Remove from favorites' : 'Save to favorites'}">★</button>
+      <div class="sc-icon">${sc.icon}</div>
+      <div class="sc-jp">${sc.jp}</div>
+      <div class="sc-en">${sc.en}</div>
+      <div class="sc-char">${sc.char}</div>
+    </div>`;
+}
 
 function renderRoleplay() {
   const m = document.getElementById('mainContent');
-  const si = S.scenario;
+  const favScenarios = S.favorites.map(id => SCENARIO_POOL.find(s => s.id === id)).filter(Boolean);
 
   m.innerHTML = `
     <div>
-      <div class="label">Choose a Scenario</div>
-      <div style="color:var(--muted);font-size:11px;margin-top:2px;margin-bottom:12px">
-        Claude plays the scene using your vocab — especially new words. It corrects gently.
+      ${favScenarios.length ? `
+        <div class="sc-section-head">
+          <div class="label">★ Favorites</div>
+        </div>
+        <div class="scenario-grid" style="margin-bottom:18px">
+          ${favScenarios.map(scCard).join('')}
+        </div>
+      ` : ''}
+      <div class="sc-section-head">
+        <div class="label">Scenarios</div>
+        <button class="btn" style="font-size:10px;padding:4px 10px" onclick="refreshScenarios()">↻ Refresh</button>
+      </div>
+      <div style="color:var(--muted);font-size:11px;margin-bottom:10px">
+        Claude plays the scene using your vocab. Star a scenario to save it to favorites.
       </div>
       <div class="scenario-grid">
-        ${SCENARIOS.map((sc, i) => `
-          <div class="scenario-card ${si === i ? 'sel' : ''}" onclick="pickScenario(${i})">
-            <div class="sc-icon">${sc.icon}</div>
-            <div class="sc-jp">${sc.jp}</div>
-            <div class="sc-en">${sc.en}</div>
-          </div>
-        `).join('')}
+        ${S.scenarios.map(scCard).join('')}
       </div>
     </div>
 
-    ${si !== null ? `
+    ${S.scenario ? `
       <div class="chat-wrap">
         <div class="chat-head">
-          <div class="label">${SCENARIOS[si].jp} — ${SCENARIOS[si].en}</div>
+          <div class="label">${S.scenario.jp} — ${S.scenario.en}</div>
           <button class="btn" onclick="resetChat()">Reset chat</button>
         </div>
         <div class="chat-window" id="chatWin">${renderMessages()}</div>
@@ -1540,8 +1636,8 @@ function escHtml(s) {
   return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-function pickScenario(i) {
-  S.scenario = i;
+function pickScenario(id) {
+  S.scenario = SCENARIO_POOL.find(s => s.id === id) || null;
   S.convo = [];
   renderRoleplay();
   startChat();
@@ -1558,14 +1654,14 @@ async function startChat() {
   if (!chatWin) return;
   chatWin.innerHTML = '<div class="loading-row"><span class="spin"></span> setting the scene…</div>';
 
-  const sc = SCENARIOS[S.scenario];
+  const sc = S.scenario;
   const words = pickWords(12);
   S.sessionWords = words;
 
   const newList  = words.filter(w => w.tier === 'n').map(w => `${w.jp}（${w.en}）`).join('、');
   const allList  = words.map(w => `${w.jp} = ${w.en}`).join(', ');
 
-  S.sysPrompt = `You are a Japanese conversation partner in this scenario: ${sc.en}. ${sc.ctx}
+  S.sysPrompt = `You are playing the role of ${sc.char}. Scenario: ${sc.en}. ${sc.ctx}
 
 VOCABULARY TO USE NATURALLY: ${allList}
 PRIORITY — embed these NEW words whenever natural: ${newList || '(none this session)'}
