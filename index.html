@@ -1265,8 +1265,10 @@ function speakJapanese(rawText, btn) {
       const voiceName = S.scenario?.voice || 'ja-JP-NanamiNeural';
       cfg.speechSynthesisVoiceName = voiceName;
       // Build SSML with speed control
-      const speed = localStorage.getItem('renshuu_speech_speed') || '100';
-      const rate = speed + '%';
+      // Azure prosody rate: 0% = normal, -50% = half speed, +50% = 1.5x
+      // Our slider: 50=half, 100=normal, 150=1.5x → subtract 100
+      const speed = parseInt(localStorage.getItem('renshuu_speech_speed') || '100', 10);
+      const rate = (speed - 100 >= 0 ? '+' : '') + (speed - 100) + '%';
       const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ja-JP">
         <voice name="${voiceName}">
           <prosody rate="${rate}">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</prosody>
