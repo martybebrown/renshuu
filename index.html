@@ -702,6 +702,12 @@ pre.code {
       <input class="field" id="azureKey" type="password" placeholder="Key" style="flex:2" oninput="localStorage.setItem('renshuu_azure_key',this.value)" />
       <input class="field" id="azureRegion" type="text" placeholder="Region (e.g. eastus)" style="flex:1" oninput="localStorage.setItem('renshuu_azure_region',this.value)" />
     </div>
+    <div class="label" style="margin-top:12px">Speech Speed <span id="speedVal" style="font-size:9px;color:var(--muted)">100%</span></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:9px;color:var(--muted)">50%</span>
+      <input type="range" id="speechSpeed" min="50" max="150" value="100" step="5" style="flex:1;accent-color:var(--accent)" oninput="localStorage.setItem('renshuu_speech_speed',this.value);document.getElementById('speedVal').textContent=this.value+'%'" />
+      <span style="font-size:9px;color:var(--muted)">150%</span>
+    </div>
     <button type="submit" class="btn w100" style="margin-top:10px">Save</button>
     <div id="settingsFeedback" style="font-size:10px;color:var(--muted);margin-top:6px;min-height:14px;line-height:1.4"></div>
   </form>
@@ -792,6 +798,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (azKey) document.getElementById('azureKey').value = azKey;
   const azRegion = localStorage.getItem('renshuu_azure_region');
   if (azRegion) document.getElementById('azureRegion').value = azRegion;
+  const speechSpeed = localStorage.getItem('renshuu_speech_speed') || '100';
+  document.getElementById('speechSpeed').value = speechSpeed;
+  document.getElementById('speedVal').textContent = speechSpeed + '%';
   // Restore or randomise scenarios (must run after SCENARIO_POOL is defined)
   const savedSc = sessionStorage.getItem('renshuu_scenarios');
   if (savedSc) {
@@ -1243,11 +1252,21 @@ function speakJapanese(rawText, btn) {
     btn?.classList.add('speaking');
     try {
       const cfg = SpeechSDK.SpeechConfig.fromSubscription(azKey, azRegion);
-      cfg.speechSynthesisVoiceName = 'ja-JP-NanamiNeural';
       cfg.speechSynthesisLanguage = 'ja-JP';
+      // Pick voice: use scenario character voice if in roleplay, else default
+      const voiceName = S.scenario?.voice || 'ja-JP-NanamiNeural';
+      cfg.speechSynthesisVoiceName = voiceName;
+      // Build SSML with speed control
+      const speed = localStorage.getItem('renshuu_speech_speed') || '100';
+      const rate = speed + '%';
+      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ja-JP">
+        <voice name="${voiceName}">
+          <prosody rate="${rate}">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</prosody>
+        </voice>
+      </speak>`;
       const synth = new SpeechSDK.SpeechSynthesizer(cfg, null);
       _azureSynth = synth;
-      synth.speakTextAsync(text,
+      synth.speakSsmlAsync(ssml,
         result => {
           if (result.reason === SpeechSDK.ResultReason.SynthesizingAudioCompleted && result.audioData) {
             const blob = new Blob([result.audioData], { type: 'audio/wav' });
@@ -1290,7 +1309,8 @@ function speakWebSpeech(text, btn) {
       voices.find(v => v.lang.startsWith('ja'));
     const utt = new SpeechSynthesisUtterance(text);
     utt.lang = 'ja-JP';
-    utt.rate = 0.85;
+    const speed = parseInt(localStorage.getItem('renshuu_speech_speed') || '100', 10);
+    utt.rate = (speed / 100) * 0.85; // scale from the base 0.85 rate
     if (jpVoice) utt.voice = jpVoice;
     btn?.classList.add('speaking');
     utt.onend = utt.onerror = () => btn?.classList.remove('speaking');
@@ -1655,37 +1675,39 @@ Student answered: "${d.input}"`;
 }
 
 // ── ROLEPLAY MODE ─────────────────────────────────────────────────────────────
+// Azure Japanese voices: NanamiNeural (young F), KeitaNeural (young M), DaichiNeural (mature M),
+// AoiNeural (child F), MayuNeural (adult F), NaokiNeural (adult M), ShioriNeural (soft F)
 const SCENARIO_POOL = [
-  { id: 'sento',      jp: '銭湯',         en: 'Neighborhood bathhouse',    icon: '♨️',  char: 'Tanaka-san, a retired postman in his 70s',              ctx: 'You\'re soaking in the local bathhouse. Tanaka-san, who\'s lived nearby for 40 years, settles in beside you and starts narrating the neighborhood\'s gossip — whether you asked or not.' },
-  { id: 'ramen_ichi', jp: '深夜ラーメン', en: 'Late-night ramen stall',    icon: '🍜',  char: 'Goto-san, a taciturn chef who decides to talk tonight',  ctx: 'It\'s 1am and you\'re the only customer at a tiny counter. Chef Goto-san is famous for refusing to say more than three sentences to anyone — but tonight he seems to want to talk.' },
-  { id: 'taxi',       jp: 'タクシー',     en: 'Opinionated taxi ride',     icon: '🚕',  char: 'Mori-san, a driver with strong opinions on everything',  ctx: 'You\'ve hailed a taxi for a 20-minute ride. Mori-san immediately shares his views on Japanese society, the weather, and — unprompted — your hairstyle.' },
-  { id: 'koban',      jp: '交番',         en: 'Lost at the police box',    icon: '🚔',  char: 'Yamamoto-kun, a very earnest young officer',            ctx: 'You\'ve come to report a lost umbrella — your third this month. Officer Yamamoto-kun is deeply serious about filling out the paperwork correctly.' },
-  { id: 'hanami',     jp: '花見',         en: 'Cherry blossom party',      icon: '🌸',  char: 'Sato-san, who brought way too much food',               ctx: 'You\'ve been invited to a hanami. Sato-san has set up an enormous spread and is anxiously making sure everyone eats enough. There is no escape from the rice balls.' },
-  { id: 'kissa',      jp: '喫茶店',       en: 'Old-school coffee shop',    icon: '☕',  char: 'The Master, who opened this kissaten in 1972',          ctx: 'You\'ve wandered into a tiny kissaten unchanged since the 70s. The Master makes your coffee with extreme deliberate slowness, then asks — in detail — where you\'re from.' },
-  { id: 'furuhon',    jp: '古本屋',       en: 'Dusty old bookshop',        icon: '📚',  char: 'Ikeda-san, who knows where every single book is',      ctx: 'Floor-to-ceiling shelves. No apparent system. Yet Ikeda-san can find any book in under 10 seconds and is very curious what you\'re looking for today.' },
-  { id: 'izakaya',    jp: '居酒屋',       en: 'After-work confession',     icon: '🍺',  char: 'Nakamura-san, a coworker hiding a secret',             ctx: 'Two beers in at an izakaya, Nakamura-san leans across the table and says there\'s something they\'ve been wanting to tell you for months.' },
-  { id: 'onsen',      jp: '露天風呂',     en: 'Outdoor hot spring',        icon: '🛁',  char: 'An innkeeper who thinks you need life advice',         ctx: 'You\'re soaking in an outdoor hot spring at a mountain inn. The elderly innkeeper joins you and, unprompted, begins sharing wisdom about life, marriage, and the importance of breakfast.' },
-  { id: 'shogi',      jp: '公園将棋',     en: 'Park shogi match',          icon: '♟️',  char: 'Oyaji-san, a retired salaryman who plays every day',   ctx: 'You\'ve sat at a public shogi board in the park. The old man immediately challenges you. He\'s played here every day for 15 years and has a story for every single move.' },
-  { id: 'tachigui',   jp: '立ち食いそば', en: 'Standing soba bar',         icon: '🍱',  char: 'A salaryman who finishes his meal in 90 seconds',      ctx: 'Lunchtime standing soba. The man next to you demolishes his bowl in 90 seconds then — inexplicably — stays to discuss the regional differences in soba culture.' },
-  { id: 'ufo',        jp: 'UFOキャッチャー', en: 'Crane game at the arcade', icon: '🕹️', char: 'A teenager who considers themselves an expert',        ctx: 'You\'re at a crane machine in a game center when a teenager materializes beside you. They have very specific opinions about your technique and insist on demonstrating the correct approach.' },
-  { id: 'konbini3',   jp: 'コンビニ深夜', en: 'Konbini at 3am',            icon: '🏪',  char: 'A fellow night owl with a mysterious purchase',        ctx: 'It\'s 3am. You and another customer keep reaching for the same thing on the shelf. They explain what they\'re buying and it raises far more questions than it answers.' },
-  { id: 'temple',     jp: '寺の掃除',     en: 'Temple cleanup duty',       icon: '⛩️',  char: 'A young monk who is bad at being serene',              ctx: 'You\'ve volunteered to sweep a temple. The young monk assigned to work with you keeps interrupting the silence to ask for advice about completely non-spiritual problems.' },
-  { id: 'recycle',    jp: 'リサイクル',   en: 'Recycle shop appraisal',    icon: '♻️',  char: 'Fujii-san, a brutally honest appraiser',               ctx: 'You\'ve brought items to sell. Fujii-san gives a long, detailed, and very candid assessment of everything you\'ve brought — including what it says about your taste.' },
-  { id: 'ekiben',     jp: '駅弁選び',     en: 'Choosing a station bento',  icon: '🚂',  char: 'A vendor with fierce regional pride',                  ctx: 'You\'re at a shinkansen station staring at bento options. The vendor — originally from a different prefecture — passionately explains why their regional box is superior to everything else.' },
-  { id: 'vet',        jp: '動物病院',     en: 'Waiting at the vet',        icon: '🐱',  char: 'An owner treating a minor issue as a full crisis',     ctx: 'You\'re in the waiting room. The person next to you has brought their cat for what turns out to be an extremely minor thing, but they are treating it as a medical emergency.' },
-  { id: 'karaoke',    jp: 'カラオケ',     en: 'Karaoke box showdown',      icon: '🎤',  char: 'A friend who takes karaoke far too seriously',         ctx: 'Your friend is warm and relaxed in everyday life — but inside a karaoke box they become intensely strategic about song selection. The queue is filling up and tensions are rising.' },
-  { id: 'tofu',       jp: '豆腐屋',       en: 'Early morning tofu shop',   icon: '🌅',  char: 'A tofu maker who\'s been at it since 4am',            ctx: 'You\'ve come to buy fresh tofu at 6am. The maker, up since 4am, is in a philosophical mood and wants to discuss the parallels between making good tofu and living a good life.' },
-  { id: 'rakugo',     jp: '落語の後',     en: 'After the rakugo show',     icon: '🎭',  char: 'A young apprentice who just did their debut',          ctx: 'You\'re backstage after a rakugo performance. The apprentice is still in full costume, visibly anxious — it was their debut tonight and they desperately want honest feedback.' },
-  { id: 'tsuri',      jp: '釣り',         en: 'Fishing off the pier',      icon: '🎣',  char: 'An old fisherman who measures time differently',       ctx: 'You\'ve rented a rod at the pier. The old man next to you has fished this exact spot every morning for 30 years. He has a deeply unusual relationship with the concept of urgency.' },
-  { id: 'curry',      jp: 'カレーの行列', en: 'Queuing for famous curry',  icon: '🍛',  char: 'A curry devotee who\'s been here 47 times',            ctx: 'You\'re in a long queue outside a legendary curry shop. The person in front has eaten here 47 times and will explain — in full — what makes the 90-minute wait worthwhile.' },
-  { id: 'taiko',      jp: '太鼓',         en: 'Taiko drum trial lesson',   icon: '🥁',  char: 'A sensei who believes in one strike, one soul',        ctx: 'You\'ve signed up for a trial taiko lesson. The sensei is warm but utterly exacting — your first 45 minutes involve only one drumstroke, repeated, until it is correct.' },
-  { id: 'machiya',    jp: '町屋カフェ',   en: 'Converted machiya café',    icon: '🏮',  char: 'The owner who turned their ancestral home into a café', ctx: 'You\'re in a beautiful old townhouse turned café. The owner explains the provenance of every object in the room. Some of it is 200 years old. More tea is poured than requested.' },
-  { id: 'parrot',     jp: 'ペットカフェ', en: 'Pet café with a parrot',    icon: '🦜',  char: 'Jiro the parrot, who has opinions',                    ctx: 'A large grey parrot named Jiro has memorized phrases from past customers. He keeps interrupting your conversation with the staff in ways that are confusing but contextually relevant.' },
-  { id: 'gokon',      jp: '合コン',       en: 'Group date (gokon)',        icon: '🥂',  char: 'Someone who was also dragged here against their will', ctx: 'You\'ve been brought to a gokon by a friend. The person next to you leans over and whispers that they were also dragged here against their will. You have found each other.' },
-  { id: 'dojo',       jp: '道場',         en: 'After training at the dojo', icon: '🥋', char: 'A training partner who gets very philosophical post-session', ctx: 'Training is over and you\'re stretching. Your training partner seems relaxed and happy — and wants to talk about what martial arts is actually for.' },
-  { id: 'omiyage',    jp: 'お土産選び',   en: 'Choosing souvenirs',        icon: '🎁',  char: 'A shop assistant who knows everyone\'s preferences',   ctx: 'You\'re at a souvenir shop trying to find the right gifts. The assistant remembers what previous customers liked and starts confidently directing you toward things you didn\'t know you needed.' },
-  { id: 'yakkyoku',   jp: '薬局',         en: 'At the pharmacy',           icon: '💊',  char: 'A pharmacist who needs to know everything first',      ctx: 'You\'ve come in for basic cold medicine. The pharmacist wants your full medical history, sleeping patterns, and diet before recommending anything. She is thorough. Very thorough.' },
-  { id: 'sentou_furo',jp: 'ジム更衣室',  en: 'Gym changing room chat',    icon: '🏋️',  char: 'A gym regular who gives unsolicited training advice',  ctx: 'You\'re getting changed after a workout. A regular who\'s been coming here for years sizes you up immediately and starts offering very specific advice about your fitness routine.' },
+  { id: 'sento',      jp: '銭湯',         en: 'Neighborhood bathhouse',    icon: '♨️',  char: 'Tanaka-san, a retired postman in his 70s',              voice: 'ja-JP-DaichiNeural', ctx: 'You\'re soaking in the local bathhouse. Tanaka-san, who\'s lived nearby for 40 years, settles in beside you and starts narrating the neighborhood\'s gossip — whether you asked or not.' },
+  { id: 'ramen_ichi', jp: '深夜ラーメン', en: 'Late-night ramen stall',    icon: '🍜',  char: 'Goto-san, a taciturn chef who decides to talk tonight',  voice: 'ja-JP-NaokiNeural',  ctx: 'It\'s 1am and you\'re the only customer at a tiny counter. Chef Goto-san is famous for refusing to say more than three sentences to anyone — but tonight he seems to want to talk.' },
+  { id: 'taxi',       jp: 'タクシー',     en: 'Opinionated taxi ride',     icon: '🚕',  char: 'Mori-san, a driver with strong opinions on everything',  voice: 'ja-JP-DaichiNeural', ctx: 'You\'ve hailed a taxi for a 20-minute ride. Mori-san immediately shares his views on Japanese society, the weather, and — unprompted — your hairstyle.' },
+  { id: 'koban',      jp: '交番',         en: 'Lost at the police box',    icon: '🚔',  char: 'Yamamoto-kun, a very earnest young officer',            voice: 'ja-JP-KeitaNeural',  ctx: 'You\'ve come to report a lost umbrella — your third this month. Officer Yamamoto-kun is deeply serious about filling out the paperwork correctly.' },
+  { id: 'hanami',     jp: '花見',         en: 'Cherry blossom party',      icon: '🌸',  char: 'Sato-san, who brought way too much food',               voice: 'ja-JP-MayuNeural',   ctx: 'You\'ve been invited to a hanami. Sato-san has set up an enormous spread and is anxiously making sure everyone eats enough. There is no escape from the rice balls.' },
+  { id: 'kissa',      jp: '喫茶店',       en: 'Old-school coffee shop',    icon: '☕',  char: 'The Master, who opened this kissaten in 1972',          voice: 'ja-JP-DaichiNeural', ctx: 'You\'ve wandered into a tiny kissaten unchanged since the 70s. The Master makes your coffee with extreme deliberate slowness, then asks — in detail — where you\'re from.' },
+  { id: 'furuhon',    jp: '古本屋',       en: 'Dusty old bookshop',        icon: '📚',  char: 'Ikeda-san, who knows where every single book is',      voice: 'ja-JP-NaokiNeural',  ctx: 'Floor-to-ceiling shelves. No apparent system. Yet Ikeda-san can find any book in under 10 seconds and is very curious what you\'re looking for today.' },
+  { id: 'izakaya',    jp: '居酒屋',       en: 'After-work confession',     icon: '🍺',  char: 'Nakamura-san, a coworker hiding a secret',             voice: 'ja-JP-KeitaNeural',  ctx: 'Two beers in at an izakaya, Nakamura-san leans across the table and says there\'s something they\'ve been wanting to tell you for months.' },
+  { id: 'onsen',      jp: '露天風呂',     en: 'Outdoor hot spring',        icon: '🛁',  char: 'An innkeeper who thinks you need life advice',         voice: 'ja-JP-DaichiNeural', ctx: 'You\'re soaking in an outdoor hot spring at a mountain inn. The elderly innkeeper joins you and, unprompted, begins sharing wisdom about life, marriage, and the importance of breakfast.' },
+  { id: 'shogi',      jp: '公園将棋',     en: 'Park shogi match',          icon: '♟️',  char: 'Oyaji-san, a retired salaryman who plays every day',   voice: 'ja-JP-DaichiNeural', ctx: 'You\'ve sat at a public shogi board in the park. The old man immediately challenges you. He\'s played here every day for 15 years and has a story for every single move.' },
+  { id: 'tachigui',   jp: '立ち食いそば', en: 'Standing soba bar',         icon: '🍱',  char: 'A salaryman who finishes his meal in 90 seconds',      voice: 'ja-JP-NaokiNeural',  ctx: 'Lunchtime standing soba. The man next to you demolishes his bowl in 90 seconds then — inexplicably — stays to discuss the regional differences in soba culture.' },
+  { id: 'ufo',        jp: 'UFOキャッチャー', en: 'Crane game at the arcade', icon: '🕹️', char: 'A teenager who considers themselves an expert',        voice: 'ja-JP-KeitaNeural',  ctx: 'You\'re at a crane machine in a game center when a teenager materializes beside you. They have very specific opinions about your technique and insist on demonstrating the correct approach.' },
+  { id: 'konbini3',   jp: 'コンビニ深夜', en: 'Konbini at 3am',            icon: '🏪',  char: 'A fellow night owl with a mysterious purchase',        voice: 'ja-JP-ShioriNeural', ctx: 'It\'s 3am. You and another customer keep reaching for the same thing on the shelf. They explain what they\'re buying and it raises far more questions than it answers.' },
+  { id: 'temple',     jp: '寺の掃除',     en: 'Temple cleanup duty',       icon: '⛩️',  char: 'A young monk who is bad at being serene',              voice: 'ja-JP-KeitaNeural',  ctx: 'You\'ve volunteered to sweep a temple. The young monk assigned to work with you keeps interrupting the silence to ask for advice about completely non-spiritual problems.' },
+  { id: 'recycle',    jp: 'リサイクル',   en: 'Recycle shop appraisal',    icon: '♻️',  char: 'Fujii-san, a brutally honest appraiser',               voice: 'ja-JP-NaokiNeural',  ctx: 'You\'ve brought items to sell. Fujii-san gives a long, detailed, and very candid assessment of everything you\'ve brought — including what it says about your taste.' },
+  { id: 'ekiben',     jp: '駅弁選び',     en: 'Choosing a station bento',  icon: '🚂',  char: 'A vendor with fierce regional pride',                  voice: 'ja-JP-MayuNeural',   ctx: 'You\'re at a shinkansen station staring at bento options. The vendor — originally from a different prefecture — passionately explains why their regional box is superior to everything else.' },
+  { id: 'vet',        jp: '動物病院',     en: 'Waiting at the vet',        icon: '🐱',  char: 'An owner treating a minor issue as a full crisis',     voice: 'ja-JP-NanamiNeural', ctx: 'You\'re in the waiting room. The person next to you has brought their cat for what turns out to be an extremely minor thing, but they are treating it as a medical emergency.' },
+  { id: 'karaoke',    jp: 'カラオケ',     en: 'Karaoke box showdown',      icon: '🎤',  char: 'A friend who takes karaoke far too seriously',         voice: 'ja-JP-NanamiNeural', ctx: 'Your friend is warm and relaxed in everyday life — but inside a karaoke box they become intensely strategic about song selection. The queue is filling up and tensions are rising.' },
+  { id: 'tofu',       jp: '豆腐屋',       en: 'Early morning tofu shop',   icon: '🌅',  char: 'A tofu maker who\'s been at it since 4am',            voice: 'ja-JP-DaichiNeural', ctx: 'You\'ve come to buy fresh tofu at 6am. The maker, up since 4am, is in a philosophical mood and wants to discuss the parallels between making good tofu and living a good life.' },
+  { id: 'rakugo',     jp: '落語の後',     en: 'After the rakugo show',     icon: '🎭',  char: 'A young apprentice who just did their debut',          voice: 'ja-JP-KeitaNeural',  ctx: 'You\'re backstage after a rakugo performance. The apprentice is still in full costume, visibly anxious — it was their debut tonight and they desperately want honest feedback.' },
+  { id: 'tsuri',      jp: '釣り',         en: 'Fishing off the pier',      icon: '🎣',  char: 'An old fisherman who measures time differently',       voice: 'ja-JP-DaichiNeural', ctx: 'You\'ve rented a rod at the pier. The old man next to you has fished this exact spot every morning for 30 years. He has a deeply unusual relationship with the concept of urgency.' },
+  { id: 'curry',      jp: 'カレーの行列', en: 'Queuing for famous curry',  icon: '🍛',  char: 'A curry devotee who\'s been here 47 times',            voice: 'ja-JP-NaokiNeural',  ctx: 'You\'re in a long queue outside a legendary curry shop. The person in front has eaten here 47 times and will explain — in full — what makes the 90-minute wait worthwhile.' },
+  { id: 'taiko',      jp: '太鼓',         en: 'Taiko drum trial lesson',   icon: '🥁',  char: 'A sensei who believes in one strike, one soul',        voice: 'ja-JP-DaichiNeural', ctx: 'You\'ve signed up for a trial taiko lesson. The sensei is warm but utterly exacting — your first 45 minutes involve only one drumstroke, repeated, until it is correct.' },
+  { id: 'machiya',    jp: '町屋カフェ',   en: 'Converted machiya café',    icon: '🏮',  char: 'The owner who turned their ancestral home into a café', voice: 'ja-JP-ShioriNeural', ctx: 'You\'re in a beautiful old townhouse turned café. The owner explains the provenance of every object in the room. Some of it is 200 years old. More tea is poured than requested.' },
+  { id: 'parrot',     jp: 'ペットカフェ', en: 'Pet café with a parrot',    icon: '🦜',  char: 'Jiro the parrot, who has opinions',                    voice: 'ja-JP-AoiNeural',    ctx: 'A large grey parrot named Jiro has memorized phrases from past customers. He keeps interrupting your conversation with the staff in ways that are confusing but contextually relevant.' },
+  { id: 'gokon',      jp: '合コン',       en: 'Group date (gokon)',        icon: '🥂',  char: 'Someone who was also dragged here against their will', voice: 'ja-JP-ShioriNeural', ctx: 'You\'ve been brought to a gokon by a friend. The person next to you leans over and whispers that they were also dragged here against their will. You have found each other.' },
+  { id: 'dojo',       jp: '道場',         en: 'After training at the dojo', icon: '🥋', char: 'A training partner who gets very philosophical post-session', voice: 'ja-JP-KeitaNeural', ctx: 'Training is over and you\'re stretching. Your training partner seems relaxed and happy — and wants to talk about what martial arts is actually for.' },
+  { id: 'omiyage',    jp: 'お土産選び',   en: 'Choosing souvenirs',        icon: '🎁',  char: 'A shop assistant who knows everyone\'s preferences',   voice: 'ja-JP-NanamiNeural', ctx: 'You\'re at a souvenir shop trying to find the right gifts. The assistant remembers what previous customers liked and starts confidently directing you toward things you didn\'t know you needed.' },
+  { id: 'yakkyoku',   jp: '薬局',         en: 'At the pharmacy',           icon: '💊',  char: 'A pharmacist who needs to know everything first',      voice: 'ja-JP-MayuNeural',   ctx: 'You\'ve come in for basic cold medicine. The pharmacist wants your full medical history, sleeping patterns, and diet before recommending anything. She is thorough. Very thorough.' },
+  { id: 'sentou_furo',jp: 'ジム更衣室',  en: 'Gym changing room chat',    icon: '🏋️',  char: 'A gym regular who gives unsolicited training advice',  voice: 'ja-JP-NaokiNeural',  ctx: 'You\'re getting changed after a workout. A regular who\'s been coming here for years sizes you up immediately and starts offering very specific advice about your fitness routine.' },
 ];
 
 function randomScenarios() {
