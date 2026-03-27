@@ -758,10 +758,9 @@ pre.code {
     <div>
       <div class="label">Focus</div>
       <div class="tabs">
-        <button class="tab active" id="focus-mix" onclick="setFocus('mix')">Mix</button>
-        <button class="tab" id="focus-n" onclick="setFocus('n')" title="New words only">新</button>
-        <button class="tab" id="focus-y" onclick="setFocus('y')" title="Young words only">若</button>
-        <button class="tab" id="focus-m" onclick="setFocus('m')" title="Mature words only">熟</button>
+        <button class="tab active" id="focus-n" onclick="toggleFocus('n')" title="New words">新</button>
+        <button class="tab active" id="focus-y" onclick="toggleFocus('y')" title="Young words">若</button>
+        <button class="tab active" id="focus-m" onclick="toggleFocus('m')" title="Mature words">熟</button>
       </div>
     </div>
 
@@ -862,7 +861,7 @@ document.addEventListener('keydown', e => {
 // ── State ─────────────────────────────────────────────────────────────────────
 const S = {
   mode: 'drill',
-  focus: 'mix',
+  focus: new Set(['n', 'y', 'm']),
   cards: { new: [], young: [], mature: [] },
   drills: [],
   scenario: null,
@@ -1351,23 +1350,34 @@ function shuffle(a) {
 function pickWords(n = 10) {
   const { new: nw, young: yw, mature: mw } = S.cards;
   const f = S.focus;
-  let pool;
-  if (f === 'n')    pool = shuffle(nw).map(c => ({ ...c, tier: 'n' }));
-  else if (f === 'y') pool = shuffle(yw).map(c => ({ ...c, tier: 'y' }));
-  else if (f === 'm') pool = shuffle(mw).map(c => ({ ...c, tier: 'm' }));
-  else pool = shuffle([
-    ...shuffle(nw).slice(0, Math.ceil(n * 0.55)).map(c => ({ ...c, tier: 'n' })),
-    ...shuffle(yw).slice(0, Math.ceil(n * 0.28)).map(c => ({ ...c, tier: 'y' })),
-    ...shuffle(mw).slice(0, Math.ceil(n * 0.17)).map(c => ({ ...c, tier: 'm' })),
-  ]);
-  return pool.slice(0, n);
+  // Build pool from all active tiers
+  const parts = [];
+  if (f.has('n')) parts.push(...shuffle(nw).map(c => ({ ...c, tier: 'n' })));
+  if (f.has('y')) parts.push(...shuffle(yw).map(c => ({ ...c, tier: 'y' })));
+  if (f.has('m')) parts.push(...shuffle(mw).map(c => ({ ...c, tier: 'm' })));
+  // If multiple tiers active, weight towards newer words
+  if (f.size > 1 && parts.length > n) {
+    const weighted = [];
+    if (f.has('n')) weighted.push(...shuffle(nw).slice(0, Math.ceil(n * 0.55)).map(c => ({ ...c, tier: 'n' })));
+    if (f.has('y')) weighted.push(...shuffle(yw).slice(0, Math.ceil(n * 0.35)).map(c => ({ ...c, tier: 'y' })));
+    if (f.has('m')) weighted.push(...shuffle(mw).slice(0, Math.ceil(n * 0.25)).map(c => ({ ...c, tier: 'm' })));
+    return shuffle(weighted).slice(0, n);
+  }
+  return shuffle(parts).slice(0, n);
 }
 
-function setFocus(f) {
+function toggleFocus(tier) {
   closeMenu();
-  S.focus = f;
-  document.querySelectorAll('[id^="focus-"]').forEach(t => t.classList.remove('active'));
-  document.getElementById(`focus-${f}`).classList.add('active');
+  const btn = document.getElementById(`focus-${tier}`);
+  if (S.focus.has(tier)) {
+    // Don't allow deselecting the last one
+    if (S.focus.size <= 1) return;
+    S.focus.delete(tier);
+    btn.classList.remove('active');
+  } else {
+    S.focus.add(tier);
+    btn.classList.add('active');
+  }
   // Reset session so next gen uses new focus
   S.drills = [];
   S.convo = [];
