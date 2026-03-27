@@ -1195,13 +1195,20 @@ function safeAnnotated(html) {
 // Convert [[word|reading|english]] or [[word|reading|english|0or1]] markers → spans.
 // The 4th pipe field (new flag) is optional — drills/roleplay use 3-pipe, story uses 4-pipe.
 function buildAnnotated(body) {
-  return (body || '').replace(
-    /\[\[([^\[\]|]+)\|([^\[\]|]+)\|([^\[\]|]+)(?:\|([01]))?\]\]/g,
-    (_, word, rt, en, isNew) => {
-      const newAttr = isNew === '1' ? ' data-new="1"' : '';
-      return `<span data-rt="${rt.trim()}" data-en="${en.trim()}"${newAttr}>${word.trim()}</span>`;
-    }
-  );
+  return (body || '')
+    // 3-value: [[word|reading|english]] with optional |0/1 flag
+    .replace(
+      /\[\[([^\[\]|]+)\|([^\[\]|]+)\|([^\[\]|]+)(?:\|([01]))?\]\]/g,
+      (_, word, rt, en, isNew) => {
+        const newAttr = isNew === '1' ? ' data-new="1"' : '';
+        return `<span data-rt="${rt.trim()}" data-en="${en.trim()}"${newAttr}>${word.trim()}</span>`;
+      }
+    )
+    // 2-value: [[kanji|reading]] — no English
+    .replace(
+      /\[\[([^\[\]|]+)\|([^\[\]|]+)\]\]/g,
+      (_, word, rt) => `<span data-rt="${rt.trim()}">${word.trim()}</span>`
+    );
 }
 
 // Strip [[word|reading|english]] markers, keeping just the surface word
