@@ -1525,8 +1525,14 @@ function drillHTML(d) {
 
   // Convert [[word|reading|english]] markers → spans, then sanitise
   const annotated = safeAnnotated(buildAnnotated(d.annotated_sentence || d.sentence));
-  // Pattern matches the target whether wrapped in a span or plain
-  const targetPat = new RegExp(`<span[^>]*data-rt[^>]*>${escapeRegex(d.target)}<\\/span>|${escapeRegex(d.target)}`);
+  const esc = escapeRegex(d.target);
+  // Try multiple patterns: exact span match, span containing target, or plain text
+  const patterns = [
+    new RegExp(`<span[^>]*data-rt[^>]*>${esc}<\\/span>`),                    // exact span
+    new RegExp(`<span[^>]*data-rt="[^"]*"[^>]*>[^<]*${esc}[^<]*<\\/span>`), // span containing target
+    new RegExp(esc),                                                          // plain text
+  ];
+  const targetPat = patterns.find(p => p.test(annotated)) || patterns[2];
 
   let displaySentence;
   if (d.answered) {
