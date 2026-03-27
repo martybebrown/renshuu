@@ -801,13 +801,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const speechSpeed = localStorage.getItem('renshuu_speech_speed') || '100';
   document.getElementById('speechSpeed').value = speechSpeed;
   document.getElementById('speedVal').textContent = speechSpeed + '%';
-  // Restore or randomise scenarios (must run after SCENARIO_POOL is defined)
+  // Migrate old favorites format (array of IDs → array of objects)
+  if (S.favorites.length && typeof S.favorites[0] === 'string') {
+    S.favorites = S.favorites.map(id => SCENARIO_POOL.find(s => s.id === id)).filter(Boolean);
+    localStorage.setItem('renshuu_favorites', JSON.stringify(S.favorites));
+  }
+  // Restore generated scenarios from session, or generate fresh
   const savedSc = sessionStorage.getItem('renshuu_scenarios');
   if (savedSc) {
-    const ids = JSON.parse(savedSc);
-    S.scenarios = ids.map(id => SCENARIO_POOL.find(s => s.id === id)).filter(Boolean);
+    try { S.scenarios = JSON.parse(savedSc); } catch (_) {}
   }
-  if (!S.scenarios.length) randomScenarios();
+  if (!S.scenarios.length) {
+    generateScenarios().then(() => { if (S.mode === 'roleplay') renderRoleplay(); });
+    // Use fallback until generation completes
+    S.scenarios = fallbackScenarios();
+  }
   loadCards();
 });
 
@@ -1710,20 +1718,65 @@ const SCENARIO_POOL = [
   { id: 'sentou_furo',jp: 'ジム更衣室',  en: 'Gym changing room chat',    icon: '🏋️',  char: 'A gym regular who gives unsolicited training advice',  voice: 'ja-JP-NaokiNeural',  ctx: 'You\'re getting changed after a workout. A regular who\'s been coming here for years sizes you up immediately and starts offering very specific advice about your fitness routine.' },
 ];
 
-function randomScenarios() {
-  const pool = SCENARIO_POOL.filter(s => !S.favorites.includes(s.id));
+const AZURE_VOICES = ['ja-JP-NanamiNeural','ja-JP-KeitaNeural','ja-JP-DaichiNeural','ja-JP-AoiNeural','ja-JP-MayuNeural','ja-JP-NaokiNeural','ja-JP-ShioriNeural'];
+
+function fallbackScenarios() {
+  const favIds = S.favorites.map(f => f.id);
+  const pool = SCENARIO_POOL.filter(s => !favIds.includes(s.id));
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  const picked = pool.slice(0, 6);
-  S.scenarios = picked;
-  sessionStorage.setItem('renshuu_scenarios', JSON.stringify(picked.map(s => s.id)));
+  return pool.slice(0, 6);
 }
 
-function refreshScenarios() {
-  randomScenarios();
-  if (S.scenario && !S.scenarios.find(s => s.id === S.scenario.id) && !S.favorites.includes(S.scenario.id)) {
+async function generateScenarios() {
+  const key = document.getElementById('apiKey')?.value?.trim();
+  if (!key) { S.scenarios = fallbackScenarios(); return; }
+
+  try {
+    const reply = await claude([{ role: 'user', content: `Generate 6 unique, creative Japanese roleplay scenarios for a language learner. Each should have a vivid, memorable character and an interesting situation set in Japan.
+
+Return ONLY a JSON array (no markdown, no explanation) where each object has:
+- "id": short kebab-case identifier
+- "jp": location/situation name in Japanese (2-4 characters)
+- "en": short English description (3-6 words)
+- "icon": a single emoji that fits the scene
+- "char": one-line character description (name + personality quirk)
+- "ctx": 2-3 sentence scene setup, written in second person, vivid and specific
+- "gender": "male_old", "male_young", "male_adult", "female_young", "female_adult", "female_soft", or "child"
+
+Be creative! Avoid generic scenarios. Think: specific moments, unusual characters, unexpected situations. Each scenario should feel like the opening of a short film.` }],
+    'You are a creative scenario designer for a Japanese language learning app. Output valid JSON only.',
+    2000);
+
+    const parsed = JSON.parse(reply.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
+    if (!Array.isArray(parsed) || parsed.length < 1) throw new Error('Bad format');
+
+    const voiceMap = {
+      male_old: 'ja-JP-DaichiNeural', male_young: 'ja-JP-KeitaNeural', male_adult: 'ja-JP-NaokiNeural',
+      female_young: 'ja-JP-NanamiNeural', female_adult: 'ja-JP-MayuNeural', female_soft: 'ja-JP-ShioriNeural',
+      child: 'ja-JP-AoiNeural',
+    };
+    S.scenarios = parsed.map(s => ({
+      id: s.id || ('gen_' + Math.random().toString(36).slice(2, 8)),
+      jp: s.jp, en: s.en, icon: s.icon || '🎭',
+      char: s.char, ctx: s.ctx,
+      voice: voiceMap[s.gender] || AZURE_VOICES[Math.floor(Math.random() * AZURE_VOICES.length)],
+    }));
+    sessionStorage.setItem('renshuu_scenarios', JSON.stringify(S.scenarios));
+  } catch (e) {
+    console.warn('Failed to generate scenarios, using fallback:', e);
+    S.scenarios = fallbackScenarios();
+  }
+}
+
+async function refreshScenarios() {
+  // Show loading state
+  const grid = document.querySelector('.scenario-grid:last-of-type');
+  if (grid) grid.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">Generating fresh scenarios…</div>';
+  await generateScenarios();
+  if (S.scenario && !S.scenarios.find(s => s.id === S.scenario.id) && !S.favorites.find(f => f.id === S.scenario.id)) {
     S.scenario = null;
     S.convo = [];
   }
@@ -1731,16 +1784,21 @@ function refreshScenarios() {
 }
 
 function toggleFavorite(id) {
-  const idx = S.favorites.indexOf(id);
-  if (idx === -1) S.favorites.push(id);
-  else S.favorites.splice(idx, 1);
+  const idx = S.favorites.findIndex(f => f.id === id);
+  if (idx === -1) {
+    // Find the full scenario object from current scenarios or pool
+    const sc = S.scenarios.find(s => s.id === id) || SCENARIO_POOL.find(s => s.id === id);
+    if (sc) S.favorites.push(sc);
+  } else {
+    S.favorites.splice(idx, 1);
+  }
   localStorage.setItem('renshuu_favorites', JSON.stringify(S.favorites));
   renderRoleplay();
   if (S.scenario) scrollChat();
 }
 
 function scCard(sc) {
-  const isFav = S.favorites.includes(sc.id);
+  const isFav = S.favorites.some(f => f.id === sc.id);
   const isSel = S.scenario?.id === sc.id;
   return `
     <div class="scenario-card ${isSel ? 'sel' : ''} ${isFav && !isSel ? 'fav-card' : ''}" onclick="pickScenario('${sc.id}')">
@@ -1754,7 +1812,7 @@ function scCard(sc) {
 
 function renderRoleplay() {
   const m = document.getElementById('mainContent');
-  const favScenarios = S.favorites.map(id => SCENARIO_POOL.find(s => s.id === id)).filter(Boolean);
+  const favScenarios = S.favorites;
 
   m.innerHTML = `
     <div>
@@ -1831,7 +1889,18 @@ function escHtml(s) {
 }
 
 function pickScenario(id) {
-  S.scenario = SCENARIO_POOL.find(s => s.id === id) || null;
+  // Check for saved conversation in favorites
+  const fav = S.favorites.find(f => f.id === id);
+  if (fav && fav.convo && fav.convo.length) {
+    S.scenario = fav;
+    S.convo = fav.convo;
+    renderRoleplay();
+    // Rebuild system prompt for continued conversation
+    buildSysPrompt(S.scenario);
+    scrollChat();
+    return;
+  }
+  S.scenario = S.scenarios.find(s => s.id === id) || S.favorites.find(f => f.id === id) || SCENARIO_POOL.find(s => s.id === id) || null;
   S.convo = [];
   renderRoleplay();
   startChat();
@@ -1843,18 +1912,11 @@ function resetChat() {
   startChat();
 }
 
-async function startChat() {
-  const chatWin = document.getElementById('chatWin');
-  if (!chatWin) return;
-  chatWin.innerHTML = '<div class="loading-row"><span class="spin"></span> setting the scene…</div>';
-
-  const sc = S.scenario;
+function buildSysPrompt(sc) {
   const words = pickWords(12);
   S.sessionWords = words;
-
   const newList  = words.filter(w => w.tier === 'n').map(w => `${w.jp}（${w.en}）`).join('、');
   const allList  = words.map(w => `${w.jp} = ${w.en}`).join(', ');
-
   S.sysPrompt = `You are playing the role of ${sc.char}. Scenario: ${sc.en}. ${sc.ctx}
 
 VOCABULARY TO USE NATURALLY: ${allList}
@@ -1868,6 +1930,24 @@ Rules:
 5. Aim for N4–N3 level.
 6. Mark every kanji word/compound (including okurigana) with [[word|reading|english]] pipe markers. Leave hiragana/katakana-only text unmarked. Example: [[日本語|にほんご|Japanese]]は[[面白い|おもしろい|interesting]]です。
 7. The student may write in rōmaji (e.g. "watashi wa gakusei desu") — understand it as Japanese and respond naturally. Only correct it if there is an actual grammar or vocab mistake, not just for using romaji.`;
+}
+
+function saveConvoToFavorite() {
+  if (!S.scenario) return;
+  const fav = S.favorites.find(f => f.id === S.scenario.id);
+  if (fav) {
+    fav.convo = S.convo.map(m => ({ role: m.role, content: m.content, _id: m._id, correction: m.correction }));
+    localStorage.setItem('renshuu_favorites', JSON.stringify(S.favorites));
+  }
+}
+
+async function startChat() {
+  const chatWin = document.getElementById('chatWin');
+  if (!chatWin) return;
+  chatWin.innerHTML = '<div class="loading-row"><span class="spin"></span> setting the scene…</div>';
+
+  const sc = S.scenario;
+  buildSysPrompt(sc);
 
   try {
     const opening = await claude(
@@ -1876,6 +1956,7 @@ Rules:
     );
     S.convo = [{ role: 'assistant', content: opening, _id: msgId() }];
     updateChat();
+    saveConvoToFavorite();
   } catch (e) {
     chatWin.innerHTML = `<div style="color:var(--red);font-size:12px">Error: ${e.message}</div>`;
   }
@@ -1924,6 +2005,7 @@ async function sendMsg() {
     S.convo.pop();
     S.convo.push({ role: 'assistant', content: clean, correction, _id: msgId() });
     updateChat();
+    saveConvoToFavorite();
   } catch (e) {
     S.convo.pop();
     S.convo.push({ role: 'assistant', content: `Error: ${e.message}`, display: `<span style="color:var(--red)">${escHtml(e.message)}</span>`, _id: msgId() });
