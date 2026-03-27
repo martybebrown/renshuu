@@ -1328,7 +1328,13 @@ ${plain}` }
     msg.breakdown = `<span style="color:var(--red)">Failed to get breakdown: ${escHtml(err.message)}</span>`;
   }
 
-  updateChat();
+  // Re-render without auto-scrolling to bottom; scroll breakdown into view instead
+  const chatWin = document.getElementById('chatWin');
+  if (chatWin) {
+    chatWin.innerHTML = renderMessages();
+    const bdEl = chatWin.querySelector(`.msg:nth-child(${mi + 1}) .msg-breakdown`);
+    if (bdEl) bdEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
 }
 
 function shuffle(a) {
