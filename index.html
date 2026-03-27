@@ -828,19 +828,18 @@ document.addEventListener('click', e => {
   }
 
   // Speak message aloud
-  const speakBtn = e.target.closest('.speak-btn[data-mi]');
+  const speakBtn = e.target.closest('.speak-btn[data-mid]');
   if (speakBtn) {
-    const msg = S.convo[parseInt(speakBtn.dataset.mi, 10)];
+    const msg = S.convo.find(m => m._id === speakBtn.dataset.mid);
     if (msg) speakJapanese(msg.content, speakBtn);
     return;
   }
 
   // Break down message
-  const bdBtn = e.target.closest('.breakdown-btn[data-mi]');
+  const bdBtn = e.target.closest('.breakdown-btn[data-mid]');
   if (bdBtn) {
-    const mi = parseInt(bdBtn.dataset.mi, 10);
-    const msg = S.convo[mi];
-    if (msg) breakdownMessage(mi, msg, bdBtn);
+    const msg = S.convo.find(m => m._id === bdBtn.dataset.mid);
+    if (msg) breakdownMessage(msg, bdBtn);
     return;
   }
 
@@ -1291,7 +1290,7 @@ function speakWebSpeech(text, btn) {
   else { speechSynthesis.onvoiceschanged = () => { speechSynthesis.onvoiceschanged = null; trySpeak(); }; }
 }
 
-async function breakdownMessage(mi, msg, btn) {
+async function breakdownMessage(msg, btn) {
   // Toggle off if already shown
   if (msg.breakdown) {
     delete msg.breakdown;
@@ -1332,10 +1331,13 @@ ${plain}` }
   const chatWin = document.getElementById('chatWin');
   if (chatWin) {
     chatWin.innerHTML = renderMessages();
-    const bdEl = chatWin.querySelector(`.msg:nth-child(${mi + 1}) .msg-breakdown`);
+    const bdEl = chatWin.querySelector(`[data-mid="${msg._id}"]`)?.closest('.msg')?.querySelector('.msg-breakdown');
     if (bdEl) bdEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 }
+
+let _msgCounter = 0;
+function msgId() { return 'm' + (++_msgCounter); }
 
 function shuffle(a) {
   const b = [...a];
@@ -1765,8 +1767,8 @@ function renderMessages() {
         ${correctionHere}
         ${isReal ? `
         <div class="msg-foot">
-          <button class="speak-btn" data-mi="${i}" title="Speak aloud">🔊</button>
-          <button class="breakdown-btn" data-mi="${i}" title="Break down this message">📖</button>
+          <button class="speak-btn" data-mid="${msg._id}" title="Speak aloud">🔊</button>
+          <button class="breakdown-btn" data-mid="${msg._id}" title="Break down this message">📖</button>
         </div>
         ${msg.breakdown ? `<div class="msg-breakdown">${msg.breakdown}</div>` : ''}` : ''}
       </div>
@@ -1822,7 +1824,7 @@ Rules:
       [{ role: 'user', content: '[Open the scenario with a natural, brief Japanese greeting or question — 1–2 sentences only.]' }],
       S.sysPrompt
     );
-    S.convo = [{ role: 'assistant', content: opening }];
+    S.convo = [{ role: 'assistant', content: opening, _id: msgId() }];
     updateChat();
   } catch (e) {
     chatWin.innerHTML = `<div style="color:var(--red);font-size:12px">Error: ${e.message}</div>`;
@@ -1851,8 +1853,8 @@ async function sendMsg() {
   inp.value = '';
   if (sendBtn) sendBtn.disabled = true;
 
-  S.convo.push({ role: 'user', content: text, display: escHtml(text) });
-  S.convo.push({ role: 'assistant', content: '…', display: '<span class="spin"></span>' });
+  S.convo.push({ role: 'user', content: text, display: escHtml(text), _id: msgId() });
+  S.convo.push({ role: 'assistant', content: '…', display: '<span class="spin"></span>', _id: 'spinner' });
   updateChat();
 
   try {
@@ -1870,11 +1872,11 @@ async function sendMsg() {
 
     // replace spinner
     S.convo.pop();
-    S.convo.push({ role: 'assistant', content: clean, correction });
+    S.convo.push({ role: 'assistant', content: clean, correction, _id: msgId() });
     updateChat();
   } catch (e) {
     S.convo.pop();
-    S.convo.push({ role: 'assistant', content: `Error: ${e.message}`, display: `<span style="color:var(--red)">${escHtml(e.message)}</span>` });
+    S.convo.push({ role: 'assistant', content: `Error: ${e.message}`, display: `<span style="color:var(--red)">${escHtml(e.message)}</span>`, _id: msgId() });
     updateChat();
   }
 
