@@ -811,7 +811,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (savedSc) {
     try {
       const parsed = JSON.parse(savedSc);
-      // Validate: must be array of objects with required fields (not old ID-string format)
       if (Array.isArray(parsed) && parsed.length && typeof parsed[0] === 'object' && parsed[0].jp) {
         S.scenarios = parsed;
       } else {
