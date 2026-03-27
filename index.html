@@ -809,7 +809,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // Restore generated scenarios from session, or generate fresh
   const savedSc = sessionStorage.getItem('renshuu_scenarios');
   if (savedSc) {
-    try { S.scenarios = JSON.parse(savedSc); } catch (_) {}
+    try {
+      const parsed = JSON.parse(savedSc);
+      // Validate: must be array of objects with required fields (not old ID-string format)
+      if (Array.isArray(parsed) && parsed.length && typeof parsed[0] === 'object' && parsed[0].jp) {
+        S.scenarios = parsed;
+      } else {
+        sessionStorage.removeItem('renshuu_scenarios');
+      }
+    } catch (_) { sessionStorage.removeItem('renshuu_scenarios'); }
   }
   if (!S.scenarios.length) {
     generateScenarios().then(() => { if (S.mode === 'roleplay') renderRoleplay(); });
