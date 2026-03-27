@@ -818,6 +818,10 @@ document.addEventListener('click', e => {
   const btn = e.target.closest('.drill-submit[data-di]');
   if (btn) { checkDrill(parseInt(btn.dataset.di, 10)); return; }
 
+  // Drill speak button
+  const drillSpeak = e.target.closest('.drill-speak[data-sentence]');
+  if (drillSpeak) { speakJapanese(drillSpeak.dataset.sentence, drillSpeak); return; }
+
   // Quiz answer reveal
   const revBtn = e.target.closest('.quiz-reveal');
   if (revBtn) {
@@ -1547,6 +1551,7 @@ function drillHTML(d) {
         <span class="num">${d.i + 1} / ${S.drills.length}</span>
       </div>
       <div class="jp-sentence">${displaySentence}</div>
+      <div style="margin:4px 0 2px"><button class="speak-btn drill-speak" data-sentence="${escHtml(stripMarkers(d.sentence))}" title="Listen">🔊</button></div>
       <div class="hint-text">Fill in: ${d.meaning}${d.hint ? ` · ${d.hint}` : ''}</div>
       <div class="answer-row">
         <input
