@@ -930,13 +930,6 @@ document.addEventListener('click', e => {
         const wb = _wordBounds.find(b => b.plainOffset < wm.end && b.plainOffset + b.plainLen > wm.start);
         if (wb) {
           _currentAudio.currentTime = wb.ms / 1000;
-          if (_currentAudio.paused) {
-            _currentAudio.play();
-            const apBtn = document.querySelector(`.ap-btn[data-ap="${_currentMsgId}"]`);
-            if (apBtn) { apBtn.textContent = '⏸'; apBtn.classList.add('playing'); }
-            const speakBtn = document.querySelector(`.speak-btn[data-mid="${_currentMsgId}"]`);
-            if (speakBtn) speakBtn.classList.add('speaking');
-          }
           updatePlayer(_currentMsgId);
           // Also show furigana on the clicked word
           document.querySelectorAll('[data-rt].active').forEach(x => x.classList.remove('active'));
