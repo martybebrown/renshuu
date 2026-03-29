@@ -489,6 +489,7 @@ pre.code {
 }
 .speak-btn:hover, .breakdown-btn:hover { border-color: var(--border); color: var(--text); }
 .speak-btn.speaking { color: var(--blue); border-color: var(--blue); }
+.w-active { background: rgba(180, 140, 100, 0.2); border-radius: 2px; transition: background 0.1s; }
 .audio-player {
   display: flex; align-items: center; gap: 6px; padding: 4px 0; margin-top: 2px;
 }
@@ -1309,6 +1310,8 @@ let _azureSynth = null;
 let _currentAudio = null;
 let _currentMsgId = null;
 let _apRAF = null;
+let _wordBounds = null;
+let _wordMap = null;
 
 function cancelSpeech() {
   if (window.speechSynthesis) speechSynthesis.cancel();
@@ -1319,6 +1322,9 @@ function cancelSpeech() {
   // Hide all players and reset
   document.querySelectorAll('.audio-player').forEach(p => { p.style.display = 'none'; });
   document.querySelectorAll('.ap-btn').forEach(b => { b.textContent = '▶'; b.classList.remove('playing'); });
+  document.querySelectorAll('.w-active').forEach(el => el.classList.remove('w-active'));
+  _wordBounds = null;
+  _wordMap = null;
   _currentMsgId = null;
 }
 
@@ -1336,9 +1342,60 @@ function updatePlayer(msgId) {
   const pct = _currentAudio.duration ? (_currentAudio.currentTime / _currentAudio.duration) * 100 : 0;
   if (fill) fill.style.width = pct + '%';
   if (time) time.textContent = fmtTime(_currentAudio.currentTime);
+  // Highlight current word
+  if (_wordBounds?.length && _wordMap?.length) {
+    const ms = _currentAudio.currentTime * 1000;
+    // Find current word boundary
+    let wb = null;
+    for (let i = _wordBounds.length - 1; i >= 0; i--) {
+      if (ms >= _wordBounds[i].ms) { wb = _wordBounds[i]; break; }
+    }
+    // Clear previous highlights
+    _wordMap.forEach(m => m.el.classList.remove('w-active'));
+    // Highlight matching nodes
+    if (wb) {
+      const wStart = wb.plainOffset;
+      const wEnd = wStart + wb.plainLen;
+      _wordMap.forEach(m => {
+        if (m.start < wEnd && m.end > wStart) m.el.classList.add('w-active');
+      });
+    }
+  }
   if (!_currentAudio.paused && !_currentAudio.ended) {
     _apRAF = requestAnimationFrame(() => updatePlayer(msgId));
   }
+}
+
+// Build a map from DOM elements in the message body to character positions in the plain text
+function buildWordMap(msgBodyEl) {
+  const map = [];
+  let pos = 0;
+  function walk(node) {
+    if (node.nodeType === 3) { // text node
+      const len = node.textContent.length;
+      if (len > 0) {
+        // Wrap bare text node in a span so we can highlight it
+        const span = document.createElement('span');
+        span.className = 'wt';
+        node.parentNode.replaceChild(span, node);
+        span.appendChild(node);
+        map.push({ el: span, start: pos, end: pos + len });
+        pos += len;
+      }
+    } else if (node.nodeType === 1) {
+      if (node.hasAttribute('data-rt')) {
+        // Annotated kanji span — treat as atomic unit
+        const len = node.textContent.length;
+        map.push({ el: node, start: pos, end: pos + len });
+        pos += len;
+      } else if (!node.classList?.contains('wt')) {
+        // Container — walk children (take snapshot to avoid mutation issues)
+        Array.from(node.childNodes).forEach(walk);
+      }
+    }
+  }
+  Array.from(msgBodyEl.childNodes).forEach(walk);
+  return map;
 }
 
 function speakJapanese(rawText, btn, msgId) {
@@ -1388,6 +1445,11 @@ function speakJapanese(rawText, btn, msgId) {
       </speak>`;
       const synth = new SpeechSDK.SpeechSynthesizer(cfg, null);
       _azureSynth = synth;
+      // Collect word boundary events for karaoke highlighting
+      const wordBounds = [];
+      synth.wordBoundary = (s, e) => {
+        wordBounds.push({ ms: e.audioOffset / 10000, text: e.text, ssmlOffset: e.textOffset, len: e.wordLength });
+      };
       synth.speakSsmlAsync(ssml,
         result => {
           if (result.reason === SpeechSDK.ResultReason.SynthesizingAudioCompleted && result.audioData) {
@@ -1396,6 +1458,8 @@ function speakJapanese(rawText, btn, msgId) {
             _currentAudio = audio;
             audio.onended = audio.onerror = () => {
               btn?.classList.remove('speaking');
+              // Clear word highlights
+              if (_wordMap) _wordMap.forEach(m => m.el.classList.remove('w-active'));
               if (msgId) {
                 const apBtn = document.querySelector(`.ap-btn[data-ap="${msgId}"]`);
                 if (apBtn) { apBtn.textContent = '▶'; apBtn.classList.remove('playing'); }
@@ -1404,6 +1468,26 @@ function speakJapanese(rawText, btn, msgId) {
                 _currentAudio = null;
               }
             };
+            // Build word map for karaoke highlighting
+            if (msgId && wordBounds.length) {
+              // Map word boundaries to plain text positions by sequential matching
+              let plainPos = 0;
+              wordBounds.forEach(wb => {
+                const idx = text.indexOf(wb.text, plainPos);
+                if (idx !== -1) {
+                  wb.plainOffset = idx;
+                  wb.plainLen = wb.text.length;
+                  plainPos = idx + wb.text.length;
+                } else {
+                  wb.plainOffset = plainPos;
+                  wb.plainLen = wb.text.length;
+                }
+              });
+              _wordBounds = wordBounds;
+              // Build DOM word map from the message body
+              const msgBody = document.getElementById('ap-' + msgId)?.closest('.msg')?.querySelector('.msg-body');
+              if (msgBody) _wordMap = buildWordMap(msgBody);
+            }
             // Show player if msgId
             if (msgId) {
               const player = document.getElementById('ap-' + msgId);
