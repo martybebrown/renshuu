@@ -917,22 +917,16 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Click word to scrub audio to that word's timing
-  if (_currentAudio && _wordMap?.length && _wordBounds?.length) {
+  // Click word to scrub audio — only when audio is actively playing (not paused)
+  // When paused/stopped, let clicks fall through to the furigana tooltip handler
+  if (_currentAudio && !_currentAudio.paused && _wordMap?.length && _wordBounds?.length) {
     const wordEl = e.target.closest('.wt, [data-rt]');
     if (wordEl) {
       const wm = _wordMap.find(m => m.el === wordEl);
       if (wm) {
-        // Find the word boundary that overlaps this element's character range
         const wb = _wordBounds.find(b => b.plainOffset < wm.end && b.plainOffset + b.plainLen > wm.start);
         if (wb) {
           _currentAudio.currentTime = wb.ms / 1000;
-          if (_currentAudio.paused) {
-            _currentAudio.play();
-            const apBtn = document.querySelector(`.ap-btn[data-ap="${_currentMsgId}"]`);
-            if (apBtn) { apBtn.textContent = '⏸'; apBtn.classList.add('playing'); }
-            document.querySelectorAll('.speak-btn.speaking').forEach(b => b.classList.add('speaking'));
-          }
           updatePlayer(_currentMsgId);
           return;
         }
