@@ -539,8 +539,12 @@ pre.code {
   .msg.assistant.has-breakdown .msg-inner { flex: 1; min-width: 0; }
   .msg.assistant.has-breakdown .msg-breakdown { margin-top: 0; flex: 0 0 280px; max-height: 400px; overflow-y: auto; }
 }
-.msg-breakdown .bd-line { margin-bottom: 6px; }
-.msg-breakdown .bd-label { font-weight: 600; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; }
+.msg-breakdown .bd-section { margin-bottom: 8px; }
+.msg-breakdown .bd-heading { font-weight: 700; color: var(--accent); font-size: 9px; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px; border-bottom: 1px solid var(--border); padding-bottom: 2px; }
+.msg-breakdown .bd-sentence { font-size: 12px; font-weight: 600; margin: 6px 0 2px; }
+.msg-breakdown .bd-meaning { font-style: italic; color: var(--muted); margin-bottom: 4px; }
+.msg-breakdown .bd-label { font-weight: 600; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+.msg-breakdown .bd-list { color: var(--text); margin-left: 4px; }
 .chat-foot { display: flex; gap: 8px; align-items: flex-end; }
 .chat-input {
   flex: 1;
@@ -917,9 +921,8 @@ document.addEventListener('click', e => {
     return;
   }
 
-  // Click word to scrub audio — only when audio is actively playing (not paused)
-  // When paused/stopped, let clicks fall through to the furigana tooltip handler
-  if (_currentAudio && !_currentAudio.paused && _wordMap?.length && _wordBounds?.length) {
+  // Click word to scrub audio — works when audio is loaded (playing or paused)
+  if (_currentAudio && _wordMap?.length && _wordBounds?.length) {
     const wordEl = e.target.closest('.wt, [data-rt]');
     if (wordEl) {
       const wm = _wordMap.find(m => m.el === wordEl);
@@ -927,7 +930,17 @@ document.addEventListener('click', e => {
         const wb = _wordBounds.find(b => b.plainOffset < wm.end && b.plainOffset + b.plainLen > wm.start);
         if (wb) {
           _currentAudio.currentTime = wb.ms / 1000;
+          if (_currentAudio.paused) {
+            _currentAudio.play();
+            const apBtn = document.querySelector(`.ap-btn[data-ap="${_currentMsgId}"]`);
+            if (apBtn) { apBtn.textContent = '⏸'; apBtn.classList.add('playing'); }
+            const speakBtn = document.querySelector(`.speak-btn[data-mid="${_currentMsgId}"]`);
+            if (speakBtn) speakBtn.classList.add('speaking');
+          }
           updatePlayer(_currentMsgId);
+          // Also show furigana on the clicked word
+          document.querySelectorAll('[data-rt].active').forEach(x => x.classList.remove('active'));
+          if (wordEl.hasAttribute('data-en')) wordEl.classList.add('active');
           return;
         }
       }
@@ -1509,7 +1522,15 @@ function speakJapanese(rawText, btn, msgId) {
               _wordBounds = wordBounds;
               // Build DOM word map from the message body
               const msgBody = document.getElementById('ap-' + msgId)?.closest('.msg')?.querySelector('.msg-body');
-              if (msgBody) _wordMap = buildWordMap(msgBody);
+              if (msgBody) {
+                _wordMap = buildWordMap(msgBody);
+                // Verify: DOM text should match plain text. If not, log for debugging.
+                const domText = msgBody.textContent;
+                if (domText !== text) {
+                  console.warn('Word map mismatch — DOM text differs from plain text sent to Azure.',
+                    { domLen: domText.length, plainLen: text.length });
+                }
+              }
             }
             // Show player if msgId
             if (msgId) {
@@ -1582,25 +1603,28 @@ async function breakdownMessage(msg, btn) {
     const reply = await claude([
       { role: 'user', content: `Break down this Japanese message for an N4–N3 learner.
 
-First, give a complete natural English translation of the full message.
+Use EXACTLY this format (with these exact headers):
 
-Then break it down sentence by sentence. For each sentence:
-1. Show the sentence in Japanese
-2. Translate it
-3. List key words/phrases with reading (hiragana) and meaning
-4. Explain grammar patterns (particles, verb forms, conjugations, sentence-ending patterns)
+TRANSLATION:
+[Full natural English translation]
 
-Keep it concise but thorough. Use plain text, no markdown.
+BREAKDOWN:
+[For each sentence, use this format:]
 
-Message to break down:
+SENTENCE: [Japanese sentence]
+MEANING: [English translation]
+VOCAB: [key word (reading) — meaning, one per line, use bullet ・]
+GRAMMAR: [grammar point explanations, one per line, use bullet ・]
+
+Keep it concise. Message:
 ${plain}` }
     ], 'You are a Japanese language teacher. Give clear, structured breakdowns.', 1500);
 
-    // Convert plain text reply to HTML
-    const html = escHtml(reply).replace(/\n/g, '<br>');
+    // Parse structured reply into styled HTML
+    const html = formatBreakdown(reply);
     msg.breakdown = html;
   } catch (err) {
-    msg.breakdown = `<span style="color:var(--red)">Failed to get breakdown: ${escHtml(err.message)}</span>`;
+    msg.breakdown = `<span style="color:var(--red)">Failed: ${escHtml(err.message)}</span>`;
   }
 
   // Re-render without auto-scrolling to bottom; scroll breakdown into view instead
@@ -1631,6 +1655,44 @@ function restoreAudioPlayer() {
     if (msgBody) _wordMap = buildWordMap(msgBody);
   }
   if (!_currentAudio.paused) updatePlayer(_currentMsgId);
+}
+
+function formatBreakdown(text) {
+  let html = '';
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const esc = escHtml(line);
+    if (/^TRANSLATION:/i.test(line)) {
+      html += `<div class="bd-section"><div class="bd-heading">Translation</div>`;
+      continue;
+    }
+    if (/^BREAKDOWN:/i.test(line)) {
+      html += `</div><div class="bd-section"><div class="bd-heading">Breakdown</div>`;
+      continue;
+    }
+    if (/^SENTENCE:/i.test(line)) {
+      html += `<div class="bd-sentence">${escHtml(line.replace(/^SENTENCE:\s*/i, ''))}</div>`;
+      continue;
+    }
+    if (/^MEANING:/i.test(line)) {
+      html += `<div class="bd-meaning">${escHtml(line.replace(/^MEANING:\s*/i, ''))}</div>`;
+      continue;
+    }
+    if (/^VOCAB:/i.test(line)) {
+      html += `<div class="bd-label">Vocab</div><div class="bd-list">${escHtml(line.replace(/^VOCAB:\s*/i, ''))}`;
+      continue;
+    }
+    if (/^GRAMMAR:/i.test(line)) {
+      html += `</div><div class="bd-label">Grammar</div><div class="bd-list">${escHtml(line.replace(/^GRAMMAR:\s*/i, ''))}`;
+      continue;
+    }
+    // Continuation lines (bullets etc.)
+    html += `<br>${esc}`;
+  }
+  html += '</div></div>';
+  return html;
 }
 
 let _msgCounter = 0;
