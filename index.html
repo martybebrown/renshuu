@@ -1655,41 +1655,34 @@ function restoreAudioPlayer() {
 }
 
 function formatBreakdown(text) {
-  let html = '';
   const lines = text.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
+  const parts = [];
+  for (const raw of lines) {
+    const line = raw.trim();
     if (!line) continue;
-    const esc = escHtml(line);
     if (/^TRANSLATION:/i.test(line)) {
-      html += `<div class="bd-section"><div class="bd-heading">Translation</div>`;
-      continue;
+      parts.push(`<div class="bd-heading">Translation</div>`);
+    } else if (/^BREAKDOWN:/i.test(line)) {
+      parts.push(`<div class="bd-heading" style="margin-top:8px">Breakdown</div>`);
+    } else if (/^SENTENCE:/i.test(line)) {
+      parts.push(`<div class="bd-sentence">${escHtml(line.replace(/^SENTENCE:\s*/i, ''))}</div>`);
+    } else if (/^MEANING:/i.test(line)) {
+      parts.push(`<div class="bd-meaning">${escHtml(line.replace(/^MEANING:\s*/i, ''))}</div>`);
+    } else if (/^VOCAB:/i.test(line)) {
+      parts.push(`<div class="bd-label">Vocab</div><div class="bd-item">${escHtml(line.replace(/^VOCAB:\s*/i, ''))}</div>`);
+    } else if (/^GRAMMAR:/i.test(line)) {
+      parts.push(`<div class="bd-label">Grammar</div><div class="bd-item">${escHtml(line.replace(/^GRAMMAR:\s*/i, ''))}</div>`);
+    } else {
+      // Continuation line — append to previous part
+      const last = parts.length - 1;
+      if (last >= 0) {
+        parts[last] = parts[last].replace(/<\/div>$/, `<br>${escHtml(line)}</div>`);
+      } else {
+        parts.push(`<div>${escHtml(line)}</div>`);
+      }
     }
-    if (/^BREAKDOWN:/i.test(line)) {
-      html += `</div><div class="bd-section"><div class="bd-heading">Breakdown</div>`;
-      continue;
-    }
-    if (/^SENTENCE:/i.test(line)) {
-      html += `<div class="bd-sentence">${escHtml(line.replace(/^SENTENCE:\s*/i, ''))}</div>`;
-      continue;
-    }
-    if (/^MEANING:/i.test(line)) {
-      html += `<div class="bd-meaning">${escHtml(line.replace(/^MEANING:\s*/i, ''))}</div>`;
-      continue;
-    }
-    if (/^VOCAB:/i.test(line)) {
-      html += `<div class="bd-label">Vocab</div><div class="bd-list">${escHtml(line.replace(/^VOCAB:\s*/i, ''))}`;
-      continue;
-    }
-    if (/^GRAMMAR:/i.test(line)) {
-      html += `</div><div class="bd-label">Grammar</div><div class="bd-list">${escHtml(line.replace(/^GRAMMAR:\s*/i, ''))}`;
-      continue;
-    }
-    // Continuation lines (bullets etc.)
-    html += `<br>${esc}`;
   }
-  html += '</div></div>';
-  return html;
+  return parts.join('');
 }
 
 let _msgCounter = 0;
