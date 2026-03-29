@@ -490,6 +490,7 @@ pre.code {
 .speak-btn:hover, .breakdown-btn:hover { border-color: var(--border); color: var(--text); }
 .speak-btn.speaking { color: var(--blue); border-color: var(--blue); }
 .w-active { background: rgba(180, 140, 100, 0.2); border-radius: 2px; transition: background 0.1s; }
+.wt, [data-rt] { cursor: pointer; }
 .audio-player {
   display: flex; align-items: center; gap: 6px; padding: 4px 0; margin-top: 2px;
 }
@@ -727,7 +728,7 @@ pre.code {
     <div class="label" style="margin-top:12px">Speech Speed <span id="speedVal" style="font-size:9px;color:var(--muted)">100%</span></div>
     <div style="display:flex;align-items:center;gap:8px">
       <span style="font-size:9px;color:var(--muted)">50%</span>
-      <input type="range" id="speechSpeed" min="50" max="150" value="100" step="5" style="flex:1;accent-color:var(--accent)" oninput="localStorage.setItem('renshuu_speech_speed',this.value);document.getElementById('speedVal').textContent=this.value+'%'" />
+      <input type="range" id="speechSpeed" min="50" max="150" value="100" step="5" style="flex:1;accent-color:var(--accent)" oninput="localStorage.setItem('renshuu_speech_speed',this.value);document.getElementById('speedVal').textContent=this.value+'%';cancelSpeech()" />
       <span style="font-size:9px;color:var(--muted)">150%</span>
     </div>
     <button type="submit" class="btn w100" style="margin-top:10px">Save</button>
@@ -909,6 +910,29 @@ document.addEventListener('click', e => {
     _currentAudio.currentTime = pct * _currentAudio.duration;
     updatePlayer(_currentMsgId);
     return;
+  }
+
+  // Click word to scrub audio to that word's timing
+  if (_currentAudio && _wordMap?.length && _wordBounds?.length) {
+    const wordEl = e.target.closest('.wt, [data-rt]');
+    if (wordEl) {
+      const wm = _wordMap.find(m => m.el === wordEl);
+      if (wm) {
+        // Find the word boundary that overlaps this element's character range
+        const wb = _wordBounds.find(b => b.plainOffset < wm.end && b.plainOffset + b.plainLen > wm.start);
+        if (wb) {
+          _currentAudio.currentTime = wb.ms / 1000;
+          if (_currentAudio.paused) {
+            _currentAudio.play();
+            const apBtn = document.querySelector(`.ap-btn[data-ap="${_currentMsgId}"]`);
+            if (apBtn) { apBtn.textContent = '⏸'; apBtn.classList.add('playing'); }
+            document.querySelectorAll('.speak-btn.speaking').forEach(b => b.classList.add('speaking'));
+          }
+          updatePlayer(_currentMsgId);
+          return;
+        }
+      }
+    }
   }
 
   // Break down message
@@ -1434,10 +1458,9 @@ function speakJapanese(rawText, btn, msgId) {
       const voiceName = S.scenario?.voice || 'ja-JP-NanamiNeural';
       cfg.speechSynthesisVoiceName = voiceName;
       // Build SSML with speed control
-      // Azure prosody rate: 0% = normal, -50% = half speed, +50% = 1.5x
-      // Our slider: 50=half, 100=normal, 150=1.5x → subtract 100
+      // Azure prosody rate as absolute percentage: "50%" = half, "100%" = normal, "150%" = 1.5x
       const speed = parseInt(localStorage.getItem('renshuu_speech_speed') || '100', 10);
-      const rate = (speed - 100 >= 0 ? '+' : '') + (speed - 100) + '%';
+      const rate = speed + '%';
       const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ja-JP">
         <voice name="${voiceName}">
           <prosody rate="${rate}">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</prosody>
