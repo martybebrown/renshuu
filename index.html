@@ -525,17 +525,22 @@ pre.code {
 }
 .breakdown-btn.active { color: var(--blue); border-color: var(--blue); }
 .msg-breakdown {
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 10px;
+  line-height: 1.5;
   color: var(--text);
   background: var(--cream);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   margin-top: 6px;
 }
+@media (min-width: 800px) {
+  .msg.assistant.has-breakdown { flex-direction: row; align-items: flex-start; gap: 10px; max-width: 95%; }
+  .msg.assistant.has-breakdown .msg-inner { flex: 1; min-width: 0; }
+  .msg.assistant.has-breakdown .msg-breakdown { margin-top: 0; flex: 0 0 280px; max-height: 400px; overflow-y: auto; }
+}
 .msg-breakdown .bd-line { margin-bottom: 6px; }
-.msg-breakdown .bd-label { font-weight: 600; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+.msg-breakdown .bd-label { font-weight: 600; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; }
 .chat-foot { display: flex; gap: 8px; align-items: flex-end; }
 .chat-input {
   flex: 1;
@@ -2121,21 +2126,24 @@ function renderMessages() {
     const nextMsg = S.convo[i + 1];
     const correctionHere = msg.role === 'user' && nextMsg?.correction
       ? `<div class="msg-correction">↳ ${escHtml(nextMsg.correction)}</div>` : '';
+    const hasBd = isReal && msg.breakdown;
     return `
-      <div class="msg ${msg.role}">
-        <div class="msg-body">${body}</div>
-        ${correctionHere}
-        ${isReal ? `
-        <div class="msg-foot">
-          <button class="speak-btn" data-mid="${msg._id}" title="Speak aloud">🔊</button>
-          <button class="breakdown-btn" data-mid="${msg._id}" title="Break down this message">📖</button>
+      <div class="msg ${msg.role}${hasBd ? ' has-breakdown' : ''}">
+        <div class="msg-inner">
+          <div class="msg-body">${body}</div>
+          ${correctionHere}
+          ${isReal ? `
+          <div class="msg-foot">
+            <button class="speak-btn" data-mid="${msg._id}" title="Speak aloud">🔊</button>
+            <button class="breakdown-btn" data-mid="${msg._id}" title="Break down this message">📖</button>
+          </div>
+          <div class="audio-player" id="ap-${msg._id}" style="display:none">
+            <button class="ap-btn" data-ap="${msg._id}" title="Play/Pause">▶</button>
+            <div class="ap-track" data-ap-track="${msg._id}"><div class="ap-fill"></div></div>
+            <span class="ap-time">0:00</span>
+          </div>` : ''}
         </div>
-        <div class="audio-player" id="ap-${msg._id}" style="display:none">
-          <button class="ap-btn" data-ap="${msg._id}" title="Play/Pause">▶</button>
-          <div class="ap-track" data-ap-track="${msg._id}"><div class="ap-fill"></div></div>
-          <span class="ap-time">0:00</span>
-        </div>
-        ${msg.breakdown ? `<div class="msg-breakdown">${msg.breakdown}</div>` : ''}` : ''}
+        ${hasBd ? `<div class="msg-breakdown">${msg.breakdown}</div>` : ''}
       </div>
     `;
   }).join('');
