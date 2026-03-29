@@ -489,6 +489,27 @@ pre.code {
 }
 .speak-btn:hover, .breakdown-btn:hover { border-color: var(--border); color: var(--text); }
 .speak-btn.speaking { color: var(--blue); border-color: var(--blue); }
+.audio-player {
+  display: flex; align-items: center; gap: 6px; padding: 4px 0; margin-top: 2px;
+}
+.audio-player .ap-btn {
+  background: none; border: 1px solid var(--border); border-radius: 3px;
+  cursor: pointer; font-size: 12px; color: var(--muted); padding: 2px 6px;
+  line-height: 1; transition: all 0.15s;
+}
+.audio-player .ap-btn:hover { color: var(--text); border-color: var(--text); }
+.audio-player .ap-btn.playing { color: var(--blue); border-color: var(--blue); }
+.audio-player .ap-track {
+  flex: 1; height: 6px; background: var(--border); border-radius: 3px;
+  cursor: pointer; position: relative; min-width: 80px;
+}
+.audio-player .ap-fill {
+  height: 100%; background: var(--blue); border-radius: 3px;
+  pointer-events: none; width: 0%;
+}
+.audio-player .ap-time {
+  font-size: 9px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 32px; text-align: right;
+}
 .breakdown-btn {
   background: none;
   border: 1px solid transparent;
@@ -857,8 +878,35 @@ document.addEventListener('click', e => {
   // Speak message aloud
   const speakBtn = e.target.closest('.speak-btn[data-mid]');
   if (speakBtn) {
-    const msg = S.convo.find(m => m._id === speakBtn.dataset.mid);
-    if (msg) speakJapanese(msg.content, speakBtn);
+    const mid = speakBtn.dataset.mid;
+    const msg = S.convo.find(m => m._id === mid);
+    if (msg) speakJapanese(msg.content, speakBtn, mid);
+    return;
+  }
+
+  // Audio player play/pause
+  const apBtn = e.target.closest('.ap-btn[data-ap]');
+  if (apBtn && _currentAudio && _currentMsgId === apBtn.dataset.ap) {
+    if (_currentAudio.paused) {
+      _currentAudio.play();
+      apBtn.textContent = '⏸';
+      apBtn.classList.add('playing');
+      updatePlayer(_currentMsgId);
+    } else {
+      _currentAudio.pause();
+      apBtn.textContent = '▶';
+      apBtn.classList.remove('playing');
+    }
+    return;
+  }
+
+  // Audio player scrub
+  const apTrack = e.target.closest('.ap-track[data-ap-track]');
+  if (apTrack && _currentAudio && _currentMsgId === apTrack.dataset.apTrack) {
+    const rect = apTrack.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    _currentAudio.currentTime = pct * _currentAudio.duration;
+    updatePlayer(_currentMsgId);
     return;
   }
 
@@ -1259,17 +1307,62 @@ function stripMarkers(text) {
 // Cancel any in-progress speech
 let _azureSynth = null;
 let _currentAudio = null;
+let _currentMsgId = null;
+let _apRAF = null;
+
 function cancelSpeech() {
   if (window.speechSynthesis) speechSynthesis.cancel();
   if (_azureSynth) { _azureSynth.close(); _azureSynth = null; }
   if (_currentAudio) { _currentAudio.pause(); _currentAudio = null; }
+  if (_apRAF) { cancelAnimationFrame(_apRAF); _apRAF = null; }
   document.querySelectorAll('.speak-btn.speaking').forEach(b => b.classList.remove('speaking'));
+  // Hide all players and reset
+  document.querySelectorAll('.audio-player').forEach(p => { p.style.display = 'none'; });
+  document.querySelectorAll('.ap-btn').forEach(b => { b.textContent = '▶'; b.classList.remove('playing'); });
+  _currentMsgId = null;
 }
 
-function speakJapanese(rawText, btn) {
+function fmtTime(s) {
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return m + ':' + (sec < 10 ? '0' : '') + sec;
+}
+
+function updatePlayer(msgId) {
+  const player = document.getElementById('ap-' + msgId);
+  if (!player || !_currentAudio) return;
+  const fill = player.querySelector('.ap-fill');
+  const time = player.querySelector('.ap-time');
+  const pct = _currentAudio.duration ? (_currentAudio.currentTime / _currentAudio.duration) * 100 : 0;
+  if (fill) fill.style.width = pct + '%';
+  if (time) time.textContent = fmtTime(_currentAudio.currentTime);
+  if (!_currentAudio.paused && !_currentAudio.ended) {
+    _apRAF = requestAnimationFrame(() => updatePlayer(msgId));
+  }
+}
+
+function speakJapanese(rawText, btn, msgId) {
+  // If this message already has audio loaded, just toggle play
+  if (msgId && _currentMsgId === msgId && _currentAudio) {
+    if (_currentAudio.paused) {
+      _currentAudio.play();
+      const apBtn = document.querySelector(`.ap-btn[data-ap="${msgId}"]`);
+      if (apBtn) { apBtn.textContent = '⏸'; apBtn.classList.add('playing'); }
+      btn?.classList.add('speaking');
+      updatePlayer(msgId);
+    } else {
+      _currentAudio.pause();
+      const apBtn = document.querySelector(`.ap-btn[data-ap="${msgId}"]`);
+      if (apBtn) { apBtn.textContent = '▶'; apBtn.classList.remove('playing'); }
+      btn?.classList.remove('speaking');
+    }
+    return;
+  }
+
   cancelSpeech();
   const text = stripMarkers(rawText);
   if (!text.trim()) return;
+  _currentMsgId = msgId || null;
 
   const azKey = localStorage.getItem('renshuu_azure_key');
   const azRegion = localStorage.getItem('renshuu_azure_region');
@@ -1301,8 +1394,25 @@ function speakJapanese(rawText, btn) {
             const blob = new Blob([result.audioData], { type: 'audio/wav' });
             const audio = new Audio(URL.createObjectURL(blob));
             _currentAudio = audio;
-            audio.onended = audio.onerror = () => { btn?.classList.remove('speaking'); _currentAudio = null; };
+            audio.onended = audio.onerror = () => {
+              btn?.classList.remove('speaking');
+              if (msgId) {
+                const apBtn = document.querySelector(`.ap-btn[data-ap="${msgId}"]`);
+                if (apBtn) { apBtn.textContent = '▶'; apBtn.classList.remove('playing'); }
+                updatePlayer(msgId);
+              } else {
+                _currentAudio = null;
+              }
+            };
+            // Show player if msgId
+            if (msgId) {
+              const player = document.getElementById('ap-' + msgId);
+              if (player) player.style.display = 'flex';
+              const apBtn = document.querySelector(`.ap-btn[data-ap="${msgId}"]`);
+              if (apBtn) { apBtn.textContent = '⏸'; apBtn.classList.add('playing'); }
+            }
             audio.play();
+            if (msgId) updatePlayer(msgId);
           } else {
             btn?.classList.remove('speaking');
           }
@@ -1913,6 +2023,11 @@ function renderMessages() {
           <button class="speak-btn" data-mid="${msg._id}" title="Speak aloud">🔊</button>
           <button class="breakdown-btn" data-mid="${msg._id}" title="Break down this message">📖</button>
         </div>
+        <div class="audio-player" id="ap-${msg._id}" style="display:none">
+          <button class="ap-btn" data-ap="${msg._id}" title="Play/Pause">▶</button>
+          <div class="ap-track" data-ap-track="${msg._id}"><div class="ap-fill"></div></div>
+          <span class="ap-time">0:00</span>
+        </div>
         ${msg.breakdown ? `<div class="msg-breakdown">${msg.breakdown}</div>` : ''}` : ''}
       </div>
     `;
@@ -1958,9 +2073,9 @@ VOCABULARY TO USE NATURALLY: ${allList}
 PRIORITY — embed these NEW words whenever natural: ${newList || '(none this session)'}
 
 Rules:
-1. Respond in Japanese only. Keep replies to 2–3 sentences.
+1. Respond in Japanese only. IMPORTANT: Vary your reply length naturally like a real conversation — sometimes just a short reaction or one sentence (え？本当？ / そうだね。), sometimes 2–3 sentences, occasionally longer when the story demands it. Do NOT always write the same length. Short replies are good and natural.
 2. Weave in vocab from the list, especially the priority new words.
-3. Stay in character. Ask a natural follow-up question each turn.
+3. Stay in character. Ask a natural follow-up question each turn (but not every single turn — sometimes just react).
 4. After your Japanese, if the student made a grammar or vocab error, add: [Correction: short note in English]
 5. Aim for N4–N3 level.
 6. Mark every kanji word/compound (including okurigana) with [[word|reading|english]] pipe markers. Leave hiragana/katakana-only text unmarked. Example: [[日本語|にほんご|Japanese]]は[[面白い|おもしろい|interesting]]です。
