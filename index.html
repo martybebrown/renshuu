@@ -727,7 +727,7 @@ pre.code {
     <div class="label" style="margin-top:12px">Speech Speed <span id="speedVal" style="font-size:9px;color:var(--muted)">100%</span></div>
     <div style="display:flex;align-items:center;gap:8px">
       <span style="font-size:9px;color:var(--muted)">50%</span>
-      <input type="range" id="speechSpeed" min="50" max="150" value="100" step="5" style="flex:1;accent-color:var(--accent)" oninput="localStorage.setItem('renshuu_speech_speed',this.value);document.getElementById('speedVal').textContent=this.value+'%';cancelSpeech()" />
+      <input type="range" id="speechSpeed" min="50" max="150" value="100" step="5" style="flex:1;accent-color:var(--accent)" oninput="localStorage.setItem('renshuu_speech_speed',this.value);document.getElementById('speedVal').textContent=this.value+'%'" />
       <span style="font-size:9px;color:var(--muted)">150%</span>
     </div>
     <button type="submit" class="btn w100" style="margin-top:10px">Save</button>
@@ -1434,9 +1434,10 @@ function speakJapanese(rawText, btn, msgId) {
       const voiceName = S.scenario?.voice || 'ja-JP-NanamiNeural';
       cfg.speechSynthesisVoiceName = voiceName;
       // Build SSML with speed control
-      // Azure prosody rate as absolute percentage: "50%" = half, "100%" = normal, "150%" = 1.5x
+      // Azure prosody rate: 0% = normal, -50% = half speed, +50% = 1.5x
+      // Our slider: 50=half, 100=normal, 150=1.5x → subtract 100
       const speed = parseInt(localStorage.getItem('renshuu_speech_speed') || '100', 10);
-      const rate = speed + '%';
+      const rate = (speed - 100 >= 0 ? '+' : '') + (speed - 100) + '%';
       const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ja-JP">
         <voice name="${voiceName}">
           <prosody rate="${rate}">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</prosody>
