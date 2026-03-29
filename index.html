@@ -1018,6 +1018,11 @@ async function loadCards() {
       const gistData = await gistFetch();
       if (gistData?.cards) {
         localStorage.setItem('renshuu_cards', JSON.stringify(gistData));
+        // Restore favorites from gist if present
+        if (gistData.favorites?.length) {
+          S.favorites = gistData.favorites;
+          localStorage.setItem('renshuu_favorites', JSON.stringify(S.favorites));
+        }
         loadFromData(gistData);
         btn.disabled = false; btn.textContent = 'Reload from Anki';
         return;
@@ -1067,10 +1072,17 @@ async function gistGetId(token) {
   return null;
 }
 
+// Debounced gist push for favorites changes
+let _gistPushTimer = null;
+function gistPushAll() {
+  clearTimeout(_gistPushTimer);
+  _gistPushTimer = setTimeout(() => gistPush(S.cards), 2000);
+}
+
 async function gistPush(cards) {
   const token = localStorage.getItem('renshuu_gh_token');
   if (!token) return;
-  const content = JSON.stringify({ cards, timestamp: Date.now() });
+  const content = JSON.stringify({ cards, favorites: S.favorites, timestamp: Date.now() });
   let id = await gistGetId(token);
   if (id) {
     await fetch(`https://api.github.com/gists/${id}`, {
@@ -1797,13 +1809,27 @@ function toggleFavorite(id) {
   if (idx === -1) {
     // Find the full scenario object from current scenarios or pool
     const sc = S.scenarios.find(s => s.id === id) || SCENARIO_POOL.find(s => s.id === id);
-    if (sc) S.favorites.push(sc);
+    if (sc) {
+      const fav = { ...sc };
+      // Save conversation if this is the active scenario
+      if (S.scenario?.id === id && S.convo.length) {
+        fav.convo = S.convo.map(m => ({ role: m.role, content: m.content, correction: m.correction || undefined }));
+      }
+      S.favorites.push(fav);
+    }
   } else {
     S.favorites.splice(idx, 1);
   }
-  localStorage.setItem('renshuu_favorites', JSON.stringify(S.favorites));
+  saveFavorites();
   renderRoleplay();
   if (S.scenario) scrollChat();
+}
+
+
+function saveFavorites() {
+  localStorage.setItem('renshuu_favorites', JSON.stringify(S.favorites));
+  // Sync to gist in background
+  gistPushAll();
 }
 
 function scCard(sc) {
@@ -1945,8 +1971,10 @@ function saveConvoToFavorite() {
   if (!S.scenario) return;
   const fav = S.favorites.find(f => f.id === S.scenario.id);
   if (fav) {
-    fav.convo = S.convo.map(m => ({ role: m.role, content: m.content, _id: m._id, correction: m.correction }));
-    localStorage.setItem('renshuu_favorites', JSON.stringify(S.favorites));
+    fav.convo = S.convo
+      .filter(m => m.content !== '…')
+      .map(m => ({ role: m.role, content: m.content, _id: m._id, correction: m.correction || undefined }));
+    saveFavorites();
   }
 }
 
