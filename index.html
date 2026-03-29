@@ -490,6 +490,7 @@ pre.code {
 .speak-btn:hover, .breakdown-btn:hover { border-color: var(--border); color: var(--text); }
 .speak-btn.speaking { color: var(--blue); border-color: var(--blue); }
 .w-active { background: rgba(180, 140, 100, 0.2); border-radius: 2px; transition: background 0.1s; }
+.wt, [data-rt] { cursor: pointer; }
 .audio-player {
   display: flex; align-items: center; gap: 6px; padding: 4px 0; margin-top: 2px;
 }
@@ -909,6 +910,29 @@ document.addEventListener('click', e => {
     _currentAudio.currentTime = pct * _currentAudio.duration;
     updatePlayer(_currentMsgId);
     return;
+  }
+
+  // Click word to scrub audio to that word's timing
+  if (_currentAudio && _wordMap?.length && _wordBounds?.length) {
+    const wordEl = e.target.closest('.wt, [data-rt]');
+    if (wordEl) {
+      const wm = _wordMap.find(m => m.el === wordEl);
+      if (wm) {
+        // Find the word boundary that overlaps this element's character range
+        const wb = _wordBounds.find(b => b.plainOffset < wm.end && b.plainOffset + b.plainLen > wm.start);
+        if (wb) {
+          _currentAudio.currentTime = wb.ms / 1000;
+          if (_currentAudio.paused) {
+            _currentAudio.play();
+            const apBtn = document.querySelector(`.ap-btn[data-ap="${_currentMsgId}"]`);
+            if (apBtn) { apBtn.textContent = '⏸'; apBtn.classList.add('playing'); }
+            document.querySelectorAll('.speak-btn.speaking').forEach(b => b.classList.add('speaking'));
+          }
+          updatePlayer(_currentMsgId);
+          return;
+        }
+      }
+    }
   }
 
   // Break down message
