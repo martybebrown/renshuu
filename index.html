@@ -1475,13 +1475,10 @@ function speakJapanese(rawText, btn, msgId) {
       const synth = new SpeechSDK.SpeechSynthesizer(cfg, null);
       _azureSynth = synth;
       // Collect word boundary events for karaoke highlighting
-      // Azure audioOffset is in 100ns ticks. Azure reports offsets for the BASE
-      // speech rate, not adjusted for prosody. Scale by inverse of speed factor
-      // so timings match the actual audio duration.
+      // Azure audioOffset is in 100ns ticks and already accounts for prosody rate
       const wordBounds = [];
-      const speedRatio = speed / 100; // 0.5 at 50%, 1.0 at 100%, 1.5 at 150%
       synth.wordBoundary = (s, e) => {
-        wordBounds.push({ ms: (e.audioOffset / 10000) / speedRatio, text: e.text, ssmlOffset: e.textOffset, len: e.wordLength });
+        wordBounds.push({ ms: e.audioOffset / 10000, text: e.text, ssmlOffset: e.textOffset, len: e.wordLength });
       };
       synth.speakSsmlAsync(ssml,
         result => {
