@@ -1709,30 +1709,41 @@ function restoreAudioPlayer() {
 }
 
 function formatBreakdown(text) {
-  const lines = text.split('\n');
+  // Strip markdown formatting: **bold**, # headers, --- separators
+  const clean = text.replace(/\*\*/g, '');
+  const lines = clean.split('\n');
   const parts = [];
   for (const raw of lines) {
     const line = raw.trim();
-    if (!line) continue;
-    if (/^TRANSLATION:/i.test(line)) {
+    if (!line || line === '---') continue;
+    // Strip leading # markdown headers
+    const stripped = line.replace(/^#{1,3}\s*/, '');
+    if (/^TRANSLATION:/i.test(stripped)) {
+      const content = stripped.replace(/^TRANSLATION:\s*/i, '').trim();
       parts.push(`<div class="bd-heading">Translation</div>`);
-    } else if (/^BREAKDOWN:/i.test(line)) {
+      if (content) parts.push(`<div class="bd-item">${escHtml(content)}</div>`);
+    } else if (/^BREAKDOWN:/i.test(stripped)) {
       parts.push(`<div class="bd-heading" style="margin-top:8px">Breakdown</div>`);
-    } else if (/^SENTENCE:/i.test(line)) {
-      parts.push(`<div class="bd-sentence">${escHtml(line.replace(/^SENTENCE:\s*/i, ''))}</div>`);
-    } else if (/^MEANING:/i.test(line)) {
-      parts.push(`<div class="bd-meaning">${escHtml(line.replace(/^MEANING:\s*/i, ''))}</div>`);
-    } else if (/^VOCAB:/i.test(line)) {
-      parts.push(`<div class="bd-label">Vocab</div><div class="bd-item">${escHtml(line.replace(/^VOCAB:\s*/i, ''))}</div>`);
-    } else if (/^GRAMMAR:/i.test(line)) {
-      parts.push(`<div class="bd-label">Grammar</div><div class="bd-item">${escHtml(line.replace(/^GRAMMAR:\s*/i, ''))}</div>`);
+    } else if (/^SENTENCE:/i.test(stripped)) {
+      parts.push(`<div class="bd-sentence">${escHtml(stripped.replace(/^SENTENCE:\s*/i, ''))}</div>`);
+    } else if (/^MEANING:/i.test(stripped)) {
+      parts.push(`<div class="bd-meaning">${escHtml(stripped.replace(/^MEANING:\s*/i, ''))}</div>`);
+    } else if (/^VOCAB:/i.test(stripped)) {
+      const content = stripped.replace(/^VOCAB:\s*/i, '').trim();
+      parts.push(`<div class="bd-label">Vocab</div>`);
+      if (content) parts.push(`<div class="bd-item">${escHtml(content)}</div>`);
+    } else if (/^GRAMMAR:/i.test(stripped)) {
+      const content = stripped.replace(/^GRAMMAR:\s*/i, '').trim();
+      parts.push(`<div class="bd-label">Grammar</div>`);
+      if (content) parts.push(`<div class="bd-item">${escHtml(content)}</div>`);
     } else {
-      // Continuation line — append to previous part
+      // Bullet or continuation line
+      const bulletText = line.replace(/^[・•\-\*]\s*/, '');
       const last = parts.length - 1;
-      if (last >= 0) {
-        parts[last] = parts[last].replace(/<\/div>$/, `<br>${escHtml(line)}</div>`);
+      if (last >= 0 && parts[last].includes('bd-item')) {
+        parts[last] = parts[last].replace(/<\/div>$/, `<br>${escHtml(bulletText)}</div>`);
       } else {
-        parts.push(`<div>${escHtml(line)}</div>`);
+        parts.push(`<div class="bd-item">${escHtml(bulletText)}</div>`);
       }
     }
   }
