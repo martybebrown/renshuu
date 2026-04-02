@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>練習 — Renshuu</title>
-<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;700&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;700&family=Nunito+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/wanakana@5/umd/wanakana.min.js"></script>
 <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
 <style>
@@ -24,7 +25,7 @@
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'DM Mono', monospace;
+  font-family: 'Nunito Sans', sans-serif;
   font-size: 13px;
   min-height: 100vh;
   display: flex;
@@ -93,7 +94,7 @@ input.field {
   color: var(--text);
   padding: 7px 10px;
   border-radius: 3px;
-  font-family: 'DM Mono', monospace;
+  font-family: 'Nunito Sans', sans-serif;
   font-size: 11px;
   width: 100%;
   outline: none;
@@ -107,7 +108,7 @@ select.field {
   color: var(--text);
   padding: 7px 10px;
   border-radius: 3px;
-  font-family: 'DM Mono', monospace;
+  font-family: 'Nunito Sans', sans-serif;
   font-size: 11px;
   width: 100%;
   outline: none;
@@ -128,7 +129,7 @@ select.field:focus { border-color: var(--muted); }
   padding: 8px 12px;
   border-radius: 3px;
   cursor: pointer;
-  font-family: 'DM Mono', monospace;
+  font-family: 'Nunito Sans', sans-serif;
   font-size: 11px;
   transition: all 0.15s;
   text-align: center;
@@ -148,7 +149,7 @@ select.field:focus { border-color: var(--muted); }
   border-radius: 3px;
   cursor: pointer;
   color: var(--muted);
-  font-family: 'DM Mono', monospace;
+  font-family: 'Nunito Sans', sans-serif;
   font-size: 11px;
   text-align: center;
   transition: all 0.15s;
@@ -181,7 +182,7 @@ select.field:focus { border-color: var(--muted); }
   font-size: 0.62em;
   white-space: nowrap;
   color: var(--gold);
-  font-family: 'DM Mono', monospace;
+  font-family: 'Nunito Sans', sans-serif;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s;
@@ -202,7 +203,7 @@ select.field:focus { border-color: var(--muted); }
   font-size: 0.6em;
   white-space: nowrap;
   color: var(--text);
-  font-family: 'DM Mono', monospace;
+  font-family: 'Nunito Sans', sans-serif;
   pointer-events: none;
   z-index: 11;
 }
@@ -292,7 +293,7 @@ select.field:focus { border-color: var(--muted); }
   border-radius: 2px;
   cursor: pointer;
   color: var(--muted);
-  font-family: 'DM Mono', monospace;
+  font-family: 'Nunito Sans', sans-serif;
   transition: all 0.15s;
 }
 .quiz-reveal:hover { border-color: var(--muted); color: var(--text); }
@@ -2542,7 +2543,7 @@ function renderStoryCard() {
       </div>
       <div class="story-title">
         ${safeAnnotated(buildAnnotated(s.title_jp || ''))}
-        <span style="font-size:0.5em;color:var(--muted);font-family:'DM Mono',monospace;font-weight:400;margin-left:8px">${escHtml(s.title_en)}</span>
+        <span style="font-size:0.5em;color:var(--muted);font-family:'Nunito Sans',sans-serif;font-weight:400;margin-left:8px">${escHtml(s.title_en)}</span>
       </div>
       <div class="story-body">${safeBody}</div>
       <div class="story-legend">
