@@ -1482,6 +1482,7 @@ function speakJapanese(rawText, btn, msgId) {
       };
       synth.speakSsmlAsync(ssml,
         result => {
+          if (_currentMsgId !== msgId) { synth.close(); return; }
           if (result.reason === SpeechSDK.ResultReason.SynthesizingAudioCompleted && result.audioData) {
             const blob = new Blob([result.audioData], { type: 'audio/wav' });
             const audio = new Audio(URL.createObjectURL(blob));
@@ -1542,6 +1543,7 @@ function speakJapanese(rawText, btn, msgId) {
           _azureSynth = null;
         },
         err => {
+          if (_currentMsgId !== msgId) { synth.close(); return; }
           console.warn('Azure TTS failed, falling back to Web Speech:', err);
           synth.close();
           _azureSynth = null;
@@ -1682,7 +1684,7 @@ function formatBreakdown(text) {
   return parts.join('');
 }
 
-let _msgCounter = 0;
+let _msgCounter = Date.now();
 function msgId() { return 'm' + (++_msgCounter); }
 
 function shuffle(a) {
