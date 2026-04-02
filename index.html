@@ -60,6 +60,45 @@ aside {
   flex-direction: column;
   gap: 18px;
   overflow-y: auto;
+  position: relative;
+  transition: width 0.2s, padding 0.2s;
+}
+.sidebar-toggle {
+  display: none;
+  position: absolute;
+  top: 10px;
+  right: -14px;
+  width: 28px;
+  height: 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  z-index: 10;
+  transition: all 0.15s;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+}
+.sidebar-toggle:hover { border-color: var(--muted); color: var(--text); }
+@media (min-width: 768px) {
+  .sidebar-toggle { display: flex; }
+  .layout.sidebar-collapsed { grid-template-columns: 0px 1fr; }
+  .layout.sidebar-collapsed aside {
+    width: 0;
+    padding: 0;
+    overflow: hidden;
+    border-right: none;
+  }
+  .layout.sidebar-collapsed .sidebar-toggle {
+    position: fixed;
+    top: 60px;
+    left: 6px;
+    right: auto;
+  }
 }
 .label {
   font-size: 10px;
@@ -746,8 +785,9 @@ pre.code {
   </form>
 </div>
 
-<div class="layout">
+<div class="layout" id="layout">
   <aside>
+    <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Collapse sidebar">«</button>
     <!-- Deck filter -->
     <div>
       <div class="label">Deck</div>
@@ -888,17 +928,17 @@ document.addEventListener('click', e => {
   }
 
   // Speak message aloud
-  const speakBtn = e.target.closest('.speak-btn[data-mid]');
+  const speakBtn = e.target.closest('.speak-btn[data-mi]');
   if (speakBtn) {
-    const mid = speakBtn.dataset.mid;
-    const msg = S.convo.find(m => m._id === mid);
-    if (msg) speakJapanese(msg.content, speakBtn, mid);
+    const mi = parseInt(speakBtn.dataset.mi, 10);
+    const msg = S.convo[mi];
+    if (msg) speakJapanese(msg.content, speakBtn, mi);
     return;
   }
 
   // Audio player play/pause
   const apBtn = e.target.closest('.ap-btn[data-ap]');
-  if (apBtn && _currentAudio && _currentMsgId === apBtn.dataset.ap) {
+  if (apBtn && _currentAudio && _currentMsgId === parseInt(apBtn.dataset.ap, 10)) {
     if (_currentAudio.paused) {
       _currentAudio.play();
       apBtn.textContent = '⏸';
@@ -914,7 +954,7 @@ document.addEventListener('click', e => {
 
   // Audio player scrub
   const apTrack = e.target.closest('.ap-track[data-ap-track]');
-  if (apTrack && _currentAudio && _currentMsgId === apTrack.dataset.apTrack) {
+  if (apTrack && _currentAudio && _currentMsgId === parseInt(apTrack.dataset.apTrack, 10)) {
     const rect = apTrack.getBoundingClientRect();
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     _currentAudio.currentTime = pct * _currentAudio.duration;
@@ -942,10 +982,11 @@ document.addEventListener('click', e => {
   }
 
   // Break down message
-  const bdBtn = e.target.closest('.breakdown-btn[data-mid]');
+  const bdBtn = e.target.closest('.breakdown-btn[data-mi]');
   if (bdBtn) {
-    const msg = S.convo.find(m => m._id === bdBtn.dataset.mid);
-    if (msg) breakdownMessage(msg, bdBtn);
+    const mi = parseInt(bdBtn.dataset.mi, 10);
+    const msg = S.convo[mi];
+    if (msg) breakdownMessage(msg, bdBtn, mi);
     return;
   }
 
@@ -1294,6 +1335,20 @@ function toggleMenu() {
 function closeMenu() {
   document.querySelector('aside')?.classList.remove('sidebar-open');
 }
+function toggleSidebar() {
+  const layout = document.getElementById('layout');
+  const btn = document.getElementById('sidebarToggle');
+  layout.classList.toggle('sidebar-collapsed');
+  const collapsed = layout.classList.contains('sidebar-collapsed');
+  btn.textContent = collapsed ? '»' : '«';
+  localStorage.setItem('renshuu_sidebar', collapsed ? '0' : '1');
+}
+// Restore sidebar state on load
+if (localStorage.getItem('renshuu_sidebar') === '0') {
+  document.getElementById('layout')?.classList.add('sidebar-collapsed');
+  const tb = document.getElementById('sidebarToggle');
+  if (tb) tb.textContent = '»';
+}
 
 // Strip all HTML except <span data-rt="...">, preserving data-en and data-new
 function safeAnnotated(html) {
@@ -1428,18 +1483,18 @@ function buildWordMap(msgBodyEl) {
   return map;
 }
 
-function speakJapanese(rawText, btn, msgId) {
+function speakJapanese(rawText, btn, msgIdx) {
   // If this message already has audio loaded, just toggle play
-  if (msgId && _currentMsgId === msgId && _currentAudio) {
+  if (msgIdx != null && _currentMsgId === msgIdx && _currentAudio) {
     if (_currentAudio.paused) {
       _currentAudio.play();
-      const apBtn = document.querySelector(`.ap-btn[data-ap="${msgId}"]`);
+      const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
       if (apBtn) { apBtn.textContent = '⏸'; apBtn.classList.add('playing'); }
       btn?.classList.add('speaking');
-      updatePlayer(msgId);
+      updatePlayer(msgIdx);
     } else {
       _currentAudio.pause();
-      const apBtn = document.querySelector(`.ap-btn[data-ap="${msgId}"]`);
+      const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
       if (apBtn) { apBtn.textContent = '▶'; apBtn.classList.remove('playing'); }
       btn?.classList.remove('speaking');
     }
@@ -1449,7 +1504,7 @@ function speakJapanese(rawText, btn, msgId) {
   cancelSpeech();
   const text = stripMarkers(rawText);
   if (!text.trim()) return;
-  _currentMsgId = msgId || null;
+  _currentMsgId = msgIdx != null ? msgIdx : null;
 
   const azKey = localStorage.getItem('renshuu_azure_key');
   const azRegion = localStorage.getItem('renshuu_azure_region');
@@ -1483,6 +1538,7 @@ function speakJapanese(rawText, btn, msgId) {
       };
       synth.speakSsmlAsync(ssml,
         result => {
+          if (_currentMsgId !== msgIdx) { synth.close(); return; }
           if (result.reason === SpeechSDK.ResultReason.SynthesizingAudioCompleted && result.audioData) {
             const blob = new Blob([result.audioData], { type: 'audio/wav' });
             const audio = new Audio(URL.createObjectURL(blob));
@@ -1491,16 +1547,16 @@ function speakJapanese(rawText, btn, msgId) {
               btn?.classList.remove('speaking');
               // Clear word highlights
               if (_wordMap) _wordMap.forEach(m => m.el.classList.remove('w-active'));
-              if (msgId) {
-                const apBtn = document.querySelector(`.ap-btn[data-ap="${msgId}"]`);
+              if (msgIdx != null) {
+                const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
                 if (apBtn) { apBtn.textContent = '▶'; apBtn.classList.remove('playing'); }
-                updatePlayer(msgId);
+                updatePlayer(msgIdx);
               } else {
                 _currentAudio = null;
               }
             };
             // Build word map for karaoke highlighting
-            if (msgId && wordBounds.length) {
+            if (msgIdx != null && wordBounds.length) {
               // Map word boundaries to plain text positions by sequential matching
               let plainPos = 0;
               wordBounds.forEach(wb => {
@@ -1516,7 +1572,7 @@ function speakJapanese(rawText, btn, msgId) {
               });
               _wordBounds = wordBounds;
               // Build DOM word map from the message body
-              const msgBody = document.getElementById('ap-' + msgId)?.closest('.msg')?.querySelector('.msg-body');
+              const msgBody = document.getElementById('ap-' + msgIdx)?.closest('.msg')?.querySelector('.msg-body');
               if (msgBody) {
                 _wordMap = buildWordMap(msgBody);
                 // Verify: DOM text should match plain text. If not, log for debugging.
@@ -1527,15 +1583,15 @@ function speakJapanese(rawText, btn, msgId) {
                 }
               }
             }
-            // Show player if msgId
-            if (msgId) {
-              const player = document.getElementById('ap-' + msgId);
+            // Show player if msgIdx
+            if (msgIdx != null) {
+              const player = document.getElementById('ap-' + msgIdx);
               if (player) player.style.display = 'flex';
-              const apBtn = document.querySelector(`.ap-btn[data-ap="${msgId}"]`);
+              const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
               if (apBtn) { apBtn.textContent = '⏸'; apBtn.classList.add('playing'); }
             }
             audio.play();
-            if (msgId) updatePlayer(msgId);
+            if (msgIdx != null) updatePlayer(msgIdx);
           } else {
             btn?.classList.remove('speaking');
           }
@@ -1543,6 +1599,7 @@ function speakJapanese(rawText, btn, msgId) {
           _azureSynth = null;
         },
         err => {
+          if (_currentMsgId !== msgIdx) { synth.close(); return; }
           console.warn('Azure TTS failed, falling back to Web Speech:', err);
           synth.close();
           _azureSynth = null;
@@ -1582,7 +1639,7 @@ function speakWebSpeech(text, btn) {
   else { speechSynthesis.onvoiceschanged = () => { speechSynthesis.onvoiceschanged = null; trySpeak(); }; }
 }
 
-async function breakdownMessage(msg, btn) {
+async function breakdownMessage(msg, btn, mi) {
   // Toggle off if already shown
   if (msg.breakdown) {
     delete msg.breakdown;
@@ -1627,14 +1684,14 @@ ${plain}` }
   if (chatWin) {
     chatWin.innerHTML = renderMessages();
     restoreAudioPlayer();
-    const bdEl = chatWin.querySelector(`[data-mid="${msg._id}"]`)?.closest('.msg')?.querySelector('.msg-breakdown');
+    const bdEl = chatWin.querySelector(`[data-mi="${mi}"]`)?.closest('.msg')?.querySelector('.msg-breakdown');
     if (bdEl) bdEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 }
 
 // After any re-render, restore audio player visibility and word map if audio is active
 function restoreAudioPlayer() {
-  if (!_currentMsgId || !_currentAudio) return;
+  if (_currentMsgId == null || !_currentAudio) return;
   const player = document.getElementById('ap-' + _currentMsgId);
   if (player) {
     player.style.display = 'flex';
@@ -1683,7 +1740,7 @@ function formatBreakdown(text) {
   return parts.join('');
 }
 
-let _msgCounter = 0;
+let _msgCounter = Date.now();
 function msgId() { return 'm' + (++_msgCounter); }
 
 function shuffle(a) {
@@ -1810,8 +1867,8 @@ async function genDrills() {
   const sys = `You are a Japanese language teacher creating fill-in-the-blank sentences.
 Return ONLY valid JSON, no markdown fences, no preamble.
 
-For "annotated_sentence": write the sentence using [[word|reading|english]] pipe markers for every kanji word/compound (including okurigana). Leave hiragana/katakana-only segments unmarked.
-Example: [[日本語|にほんご|Japanese]]の[[勉強|べんきょう|study]]をしています。
+For "annotated_sentence": write the sentence using [[word|reading|english]] pipe markers for every kanji word/compound (including okurigana). Also mark katakana words and meaningful hiragana phrases (2+ chars forming a distinct word) — use hiragana as the reading for katakana.
+Example: [[日本語|にほんご|Japanese]]の[[勉強|べんきょう|study]]を[[コーヒー|こーひー|coffee]]で[[やっぱり|やっぱり|as expected]]しています。
 
 Schema:
 {
@@ -2200,12 +2257,12 @@ function renderMessages() {
           ${correctionHere}
           ${isReal ? `
           <div class="msg-foot">
-            <button class="speak-btn" data-mid="${msg._id}" title="Speak aloud">🔊</button>
-            <button class="breakdown-btn" data-mid="${msg._id}" title="Break down this message">📖</button>
+            <button class="speak-btn" data-mi="${i}" title="Speak aloud">🔊</button>
+            <button class="breakdown-btn" data-mi="${i}" title="Break down this message">📖</button>
           </div>
-          <div class="audio-player" id="ap-${msg._id}" style="display:none">
-            <button class="ap-btn" data-ap="${msg._id}" title="Play/Pause">▶</button>
-            <div class="ap-track" data-ap-track="${msg._id}"><div class="ap-fill"></div></div>
+          <div class="audio-player" id="ap-${i}" style="display:none">
+            <button class="ap-btn" data-ap="${i}" title="Play/Pause">▶</button>
+            <div class="ap-track" data-ap-track="${i}"><div class="ap-fill"></div></div>
             <span class="ap-time">0:00</span>
           </div>` : ''}
         </div>
@@ -2259,7 +2316,7 @@ Rules:
 3. Stay in character. Ask a natural follow-up question each turn (but not every single turn — sometimes just react).
 4. After your Japanese, if the student made a grammar or vocab error, add: [Correction: short note in English]
 5. Aim for N4–N3 level.
-6. Mark every kanji word/compound (including okurigana) with [[word|reading|english]] pipe markers. Leave hiragana/katakana-only text unmarked. Example: [[日本語|にほんご|Japanese]]は[[面白い|おもしろい|interesting]]です。
+6. Mark every kanji word/compound (including okurigana) with [[word|reading|english]] pipe markers. Also mark katakana words and meaningful hiragana phrases (2+ chars forming a distinct word) — use hiragana as the reading for katakana. Example: [[日本語|にほんご|Japanese]]は[[面白い|おもしろい|interesting]]し、[[コーヒー|こーひー|coffee]]も[[やっぱり|やっぱり|as expected]][[美味しい|おいしい|delicious]]。
 7. The student may write in rōmaji (e.g. "watashi wa gakusei desu") — understand it as Japanese and respond naturally. Only correct it if there is an actual grammar or vocab mistake, not just for using romaji.`;
 }
 
@@ -2471,8 +2528,8 @@ ANNOTATION FORMAT for "body" — mark every word/compound containing kanji:
   • reading = hiragana reading
   • english = brief English gloss (no quotes, no pipes)
   • new = 1 if NOT in student vocab list, 0 if it IS
-  Mark EVERY kanji-containing segment — do not skip any. Leave pure hiragana/katakana unmarked.
-  Example: [[日本語|にほんご|Japanese|0]]の[[勉強|べんきょう|study|1]]って[[楽しい|たのしい|fun|1]]よな。
+  Mark EVERY kanji-containing segment — do not skip any. Also mark katakana words and meaningful hiragana phrases (2+ chars forming a distinct word) — use hiragana as the reading for katakana.
+  Example: [[日本語|にほんご|Japanese|0]]の[[勉強|べんきょう|study|1]]って[[やっぱり|やっぱり|as expected|0]][[楽しい|たのしい|fun|1]]よな。[[コーヒー|こーひー|coffee|1]]も[[最高|さいこう|the best|0]]。
 
 Schema:
 {
