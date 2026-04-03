@@ -2348,6 +2348,7 @@ function getSprite(voice, px) {
 // hatRows replace pixel rows 0-1. K=hatColor, k=hatHl, S=skin.
 // overlay: [{x,y,c}] drawn on top.
 const ACCESSORY_KIT = {
+  // ── Shoulder companions ──────────────────────────────────────────────
   parrot: {
     overlay:[
       {x:13,y:8, c:'#22AA22'},{x:14,y:8, c:'#FF6600'},
@@ -2356,12 +2357,22 @@ const ACCESSORY_KIT = {
       {x:13,y:11,c:'#157715'},{x:14,y:11,c:'#157715'},
     ]
   },
+  cat: {
+    overlay:[
+      {x:13,y:7,c:'#E08830'},{x:15,y:7,c:'#E08830'},
+      {x:13,y:8,c:'#E08830'},{x:14,y:8,c:'#E08830'},{x:15,y:8,c:'#E08830'},
+      {x:13,y:9,c:'#E08830'},{x:14,y:9,c:'#EEEECC'},{x:15,y:9,c:'#E08830'},
+      {x:13,y:10,c:'#CC7720'},{x:14,y:10,c:'#CC7720'},{x:15,y:10,c:'#CC7720'},
+      {x:12,y:11,c:'#CC7720'},{x:13,y:11,c:'#CC7720'},
+    ]
+  },
+  // ── Hats ─────────────────────────────────────────────────────────────
   police_cap: {
     hatRows:['..KKKKKKKKKKKK..','..kKKKKKKKKKKk..'],
     hatColor:'#1A2A6A', hatHl:'#2A3A7A',
     overlay:[{x:7,y:1,c:'#C8A020'},{x:8,y:1,c:'#C8A020'}]
   },
-  // chef_hat is computed dynamically to adapt to mature vs adult/young base
+  // chef_hat is computed dynamically (mature vs adult/young base)
   tonsure: {
     hatRows:['..KKKKKKKKKKKK..','..KKKKKKKKKKKK..'],
     hatColor:'#EFC090', hatHl:'#EFC090',
@@ -2375,8 +2386,97 @@ const ACCESSORY_KIT = {
     hatColor:'#1A1A1A', hatHl:'#2A2A2A',
   },
   wide_hat: {
-    hatRows:['....KKKKKKKK....', '.kKKKKKKKKKKKk.'],
+    hatRows:['....KKKKKKKK....', '.kKKKKKKKKKKKKk.'],
     hatColor:'#7A8C40', hatHl:'#9AAA55',
+  },
+  baseball_cap: {
+    hatRows:['..KKKKKKKKKKKK..', '.kKKKKKKKKKKKKk.'],
+    hatColor:'#CC2222', hatHl:'#AA1111',
+  },
+  beanie: {
+    hatRows:['..KkKkKkKkKkKk..','..KKKKKKKKKKKK..'],
+    hatColor:'#446688', hatHl:'#335577',
+  },
+  beret: {
+    hatRows:['..KKKKKKKKKKkK..','...KKKKKKKKk....'],
+    hatColor:'#2A2A4A', hatHl:'#3A3A6A',
+  },
+  hard_hat: {
+    hatRows:['..KKKKKKKKKKKK..', '.kKKKKKKKKKKKKk.'],
+    hatColor:'#FFCC00', hatHl:'#E6B800',
+  },
+  top_hat: {
+    hatRows:['....KKKKKKKK....', '.kKKKKKKKKKKKKk.'],
+    hatColor:'#111111', hatHl:'#333333',
+  },
+  // ── Face accessories ─────────────────────────────────────────────────
+  glasses: {
+    overlay:[
+      {x:3,y:5,c:'#444444'},{x:6,y:5,c:'#444444'},
+      {x:9,y:5,c:'#444444'},{x:12,y:5,c:'#444444'},
+      {x:4,y:6,c:'#444444'},{x:5,y:6,c:'#444444'},
+      {x:7,y:6,c:'#666666'},{x:8,y:6,c:'#666666'},
+      {x:10,y:6,c:'#444444'},{x:11,y:6,c:'#444444'},
+    ]
+  },
+  sunglasses: {
+    overlay:[
+      {x:3,y:5,c:'#1A1A2A'},{x:4,y:5,c:'#223355'},{x:5,y:5,c:'#223355'},
+      {x:6,y:5,c:'#1A1A2A'},{x:7,y:5,c:'#222222'},{x:8,y:5,c:'#222222'},
+      {x:9,y:5,c:'#1A1A2A'},{x:10,y:5,c:'#223355'},{x:11,y:5,c:'#223355'},
+      {x:12,y:5,c:'#1A1A2A'},
+    ]
+  },
+  surgical_mask: {
+    overlay:[
+      {x:3,y:8,c:'#E8E8E8'},{x:4,y:8,c:'#E8E8E8'},{x:5,y:8,c:'#E8E8E8'},
+      {x:6,y:8,c:'#E8E8E8'},{x:7,y:8,c:'#E8E8E8'},{x:8,y:8,c:'#E8E8E8'},
+      {x:9,y:8,c:'#E8E8E8'},{x:10,y:8,c:'#E8E8E8'},{x:11,y:8,c:'#E8E8E8'},{x:12,y:8,c:'#E8E8E8'},
+      {x:3,y:9,c:'#D8D8D8'},{x:4,y:9,c:'#D8D8D8'},{x:5,y:9,c:'#D8D8D8'},
+      {x:6,y:9,c:'#D8D8D8'},{x:7,y:9,c:'#D8D8D8'},{x:8,y:9,c:'#D8D8D8'},
+      {x:9,y:9,c:'#D8D8D8'},{x:10,y:9,c:'#D8D8D8'},{x:11,y:9,c:'#D8D8D8'},{x:12,y:9,c:'#D8D8D8'},
+      {x:3,y:10,c:'#E8E8E8'},{x:4,y:10,c:'#E8E8E8'},{x:5,y:10,c:'#E8E8E8'},
+      {x:6,y:10,c:'#E8E8E8'},{x:7,y:10,c:'#E8E8E8'},{x:8,y:10,c:'#E8E8E8'},
+      {x:9,y:10,c:'#E8E8E8'},{x:10,y:10,c:'#E8E8E8'},{x:11,y:10,c:'#E8E8E8'},{x:12,y:10,c:'#E8E8E8'},
+    ]
+  },
+  // ── Clothing details ─────────────────────────────────────────────────
+  tie: {
+    overlay:[
+      {x:7,y:12,c:'#AA1111'},{x:8,y:12,c:'#AA1111'},
+      {x:7,y:13,c:'#CC1111'},{x:8,y:13,c:'#CC1111'},
+      {x:7,y:14,c:'#CC1111'},{x:8,y:14,c:'#CC1111'},
+      {x:8,y:15,c:'#AA0000'},
+    ]
+  },
+  bow_tie: {
+    overlay:[
+      {x:5,y:12,c:'#550088'},{x:6,y:12,c:'#6600AA'},
+      {x:7,y:12,c:'#7700AA'},{x:8,y:12,c:'#7700AA'},
+      {x:9,y:12,c:'#6600AA'},{x:10,y:12,c:'#550088'},
+    ]
+  },
+  medical: {
+    overlay:[
+      {x:7,y:13,c:'#CC2222'},{x:7,y:14,c:'#CC2222'},{x:7,y:15,c:'#CC2222'},
+      {x:6,y:14,c:'#CC2222'},{x:8,y:14,c:'#CC2222'},
+    ]
+  },
+  // ── Held items / corner icons ─────────────────────────────────────────
+  sake_cup: {
+    overlay:[
+      {x:13,y:9, c:'#F0F0F0'},{x:14,y:9, c:'#F0F0F0'},
+      {x:12,y:10,c:'#F0F0F0'},{x:13,y:10,c:'#E0E0E0'},{x:14,y:10,c:'#F0F0F0'},
+      {x:13,y:11,c:'#F0F0F0'},{x:14,y:11,c:'#F0F0F0'},
+    ]
+  },
+  fan: {
+    overlay:[
+      {x:14,y:7,c:'#FFCC44'},{x:15,y:7,c:'#FFCC44'},
+      {x:13,y:8,c:'#FFCC44'},{x:14,y:8,c:'#FF8844'},{x:15,y:8,c:'#FFCC44'},
+      {x:13,y:9,c:'#FFCC44'},{x:14,y:9,c:'#FFCC44'},{x:15,y:9,c:'#FF8844'},
+      {x:13,y:10,c:'#884400'},{x:13,y:11,c:'#884400'},
+    ]
   },
   hachimaki: {
     overlay:[
@@ -2394,15 +2494,6 @@ const ACCESSORY_KIT = {
       {x:12,y:2,c:'#3355CC'},
     ]
   },
-  glasses: {
-    overlay:[
-      {x:3,y:5,c:'#444444'},{x:6,y:5,c:'#444444'},
-      {x:9,y:5,c:'#444444'},{x:12,y:5,c:'#444444'},
-      {x:4,y:6,c:'#444444'},{x:5,y:6,c:'#444444'},
-      {x:7,y:6,c:'#666666'},{x:8,y:6,c:'#666666'},
-      {x:10,y:6,c:'#444444'},{x:11,y:6,c:'#444444'},
-    ]
-  },
   music_note: {
     overlay:[
       {x:14,y:0,c:'#CC8800'},{x:15,y:0,c:'#CC8800'},
@@ -2410,32 +2501,43 @@ const ACCESSORY_KIT = {
       {x:14,y:2,c:'#CC8800'},{x:15,y:2,c:'#CC8800'},
     ]
   },
-  medical: {
-    // red cross on the shirt
-    overlay:[
-      {x:7,y:13,c:'#CC2222'},{x:7,y:14,c:'#CC2222'},{x:7,y:15,c:'#CC2222'},
-      {x:6,y:14,c:'#CC2222'},{x:8,y:14,c:'#CC2222'},
-    ]
-  },
 };
 
-// ── Infer accessory from scenario text (works for any scenario, including
-//    procedurally generated ones — just needs keywords in id/en/char) ──────
+// ── Infer accessory from scenario text ───────────────────────────────────
+// Reads sc.id + sc.en + sc.char, so works for any scenario including
+// procedurally generated ones — no hardcoded IDs needed.
 function inferAccessory(sc) {
   const t = `${sc.id||''} ${sc.en||''} ${sc.char||''}`.toLowerCase();
-  if (/parrot|bird|pet.caf/.test(t))                               return 'parrot';
-  if (/police|officer|koban/.test(t))                              return 'police_cap';
+  // companions (cat before parrot so cat-café doesn't match pet-café → parrot)
+  if (/cat.caf|neko.caf|kitten.*sit|kitty.*perch/.test(t))          return 'cat';
+  if (/parrot|bird.*caf|pet.caf/.test(t))                           return 'parrot';
+  // hats
+  if (/police|officer|koban/.test(t))                               return 'police_cap';
   if (/chef|ramen|soba|cook|tofu|noodle|yakitori|izakaya.*chef/.test(t)) return 'chef_hat';
-  if (/monk|temple|priest|zen|buddh/.test(t))                      return 'tonsure';
-  if (/fish|pier|angl|fisherman/.test(t))                          return 'fishing_hat';
-  if (/taxi|cab driver|chauffeur/.test(t))                         return 'taxi_cap';
-  if (/garden|florist|flower|outdoor market|farm/.test(t))         return 'wide_hat';
-  if (/taiko|drum.*lesson|one stroke|one soul/.test(t))            return 'hachimaki';
-  if (/gym|workout|fitness|dojo|martial art|kendo|judo/.test(t))   return 'headband';
-  if (/book.?shop|second.hand book|librari|used book/.test(t))     return 'glasses';
-  if (/professor|scholar|researcher|scientist/.test(t))            return 'glasses';
-  if (/karaoke|sing.*song/.test(t))                                return 'music_note';
-  if (/doctor|pharmacist|vet|clinic|hospital|nurse/.test(t))       return 'medical';
+  if (/monk|temple|priest|zen|buddh/.test(t))                       return 'tonsure';
+  if (/fish|pier|angl|fisherman/.test(t))                           return 'fishing_hat';
+  if (/taxi|cab driver|chauffeur/.test(t))                          return 'taxi_cap';
+  if (/magic|magician|illusionist|trick/.test(t))                   return 'top_hat';
+  if (/hard.hat|construct|builder|work.site|renovation/.test(t))    return 'hard_hat';
+  if (/artist|paint.*studio|art class|gallery|atelier/.test(t))     return 'beret';
+  if (/winter|cold.*weather|snow|ski|knit hat/.test(t))             return 'beanie';
+  if (/baseball|sport.*casual|ufo.catcher|crane.game|arcade/.test(t)) return 'baseball_cap';
+  if (/garden|florist|flower.market|farm|outdoor.stall/.test(t))    return 'wide_hat';
+  // face
+  if (/surgical.mask|wear.*mask|cold.*sneez|hay fever/.test(t))     return 'surgical_mask';
+  if (/sunglasses|fashion.*cool|trendy|influencer/.test(t))         return 'sunglasses';
+  if (/book.?shop|second.hand book|librari|used book/.test(t))      return 'glasses';
+  if (/professor|scholar|researcher|scientist/.test(t))             return 'glasses';
+  // clothing
+  if (/wedding|formal dinner|black tie|gala|ceremony/.test(t))      return 'bow_tie';
+  if (/business|salaryman|office worker|company.*meeting|suit/.test(t)) return 'tie';
+  if (/doctor|pharmacist|vet|clinic|hospital|nurse/.test(t))        return 'medical';
+  // held / icons
+  if (/izakaya|sake bar|pub|drinking party|beer garden/.test(t))    return 'sake_cup';
+  if (/festival|matsuri|bon.odori|traditional dance|summer.event/.test(t)) return 'fan';
+  if (/taiko|drum.*lesson|one stroke|one soul/.test(t))             return 'hachimaki';
+  if (/karaoke|karaoke box|sing.*song/.test(t))                     return 'music_note';
+  if (/gym|workout|fitness|dojo|martial art|kendo|judo/.test(t))    return 'headband';
   return null;
 }
 
