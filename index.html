@@ -2344,41 +2344,41 @@ function getSprite(voice, px) {
 // ── Scenario-specific sprite modifications ───────────────────────────────
 // hatRows: replaces pixel rows 0–1 (hair top). Use K=hatColor, k=hatHl, S=skin
 // overlay: array of {x,y,c} drawn on top of the base sprite
-const SCENARIO_SPRITE_MODS = {
+// ── Accessory kit: named parts that can be applied to any sprite ─────────
+// hatRows replace pixel rows 0-1. K=hatColor, k=hatHl, S=skin.
+// overlay: [{x,y,c}] drawn on top.
+const ACCESSORY_KIT = {
   parrot: {
-    overlay: [
+    overlay:[
       {x:13,y:8, c:'#22AA22'},{x:14,y:8, c:'#FF6600'},
       {x:13,y:9, c:'#22AA22'},{x:14,y:9, c:'#22AA22'},
       {x:13,y:10,c:'#FFCC00'},{x:14,y:10,c:'#22AA22'},
       {x:13,y:11,c:'#157715'},{x:14,y:11,c:'#157715'},
     ]
   },
-  koban: {
-    hatRows: ['..KKKKKKKKKKKK..','..kKKKKKKKKKKk..'],
+  police_cap: {
+    hatRows:['..KKKKKKKKKKKK..','..kKKKKKKKKKKk..'],
     hatColor:'#1A2A6A', hatHl:'#2A3A7A',
     overlay:[{x:7,y:1,c:'#C8A020'},{x:8,y:1,c:'#C8A020'}]
   },
-  ramen_ichi: {
-    hatRows:['..KKKKKKKKKKKK..','..KSSSSSSSSSSK..'],
-    hatColor:'#F0F0F0', hatHl:'#D8D8D8',
+  // chef_hat is computed dynamically to adapt to mature vs adult/young base
+  tonsure: {
+    hatRows:['..KKKKKKKKKKKK..','..KKKKKKKKKKKK..'],
+    hatColor:'#EFC090', hatHl:'#EFC090',
   },
-  tofu: {
-    hatRows:['....KKKKKKKK....','...KKSSSSSSSKK..'],
-    hatColor:'#F0F0F0', hatHl:'#D8D8D8',
-  },
-  kissa: {
-    hatRows:['....KKKKKKKK....','...KKSSSSSSSKK..'],
-    hatColor:'#F0F0F0', hatHl:'#D8D8D8',
-  },
-  taxi: {
-    hatRows:['....KKKKKKKK....','..kKKKKKKKKKKk..'],
-    hatColor:'#1A1A1A', hatHl:'#2A2A2A',
-  },
-  tsuri: {
+  fishing_hat: {
     hatRows:['....kKkKkKkK....', '.KKKKKKKKKKKKKK.'],
     hatColor:'#8B7355', hatHl:'#A68B60',
   },
-  taiko: {
+  taxi_cap: {
+    hatRows:['....KKKKKKKK....','..kKKKKKKKKKKk..'],
+    hatColor:'#1A1A1A', hatHl:'#2A2A2A',
+  },
+  wide_hat: {
+    hatRows:['....KKKKKKKK....', '.kKKKKKKKKKKKk.'],
+    hatColor:'#7A8C40', hatHl:'#9AAA55',
+  },
+  hachimaki: {
     overlay:[
       {x:3,y:2,c:'#F5F5F5'},{x:4,y:2,c:'#F5F5F5'},{x:5,y:2,c:'#F5F5F5'},
       {x:6,y:2,c:'#F5F5F5'},{x:7,y:2,c:'#CC2222'},{x:8,y:2,c:'#CC2222'},
@@ -2386,12 +2386,15 @@ const SCENARIO_SPRITE_MODS = {
       {x:12,y:2,c:'#F5F5F5'},
     ]
   },
-  temple: {
-    // shaved head (tonsure) — skin-coloured top rows
-    hatRows:['..KKKKKKKKKKKK..','..KKKKKKKKKKKK..'],
-    hatColor:'#EFC090', hatHl:'#EFC090',
+  headband: {
+    overlay:[
+      {x:3,y:2,c:'#3355CC'},{x:4,y:2,c:'#3355CC'},{x:5,y:2,c:'#3355CC'},
+      {x:6,y:2,c:'#3355CC'},{x:7,y:2,c:'#3355CC'},{x:8,y:2,c:'#3355CC'},
+      {x:9,y:2,c:'#3355CC'},{x:10,y:2,c:'#3355CC'},{x:11,y:2,c:'#3355CC'},
+      {x:12,y:2,c:'#3355CC'},
+    ]
   },
-  furuhon: {
+  glasses: {
     overlay:[
       {x:3,y:5,c:'#444444'},{x:6,y:5,c:'#444444'},
       {x:9,y:5,c:'#444444'},{x:12,y:5,c:'#444444'},
@@ -2400,21 +2403,60 @@ const SCENARIO_SPRITE_MODS = {
       {x:10,y:6,c:'#444444'},{x:11,y:6,c:'#444444'},
     ]
   },
-  karaoke: {
+  music_note: {
     overlay:[
       {x:14,y:0,c:'#CC8800'},{x:15,y:0,c:'#CC8800'},
       {x:15,y:1,c:'#CC8800'},
       {x:14,y:2,c:'#CC8800'},{x:15,y:2,c:'#CC8800'},
     ]
   },
+  medical: {
+    // red cross on the shirt
+    overlay:[
+      {x:7,y:13,c:'#CC2222'},{x:7,y:14,c:'#CC2222'},{x:7,y:15,c:'#CC2222'},
+      {x:6,y:14,c:'#CC2222'},{x:8,y:14,c:'#CC2222'},
+    ]
+  },
 };
+
+// ── Infer accessory from scenario text (works for any scenario, including
+//    procedurally generated ones — just needs keywords in id/en/char) ──────
+function inferAccessory(sc) {
+  const t = `${sc.id||''} ${sc.en||''} ${sc.char||''}`.toLowerCase();
+  if (/parrot|bird|pet.caf/.test(t))                               return 'parrot';
+  if (/police|officer|koban/.test(t))                              return 'police_cap';
+  if (/chef|ramen|soba|cook|tofu|noodle|yakitori|izakaya.*chef/.test(t)) return 'chef_hat';
+  if (/monk|temple|priest|zen|buddh/.test(t))                      return 'tonsure';
+  if (/fish|pier|angl|fisherman/.test(t))                          return 'fishing_hat';
+  if (/taxi|cab driver|chauffeur/.test(t))                         return 'taxi_cap';
+  if (/garden|florist|flower|outdoor market|farm/.test(t))         return 'wide_hat';
+  if (/taiko|drum.*lesson|one stroke|one soul/.test(t))            return 'hachimaki';
+  if (/gym|workout|fitness|dojo|martial art|kendo|judo/.test(t))   return 'headband';
+  if (/book.?shop|second.hand book|librari|used book/.test(t))     return 'glasses';
+  if (/professor|scholar|researcher|scientist/.test(t))            return 'glasses';
+  if (/karaoke|sing.*song/.test(t))                                return 'music_note';
+  if (/doctor|pharmacist|vet|clinic|hospital|nurse/.test(t))       return 'medical';
+  return null;
+}
 
 function getScenarioSprite(sc, px) {
   if (!sc?.voice) return '';
   px = px || 2;
-  const mod = SCENARIO_SPRITE_MODS[sc.id] || {};
   const baseType = VOICE_SPRITE_MAP[sc.voice] || 'adult_male';
   const sp = CHAR_SPRITES[baseType];
+
+  // Resolve accessory → mod object
+  const acc = inferAccessory(sc);
+  let mod = {};
+  if (acc === 'chef_hat') {
+    // Two hat shapes: narrow (mature_male receding hair) vs wide (full hair)
+    mod = baseType === 'mature_male'
+      ? {hatRows:['....KKKKKKKK....','...KKSSSSSSSKK..'], hatColor:'#F0F0F0', hatHl:'#D8D8D8'}
+      : {hatRows:['..KKKKKKKKKKKK..','..KSSSSSSSSSSK..'], hatColor:'#F0F0F0', hatHl:'#D8D8D8'};
+  } else if (acc) {
+    mod = ACCESSORY_KIT[acc] || {};
+  }
+
   let rows = [...sp.pixels];
   if (mod.hatRows) { rows[0] = mod.hatRows[0]; rows[1] = mod.hatRows[1]; }
   const size = 16 * px;
