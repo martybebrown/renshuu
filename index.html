@@ -2397,11 +2397,11 @@ async function sendMsg() {
 
     const reply = await claude(msgs, S.sysPrompt);
 
-    // parse optional [Correction: ...]
-    const corrRx = /\[Correction:\s*([\s\S]*?)\]/i;
+    // parse optional [Correction: ...] — greedy match to final ] since corrections may contain ]] annotation markers
+    const corrRx = /\[Correction:\s*([\s\S]*)\]\s*$/i;
     const corrMatch = reply.match(corrRx);
     const clean = reply.replace(corrRx, '').trim();
-    const correction = corrMatch ? corrMatch[1].trim() : null;
+    const correction = corrMatch ? corrMatch[1].replace(/\[\[([^\[\]|]+)\|[^\[\]]+\]\]/g, '$1').trim() : null;
 
     // replace spinner
     S.convo.pop();
