@@ -467,6 +467,7 @@ pre.code {
 .sc-jp { font-family: 'Shippori Mincho', serif; font-size: 15px; margin-bottom: 2px; }
 .sc-en { color: var(--muted); font-size: 10px; }
 .sc-char { color: var(--muted); font-size: 9px; margin-top: 4px; line-height: 1.35; font-style: italic; }
+.sc-sprite { display: flex; justify-content: center; margin-bottom: 6px; image-rendering: pixelated; }
 .sc-fav {
   position: absolute; top: 6px; right: 7px;
   background: none; border: none; cursor: pointer;
@@ -498,7 +499,9 @@ pre.code {
 }
 .msg { max-width: 82%; display: flex; flex-direction: column; gap: 3px; }
 .msg.user { align-self: flex-end; text-align: right; }
-.msg.assistant { align-self: flex-start; }
+.msg.assistant { align-self: flex-start; flex-direction: row; align-items: flex-start; gap: 8px; }
+.msg-avatar { width: 32px; height: 32px; flex-shrink: 0; margin-top: 4px; image-rendering: pixelated; border-radius: 3px; }
+.msg-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .msg-body {
   padding: 10px 14px;
   border-radius: 4px;
@@ -575,7 +578,8 @@ pre.code {
   margin-top: 6px;
 }
 @media (min-width: 800px) {
-  .msg.assistant.has-breakdown { flex-direction: row; align-items: flex-start; gap: 10px; max-width: 95%; }
+  .msg.assistant.has-breakdown { max-width: 95%; }
+  .msg.assistant.has-breakdown .msg-main { flex-direction: row; align-items: flex-start; gap: 10px; }
   .msg.assistant.has-breakdown .msg-inner { flex: 1; min-width: 0; }
   .msg.assistant.has-breakdown .msg-breakdown { margin-top: 0; flex: 0 0 280px; max-height: 400px; overflow-y: auto; }
 }
@@ -2188,13 +2192,256 @@ function saveFavorites() {
   gistPushAll();
 }
 
+// ── Pixel-art character sprites ──────────────────────────────────────────
+const CHAR_SPRITES = {
+  mature_male: {
+    hair: '#8C8C8C', hairHl: '#B4B4B4',
+    shirt: '#2E4A6A', shirtHl: '#4A6A8A',
+    pixels: [
+      '....HHHHHHHH....',
+      '...HHSSSSSSHHH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSEESSSSEESH..',
+      '..HS..SSSS..SH..',
+      '..HSSSSnSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSmmSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HHSSSSSSSSSH..',
+      '....ssssssss....',
+      '....BBBBBBBB....',
+      '....BBbbbbBB....',
+      '....BBBBBBBB....',
+    ]
+  },
+  adult_male: {
+    hair: '#1A0800', hairHl: '#3A2010',
+    shirt: '#1A3A6A', shirtHl: '#2A5A90',
+    pixels: [
+      '..HHHHHHHHHHHH..',
+      '..HHHSSSSSSHHH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSEESSSSEESH..',
+      '..HS..SSSS..SH..',
+      '..HSSSSnSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSmmSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HHSSSSSSSSSH..',
+      '....ssssssss....',
+      '....BBBBBBBB....',
+      '....BBbbbbBB....',
+      '....BBBBBBBB....',
+    ]
+  },
+  young_male: {
+    hair: '#1A0800', hairHl: '#4A2010',
+    shirt: '#1A6030', shirtHl: '#2A8050',
+    pixels: [
+      '..HHHhHHHHhHHH..',
+      '..HHHSSSSSSHHH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSEESSSSEESH..',
+      '..HS..SSSS..SH..',
+      '..HSSSSnSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSmmSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HHSSSSSSSSSH..',
+      '....ssssssss....',
+      '....BBBBBBBB....',
+      '....BBbbbbBB....',
+      '....BBBBBBBB....',
+    ]
+  },
+  adult_female: {
+    hair: '#1A0800', hairHl: '#3A2010',
+    shirt: '#8A2050', shirtHl: '#AA4070',
+    pixels: [
+      '..HHHHHHHHHHHH..',
+      '..HHHhhhhhHHHH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSEESSSSEESH..',
+      '..HS..SSSS..SH..',
+      '..HSSSSnSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSmmSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HHSSSSSSSSSH..',
+      '..HHHhhhhhHHHH..',
+      '.HHhBBBBBBBBhHH.',
+      '.HHhBBbbbbBBhHH.',
+      '.HHhBBBBBBBBhHH.',
+    ]
+  },
+  young_female: {
+    hair: '#1A0800', hairHl: '#3A2010',
+    shirt: '#6030A0', shirtHl: '#8050C0',
+    pixels: [
+      '..HHHHHHHHHHHH..',
+      '..HHHhhhhhHHHH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSEESSSSEESH..',
+      '..HS..SSSS..SH..',
+      '..HSSSSnSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSmmSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HHSSSSSSSSSH..',
+      '..HHHhhhhhHHHH..',
+      '.HHhBBBBBBBBhHH.',
+      '.HHhBBbbbbBBhHH.',
+      '.HHhBBBBBBBBhHH.',
+    ]
+  },
+};
+
+const VOICE_SPRITE_MAP = {
+  'ja-JP-DaichiNeural': 'mature_male',
+  'ja-JP-NaokiNeural':  'adult_male',
+  'ja-JP-KeitaNeural':  'young_male',
+  'ja-JP-NanamiNeural': 'adult_female',
+  'ja-JP-MayuNeural':   'adult_female',
+  'ja-JP-ShioriNeural': 'young_female',
+  'ja-JP-AoiNeural':    'young_female',
+};
+
+function renderSprite(type, px) {
+  px = px || 2;
+  const sp = CHAR_SPRITES[type] || CHAR_SPRITES.adult_male;
+  const size = 16 * px;
+  const cm = {
+    '.': null, 'S': '#EFC090', 's': '#C89060',
+    'H': sp.hair, 'h': sp.hairHl,
+    'E': '#1A0800', 'W': '#F8F8F8',
+    'm': '#8B3030', 'n': '#D09060',
+    'B': sp.shirt, 'b': sp.shirtHl,
+  };
+  let rects = '';
+  sp.pixels.forEach((row, y) => {
+    [...row].forEach((ch, x) => {
+      const c = cm[ch];
+      if (c) rects += `<rect x="${x*px}" y="${y*px}" width="${px}" height="${px}" fill="${c}"/>`;
+    });
+  });
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges">${rects}</svg>`;
+}
+
+function getSprite(voice, px) {
+  return renderSprite(VOICE_SPRITE_MAP[voice] || 'adult_male', px);
+}
+
+// ── Scenario-specific sprite modifications ───────────────────────────────
+// hatRows: replaces pixel rows 0–1 (hair top). Use K=hatColor, k=hatHl, S=skin
+// overlay: array of {x,y,c} drawn on top of the base sprite
+const SCENARIO_SPRITE_MODS = {
+  parrot: {
+    overlay: [
+      {x:13,y:8, c:'#22AA22'},{x:14,y:8, c:'#FF6600'},
+      {x:13,y:9, c:'#22AA22'},{x:14,y:9, c:'#22AA22'},
+      {x:13,y:10,c:'#FFCC00'},{x:14,y:10,c:'#22AA22'},
+      {x:13,y:11,c:'#157715'},{x:14,y:11,c:'#157715'},
+    ]
+  },
+  koban: {
+    hatRows: ['..KKKKKKKKKKKK..','..kKKKKKKKKKKk..'],
+    hatColor:'#1A2A6A', hatHl:'#2A3A7A',
+    overlay:[{x:7,y:1,c:'#C8A020'},{x:8,y:1,c:'#C8A020'}]
+  },
+  ramen_ichi: {
+    hatRows:['..KKKKKKKKKKKK..','..KSSSSSSSSSSK..'],
+    hatColor:'#F0F0F0', hatHl:'#D8D8D8',
+  },
+  tofu: {
+    hatRows:['....KKKKKKKK....','...KKSSSSSSSKK..'],
+    hatColor:'#F0F0F0', hatHl:'#D8D8D8',
+  },
+  kissa: {
+    hatRows:['....KKKKKKKK....','...KKSSSSSSSKK..'],
+    hatColor:'#F0F0F0', hatHl:'#D8D8D8',
+  },
+  taxi: {
+    hatRows:['....KKKKKKKK....','..kKKKKKKKKKKk..'],
+    hatColor:'#1A1A1A', hatHl:'#2A2A2A',
+  },
+  tsuri: {
+    hatRows:['....kKkKkKkK....', '.KKKKKKKKKKKKKK.'],
+    hatColor:'#8B7355', hatHl:'#A68B60',
+  },
+  taiko: {
+    overlay:[
+      {x:3,y:2,c:'#F5F5F5'},{x:4,y:2,c:'#F5F5F5'},{x:5,y:2,c:'#F5F5F5'},
+      {x:6,y:2,c:'#F5F5F5'},{x:7,y:2,c:'#CC2222'},{x:8,y:2,c:'#CC2222'},
+      {x:9,y:2,c:'#F5F5F5'},{x:10,y:2,c:'#F5F5F5'},{x:11,y:2,c:'#F5F5F5'},
+      {x:12,y:2,c:'#F5F5F5'},
+    ]
+  },
+  temple: {
+    // shaved head (tonsure) — skin-coloured top rows
+    hatRows:['..KKKKKKKKKKKK..','..KKKKKKKKKKKK..'],
+    hatColor:'#EFC090', hatHl:'#EFC090',
+  },
+  furuhon: {
+    overlay:[
+      {x:3,y:5,c:'#444444'},{x:6,y:5,c:'#444444'},
+      {x:9,y:5,c:'#444444'},{x:12,y:5,c:'#444444'},
+      {x:4,y:6,c:'#444444'},{x:5,y:6,c:'#444444'},
+      {x:7,y:6,c:'#666666'},{x:8,y:6,c:'#666666'},
+      {x:10,y:6,c:'#444444'},{x:11,y:6,c:'#444444'},
+    ]
+  },
+  karaoke: {
+    overlay:[
+      {x:14,y:0,c:'#CC8800'},{x:15,y:0,c:'#CC8800'},
+      {x:15,y:1,c:'#CC8800'},
+      {x:14,y:2,c:'#CC8800'},{x:15,y:2,c:'#CC8800'},
+    ]
+  },
+};
+
+function getScenarioSprite(sc, px) {
+  if (!sc?.voice) return '';
+  px = px || 2;
+  const mod = SCENARIO_SPRITE_MODS[sc.id] || {};
+  const baseType = VOICE_SPRITE_MAP[sc.voice] || 'adult_male';
+  const sp = CHAR_SPRITES[baseType];
+  let rows = [...sp.pixels];
+  if (mod.hatRows) { rows[0] = mod.hatRows[0]; rows[1] = mod.hatRows[1]; }
+  const size = 16 * px;
+  const cm = {
+    '.':null,'S':'#EFC090','s':'#C89060',
+    'H':sp.hair,'h':sp.hairHl,
+    'K':mod.hatColor||sp.hair,'k':mod.hatHl||sp.hairHl,
+    'E':'#1A0800','W':'#F8F8F8','m':'#8B3030','n':'#D09060',
+    'B':sp.shirt,'b':sp.shirtHl,
+  };
+  let rects = '';
+  rows.forEach((row,y)=>{
+    [...row].forEach((ch,x)=>{ const c=cm[ch]; if(c) rects+=`<rect x="${x*px}" y="${y*px}" width="${px}" height="${px}" fill="${c}"/>`; });
+  });
+  (mod.overlay||[]).forEach(({x,y,c})=>{
+    rects+=`<rect x="${x*px}" y="${y*px}" width="${px}" height="${px}" fill="${c}"/>`;
+  });
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges">${rects}</svg>`;
+}
+
 function scCard(sc) {
   const isFav = S.favorites.some(f => f.id === sc.id);
   const isSel = S.scenario?.id === sc.id;
   return `
     <div class="scenario-card ${isSel ? 'sel' : ''} ${isFav && !isSel ? 'fav-card' : ''}" onclick="pickScenario('${sc.id}')">
       <button class="sc-fav ${isFav ? 'active' : ''}" onclick="toggleFavorite('${sc.id}');event.stopPropagation()" title="${isFav ? 'Remove from favorites' : 'Save to favorites'}">★</button>
-      <div class="sc-icon">${sc.icon}</div>
+      <div class="sc-sprite">${getScenarioSprite(sc, 3)}</div>
       <div class="sc-jp">${sc.jp}</div>
       <div class="sc-en">${sc.en}</div>
       <div class="sc-char">${sc.char}</div>
@@ -2261,8 +2508,9 @@ function renderMessages() {
     const correctionHere = msg.role === 'user' && nextMsg?.correction
       ? `<div class="msg-correction">↳ ${escHtml(nextMsg.correction)}</div>` : '';
     const hasBd = isReal && msg.breakdown;
-    return `
-      <div class="msg ${msg.role}${hasBd ? ' has-breakdown' : ''}">
+    const avatarHtml = msg.role === 'assistant' && S.scenario
+      ? `<div class="msg-avatar">${getScenarioSprite(S.scenario, 2)}</div>` : '';
+    const inner = `
         <div class="msg-inner">
           <div class="msg-body">${body}</div>
           ${correctionHere}
@@ -2277,7 +2525,11 @@ function renderMessages() {
             <span class="ap-time">0:00</span>
           </div>` : ''}
         </div>
-        ${hasBd ? `<div class="msg-breakdown">${msg.breakdown}</div>` : ''}
+        ${hasBd ? `<div class="msg-breakdown">${msg.breakdown}</div>` : ''}`;
+    return `
+      <div class="msg ${msg.role}${hasBd ? ' has-breakdown' : ''}">
+        ${avatarHtml}
+        ${msg.role === 'assistant' ? `<div class="msg-main">${inner}</div>` : inner}
       </div>
     `;
   }).join('');
