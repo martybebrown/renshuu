@@ -784,6 +784,15 @@ pre.code {
       <input type="range" id="speechSpeed" min="50" max="150" value="100" step="5" style="flex:1;accent-color:var(--accent)" oninput="localStorage.setItem('renshuu_speech_speed',this.value);document.getElementById('speedVal').textContent=this.value+'%';cancelSpeech()" />
       <span style="font-size:9px;color:var(--muted)">150%</span>
     </div>
+    <div class="label" style="margin-top:12px">Roleplay Vocab Control</div>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--fg)">
+      <input type="checkbox" id="vocabReinforce" checked onchange="localStorage.setItem('renshuu_vocab_reinforce',this.checked?'1':'0')" style="accent-color:var(--accent)" />
+      <span>Reinforce unused words <span style="font-size:9px;color:var(--muted)">(nudge AI to use vocab it missed)</span></span>
+    </label>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--fg);margin-top:6px">
+      <input type="checkbox" id="vocabConstrain" checked onchange="localStorage.setItem('renshuu_vocab_constrain',this.checked?'1':'0')" style="accent-color:var(--accent)" />
+      <span>Stick to known words <span style="font-size:9px;color:var(--muted)">(limit AI to your Anki deck)</span></span>
+    </label>
     <button type="submit" class="btn w100" style="margin-top:10px">Save</button>
     <div id="settingsFeedback" style="font-size:10px;color:var(--muted);margin-top:6px;min-height:14px;line-height:1.4"></div>
   </form>
@@ -878,6 +887,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const speechSpeed = localStorage.getItem('renshuu_speech_speed') || '100';
   document.getElementById('speechSpeed').value = speechSpeed;
   document.getElementById('speedVal').textContent = speechSpeed + '%';
+  const vocabReinforce = localStorage.getItem('renshuu_vocab_reinforce');
+  if (vocabReinforce === '0') document.getElementById('vocabReinforce').checked = false;
+  const vocabConstrain = localStorage.getItem('renshuu_vocab_constrain');
+  if (vocabConstrain === '0') document.getElementById('vocabConstrain').checked = false;
   // Migrate old favorites format (array of IDs → array of objects)
   if (S.favorites.length && typeof S.favorites[0] === 'string') {
     S.favorites = S.favorites.map(id => SCENARIO_POOL.find(s => s.id === id)).filter(Boolean);
@@ -2712,11 +2725,16 @@ function buildSysPrompt(sc) {
   S.sessionWords = words;
   const newList  = words.filter(w => w.tier === 'n').map(w => `${w.jp}（${w.en}）`).join('、');
   const allList  = words.map(w => `${w.jp} = ${w.en}`).join(', ');
+  S.usedWords = new Set();
+  // Build compact known-words list from entire Anki deck (when setting enabled)
+  const constrainOn = localStorage.getItem('renshuu_vocab_constrain') !== '0';
+  const allKnown = constrainOn ? [...S.cards.new, ...S.cards.young, ...S.cards.mature].map(c => c.jp) : [];
+  const knownList = allKnown.length ? allKnown.join('、') : '';
   S.sysPrompt = `You are playing the role of ${sc.char}. Scenario: ${sc.en}. ${sc.ctx}
 
 VOCABULARY TO USE NATURALLY: ${allList}
 PRIORITY — embed these NEW words whenever natural: ${newList || '(none this session)'}
-
+${knownList ? `\nSTUDENT'S KNOWN VOCABULARY (their full Anki deck): ${knownList}\nIMPORTANT: Strongly prefer words from this known vocabulary list. Minimise using words the student hasn't studied yet — keep unknown words to only essential particles, greetings, and words required by the scenario context. If you must use an unknown word, keep it simple and high-frequency.\n` : ''}
 Rules:
 1. Respond in Japanese only. IMPORTANT: Vary your reply length naturally like a real conversation — sometimes just a short reaction or one sentence (え？本当？ / そうだね。), sometimes 2–3 sentences, occasionally longer when the story demands it. Do NOT always write the same length. Short replies are good and natural.
 2. Weave in vocab from the list, especially the priority new words.
@@ -2791,6 +2809,21 @@ async function sendMsg() {
       .filter(m => m.content !== '…')
       .map(m => ({ role: m.role, content: m.content }));
 
+    // Vocab reinforcement: track used words and remind about unused ones
+    const reinforceOn = localStorage.getItem('renshuu_vocab_reinforce') !== '0';
+    if (reinforceOn && S.sessionWords?.length) {
+      // Scan all assistant messages for session words already used
+      const allText = S.convo.filter(m => m.role === 'assistant' && m.content !== '…').map(m => m.content).join(' ');
+      for (const w of S.sessionWords) {
+        if (allText.includes(w.jp)) S.usedWords.add(w.jp);
+      }
+      const unused = S.sessionWords.filter(w => !S.usedWords.has(w.jp));
+      if (unused.length > 0) {
+        const nudge = `[System: You haven't used these vocab words yet — try to work them in naturally: ${unused.map(w => `${w.jp}（${w.en}）`).join('、')}]`;
+        msgs.push({ role: 'user', content: nudge });
+      }
+    }
+
     const reply = await claude(msgs, S.sysPrompt);
 
     // parse optional [Correction: ...] — greedy match to final ] since corrections may contain ]] annotation markers
@@ -2798,6 +2831,13 @@ async function sendMsg() {
     const corrMatch = reply.match(corrRx);
     const clean = reply.replace(corrRx, '').trim();
     const correction = corrMatch ? corrMatch[1].replace(/\[\[([^\[\]|]+)\|[^\[\]]+\]\]/g, '$1').trim() : null;
+
+    // Track newly used vocab words from this reply
+    if (reinforceOn && S.sessionWords?.length) {
+      for (const w of S.sessionWords) {
+        if (clean.includes(w.jp)) S.usedWords.add(w.jp);
+      }
+    }
 
     // replace spinner
     S.convo.pop();
