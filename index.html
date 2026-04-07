@@ -621,6 +621,177 @@ pre.code {
 .send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .chat-tip { font-size: 10px; color: var(--muted); }
 
+/* ── Sierra RPG Scene Styles ──────────────────────────────────────────────── */
+.rpg-frame {
+  background: #08080f;
+  border: 3px solid #3a3a5a;
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px #1a1a2a, 0 4px 24px rgba(0,0,0,0.5);
+}
+.rpg-scene {
+  width: 100%;
+  aspect-ratio: 8/5;
+  max-height: 400px;
+  position: relative;
+  overflow: hidden;
+  background: #08080f;
+}
+.rpg-scene > svg { width: 100%; height: 100%; display: block; }
+.rpg-scene::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(transparent 0px, transparent 2px, rgba(0,0,0,0.05) 2px, rgba(0,0,0,0.05) 4px);
+  pointer-events: none;
+  z-index: 1;
+}
+.rpg-scene::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.35) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+.rpg-scene-label {
+  position: absolute; top: 8px; left: 10px;
+  font-family: 'Courier New', monospace; font-size: 11px; color: #d0c890;
+  text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+  z-index: 2; letter-spacing: 1px;
+}
+.rpg-dialogue-wrap { background: #0a0a16; border-top: 2px solid #3a3a5a; }
+.rpg-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 12px; background: #0e0e1a; border-bottom: 1px solid #1a1a2a;
+}
+.rpg-head .label { color: #c0b080; font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.5px; }
+.rpg-head .btn {
+  background: #1a1a2a; border: 1px solid #3a3a5a; color: #8a8a9a;
+  font-size: 10px; padding: 3px 10px; border-radius: 2px; cursor: pointer;
+  font-family: 'Courier New', monospace;
+}
+.rpg-head .btn:hover { background: #2a2a3a; color: #c0b080; }
+.rpg-dialogue {
+  max-height: 300px; overflow-y: auto; scroll-behavior: smooth; padding: 12px 14px;
+}
+.rpg-dialogue .loading-row { color: #5a5a7a; }
+.rpg-dialogue .loading-row .spin { border-color: #2a2a3a; border-top-color: #5a5a7a; }
+.rpg-msg {
+  display: flex; gap: 10px; margin-bottom: 12px; align-items: flex-start; max-width: none;
+}
+.rpg-msg.user { flex-direction: row-reverse; align-self: auto; }
+.rpg-portrait-frame {
+  width: 52px; height: 52px; border: 2px solid #3a3a5a; background: #12121e;
+  flex-shrink: 0; padding: 2px; image-rendering: pixelated;
+}
+.rpg-portrait-frame svg { width: 100%; height: 100%; display: block; }
+.rpg-bubble { flex: 1; min-width: 0; }
+.rpg-name {
+  font-family: 'Courier New', monospace; font-size: 10px; font-weight: bold;
+  color: #d0a850; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 1px;
+}
+.rpg-msg.user .rpg-name { color: #6090c0; text-align: right; }
+.rpg-msg .msg-body {
+  padding: 0; border-radius: 0; background: none !important;
+  font-family: 'Shippori Mincho', serif; font-size: 15px; line-height: 1.7; color: #e0d8c8;
+  border: none !important;
+}
+.rpg-msg .msg-body .wt, .rpg-msg .msg-body [data-rt] { cursor: pointer; }
+.rpg-msg .msg-body .w-active { background: rgba(180,160,100,0.25); border-radius: 2px; }
+.rpg-msg.user .msg-body { color: #a0b8d0; text-align: right; font-size: 14px; }
+.rpg-msg .msg-correction { font-size: 10px; color: #cc7744; padding: 2px 0; font-family: 'Courier New', monospace; }
+.rpg-msg.user .msg-correction { text-align: right; }
+.rpg-msg .msg-foot { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
+.rpg-msg .msg-foot button {
+  background: none; border: 1px solid transparent; border-radius: 2px;
+  cursor: pointer; font-size: 11px; color: #5a5a7a; padding: 1px 5px; line-height: 1;
+}
+.rpg-msg .msg-foot button:hover { border-color: #3a3a5a; color: #c0b080; }
+.rpg-msg .msg-foot button.speaking { color: #4a7aaa; border-color: #4a7aaa; }
+.rpg-msg .msg-foot button.active { color: #4a7aaa; border-color: #4a7aaa; }
+.rpg-msg .msg-breakdown {
+  font-size: 10px; line-height: 1.5; color: #b0a888; background: #14141e;
+  border: 1px solid #2a2a3a; border-radius: 3px; padding: 8px 10px; margin-top: 6px;
+}
+.rpg-msg .msg-breakdown .bd-heading { color: #d0a850; border-bottom-color: #2a2a3a; }
+.rpg-msg .msg-breakdown .bd-meaning { color: #8a8a9a; }
+.rpg-msg .msg-breakdown .bd-label { color: #8a8a9a; }
+.rpg-msg .audio-player { margin-top: 4px; }
+.rpg-msg .audio-player .ap-btn { color: #5a5a7a; border-color: #2a2a3a; }
+.rpg-msg .audio-player .ap-btn:hover { color: #c0b080; border-color: #3a3a5a; }
+.rpg-msg .audio-player .ap-btn.playing { color: #4a7aaa; border-color: #4a7aaa; }
+.rpg-msg .audio-player .ap-track { background: #2a2a3a; }
+.rpg-msg .audio-player .ap-fill { background: #4a7aaa; }
+.rpg-msg .audio-player .ap-time { color: #5a5a7a; }
+.rpg-input-area {
+  border-top: 1px solid #1a1a2a; padding: 8px 12px;
+  display: flex; gap: 8px; align-items: flex-end; background: #0a0a16;
+}
+.rpg-input {
+  flex: 1; background: #12121e; border: 1px solid #2a2a3a; color: #e0d8c8;
+  padding: 8px 12px; border-radius: 2px;
+  font-family: 'Shippori Mincho', serif; font-size: 14px;
+  outline: none; resize: none; min-height: 36px;
+}
+.rpg-input:focus { border-color: #4a4a6a; }
+.rpg-input::placeholder { color: #3a3a5a; }
+.rpg-send {
+  background: #2a2a3a; border: 1px solid #3a3a5a; color: #c0b080;
+  width: 36px; height: 36px; border-radius: 2px; cursor: pointer;
+  font-size: 14px; transition: all 0.15s; flex-shrink: 0;
+}
+.rpg-send:hover { background: #3a3a5a; }
+.rpg-send:disabled { opacity: 0.3; cursor: not-allowed; }
+.rpg-tip { font-size: 9px; color: #3a3a5a; padding: 4px 12px 8px; background: #0a0a16; font-family: 'Courier New', monospace; }
+.sc-scene-preview {
+  width: 100%; aspect-ratio: 8/5; overflow: hidden; border-radius: 3px;
+  margin-bottom: 6px; background: #08080f; image-rendering: pixelated;
+  border: 1px solid var(--border);
+}
+.sc-scene-preview > svg { width: 100%; height: 100%; display: block; }
+
+/* RPG split layout when sidebar is collapsed on desktop */
+@media (min-width: 900px) {
+  .sidebar-collapsed .rpg-frame {
+    display: flex;
+    flex-direction: row;
+    height: calc(100vh - 120px);
+    min-height: 400px;
+  }
+  .sidebar-collapsed .rpg-scene {
+    width: 50%;
+    flex-shrink: 0;
+    max-height: none;
+    aspect-ratio: unset;
+    height: 100%;
+  }
+  .sidebar-collapsed .rpg-scene > svg {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .sidebar-collapsed .rpg-dialogue-wrap {
+    width: 50%;
+    display: flex;
+    flex-direction: column;
+    border-top: none;
+    border-left: 2px solid #3a3a5a;
+    overflow: hidden;
+  }
+  .sidebar-collapsed .rpg-dialogue {
+    flex: 1;
+    max-height: none;
+    overflow-y: auto;
+  }
+  .sidebar-collapsed .rpg-input-area {
+    flex-shrink: 0;
+  }
+  .sidebar-collapsed .rpg-tip {
+    flex-shrink: 0;
+  }
+}
+
 /* Spinner */
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin {
@@ -792,6 +963,10 @@ pre.code {
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--fg);margin-top:6px">
       <input type="checkbox" id="vocabConstrain" checked onchange="localStorage.setItem('renshuu_vocab_constrain',this.checked?'1':'0')" style="accent-color:var(--accent)" />
       <span>Stick to known words <span style="font-size:9px;color:var(--muted)">(limit AI to your Anki deck)</span></span>
+    <div class="label" style="margin-top:12px">Roleplay Style</div>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11px;color:var(--text)">
+      <input type="checkbox" id="sierraToggle" onchange="S.sierraMode=this.checked;localStorage.setItem('renshuu_sierra_mode',this.checked);if(S.mode==='roleplay')renderRoleplay()" />
+      Sierra RPG mode <span style="font-size:9px;color:var(--muted)">(pixel art scenes)</span>
     </label>
     <button type="submit" class="btn w100" style="margin-top:10px">Save</button>
     <div id="settingsFeedback" style="font-size:10px;color:var(--muted);margin-top:6px;min-height:14px;line-height:1.4"></div>
@@ -891,6 +1066,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (vocabReinforce === '0') document.getElementById('vocabReinforce').checked = false;
   const vocabConstrain = localStorage.getItem('renshuu_vocab_constrain');
   if (vocabConstrain === '0') document.getElementById('vocabConstrain').checked = false;
+  document.getElementById('sierraToggle').checked = S.sierraMode;
   // Migrate old favorites format (array of IDs → array of objects)
   if (S.favorites.length && typeof S.favorites[0] === 'string') {
     S.favorites = S.favorites.map(id => SCENARIO_POOL.find(s => s.id === id)).filter(Boolean);
@@ -1036,6 +1212,7 @@ const S = {
   sysPrompt: '',
   sessionWords: [],
   story: null,
+  sierraMode: localStorage.getItem('renshuu_sierra_mode') !== 'false',
 };
 
 
@@ -2554,6 +2731,344 @@ function inferAccessory(sc) {
   return null;
 }
 
+// ── Scene backgrounds (layered rects in 80×50 viewBox) ──────────────────
+// Each rect: [x, y, width, height, fill]
+// charX/charY = where to place the 2×-scaled character sprite in the scene
+const SCENE_BACKGROUNDS = {
+  bathhouse: {
+    charX: 24, charY: 12,
+    r: [
+      [0,0,80,50,'#1a1008'],
+      [0,0,80,10,'#3a2814'],
+      [0,2,80,1,'#4a3824'],[0,5,80,1,'#4a3824'],[0,8,80,1,'#4a3824'],
+      [0,9,80,2,'#5a4830'],
+      [18,0,3,10,'#5a4830'],[58,0,3,10,'#5a4830'],
+      [38,2,4,5,'#aa6620'],[39,3,2,2,'#ddaa40'],
+      [0,11,80,14,'#5a7a88'],
+      [0,14,80,1,'#4a6a78'],[0,18,80,1,'#4a6a78'],[0,22,80,1,'#4a6a78'],
+      [10,11,1,14,'#4a6a78'],[20,11,1,14,'#4a6a78'],[30,11,1,14,'#4a6a78'],
+      [40,11,1,14,'#4a6a78'],[50,11,1,14,'#4a6a78'],[60,11,1,14,'#4a6a78'],
+      [70,11,1,14,'#4a6a78'],
+      [0,25,80,25,'#2a5a78'],
+      [0,25,80,2,'#3a6a88'],
+      [5,26,15,1,'#4a7a98'],[35,25,10,1,'#4a7a98'],[58,26,16,1,'#4a7a98'],
+      [0,38,80,12,'#1a4a68'],
+      [14,17,4,3,'rgba(180,200,220,0.12)'],[48,15,5,4,'rgba(180,200,220,0.12)'],
+      [28,19,3,2,'rgba(180,200,220,0.08)'],
+      [6,20,6,5,'#5a4020'],[6,20,6,1,'#7a6040'],
+      [70,16,5,7,'#e0d8c0'],[70,16,5,1,'#f0e8d0'],
+    ]
+  },
+  restaurant: {
+    charX: 26, charY: 10,
+    r: [
+      [0,0,80,50,'#1a1008'],
+      [0,0,80,8,'#2a1a0a'],
+      [12,2,4,5,'#cc4420'],[13,3,2,2,'#ff8844'],
+      [35,1,4,5,'#cc4420'],[36,2,2,2,'#ff8844'],
+      [60,2,4,5,'#cc4420'],[61,3,2,2,'#ff8844'],
+      [0,8,80,16,'#3a2a1a'],
+      [2,9,76,1,'#5a4830'],
+      [5,10,3,4,'#446688'],[10,10,2,4,'#88aa44'],[14,10,3,4,'#884422'],
+      [20,10,2,4,'#446688'],[25,10,3,4,'#aa6622'],[30,10,2,4,'#446688'],
+      [2,14,76,1,'#5a4830'],
+      [5,15,3,3,'#664422'],[10,15,2,3,'#88aa44'],[14,15,3,3,'#446688'],
+      [20,15,2,3,'#aa4422'],[25,15,3,3,'#664422'],
+      [55,9,20,8,'#f0e0c0'],[56,10,18,6,'#e8d8b0'],
+      [0,24,80,4,'#5a4020'],[0,24,80,1,'#7a6040'],
+      [0,28,80,6,'#4a3018'],[0,28,80,1,'#5a4020'],
+      [0,34,80,16,'#2a1a0a'],
+      [0,40,80,1,'#1a0a00'],[0,45,80,1,'#1a0a00'],
+      [15,34,5,3,'#5a4830'],[17,37,1,5,'#4a3820'],
+      [40,34,5,3,'#5a4830'],[42,37,1,5,'#4a3820'],
+      [65,34,5,3,'#5a4830'],[67,37,1,5,'#4a3820'],
+      [30,10,6,5,'rgba(200,180,160,0.1)'],[45,8,4,6,'rgba(200,180,160,0.08)'],
+    ]
+  },
+  park: {
+    charX: 26, charY: 16,
+    r: [
+      [0,0,80,22,'#4a88cc'],
+      [0,0,80,4,'#3a78bb'],[0,18,80,4,'#5a98dd'],
+      [8,3,12,3,'#d0e0f0'],[10,2,8,2,'#e0eeff'],
+      [55,5,10,3,'#d0e0f0'],[57,4,6,2,'#e0eeff'],
+      [2,8,16,14,'#dd88aa'],[4,6,12,4,'#ee99bb'],
+      [6,10,8,4,'#cc7799'],[3,12,14,6,'#dd88aa'],
+      [8,20,4,12,'#5a3a20'],[9,20,2,12,'#6a4a30'],
+      [60,6,18,14,'#dd88aa'],[62,4,14,4,'#ee99bb'],
+      [64,8,10,4,'#cc7799'],[61,10,16,6,'#dd88aa'],
+      [68,18,4,14,'#5a3a20'],[69,18,2,14,'#6a4a30'],
+      [25,8,2,1,'#ffaacc'],[42,12,1,1,'#ffaacc'],[35,5,1,1,'#ffaacc'],
+      [50,10,2,1,'#ffaacc'],[18,14,1,1,'#ffaacc'],
+      [0,22,80,28,'#4a8838'],
+      [0,22,80,3,'#5a9848'],
+      [20,24,40,26,'#c8b898'],
+      [22,24,36,2,'#d8c8a8'],
+      [20,24,2,26,'#a89878'],[58,24,2,26,'#a89878'],
+      [62,26,12,2,'#6a4a30'],[63,28,2,6,'#5a3a20'],[72,28,2,6,'#5a3a20'],
+      [62,26,12,1,'#7a5a40'],
+      [24,28,14,8,'#3366aa'],[24,28,14,1,'#4477bb'],
+    ]
+  },
+  shop: {
+    charX: 26, charY: 16,
+    r: [
+      [0,0,80,50,'#2a2018'],
+      [0,0,80,6,'#3a2a18'],
+      [15,1,50,2,'#e8e8dd'],[16,2,48,1,'#f8f8f0'],
+      [0,6,80,20,'#d8c8a8'],
+      [0,7,30,2,'#6a5030'],[0,12,30,2,'#6a5030'],[0,17,30,2,'#6a5030'],
+      [2,9,4,3,'#cc4444'],[7,9,3,3,'#4488aa'],[12,9,4,3,'#88aa44'],
+      [18,9,3,3,'#ddaa44'],[22,9,4,3,'#aa4488'],
+      [2,14,3,3,'#4488aa'],[7,14,4,3,'#cc8844'],[13,14,3,3,'#44aa88'],
+      [18,14,4,3,'#aa4444'],[23,14,3,3,'#8844aa'],
+      [50,7,30,2,'#6a5030'],[50,12,30,2,'#6a5030'],[50,17,30,2,'#6a5030'],
+      [52,9,4,3,'#ddaa44'],[58,9,3,3,'#cc4444'],[63,9,4,3,'#4488aa'],
+      [52,14,3,3,'#88aa44'],[57,14,4,3,'#aa4488'],[63,14,3,3,'#cc8844'],
+      [32,7,16,12,'#88bbdd'],
+      [32,7,16,1,'#6a5030'],[32,18,16,1,'#6a5030'],
+      [32,7,1,12,'#6a5030'],[47,7,1,12,'#6a5030'],[39,7,1,12,'#6a5030'],
+      [0,26,80,4,'#7a5a38'],[0,26,80,1,'#8a6a48'],
+      [60,22,8,4,'#3a3a3a'],[60,22,8,1,'#5a5a5a'],
+      [0,30,80,20,'#8a7860'],
+      [0,35,80,1,'#7a6850'],[0,42,80,1,'#7a6850'],
+    ]
+  },
+  cafe: {
+    charX: 28, charY: 16,
+    r: [
+      [0,0,80,50,'#2a1a10'],
+      [0,0,80,6,'#3a2a18'],
+      [38,1,4,4,'#ffcc66'],[39,1,2,1,'#ffdd88'],
+      [36,5,8,2,'rgba(255,204,102,0.15)'],
+      [0,6,80,22,'#6a5038'],
+      [0,8,80,1,'#7a6048'],[0,14,80,1,'#7a6048'],[0,20,80,1,'#7a6048'],
+      [4,8,28,14,'#6088aa'],
+      [4,8,28,1,'#4a3828'],[4,21,28,1,'#4a3828'],
+      [4,8,1,14,'#4a3828'],[31,8,1,14,'#4a3828'],[17,8,1,14,'#4a3828'],
+      [5,8,4,14,'#cc8844'],[28,8,4,14,'#cc8844'],
+      [9,9,8,5,'#88bbdd'],[9,14,8,7,'#8a7a6a'],
+      [18,9,9,5,'#88bbdd'],[18,14,9,7,'#9a8a7a'],
+      [55,8,20,10,'#5a4028'],
+      [57,9,4,3,'#cc8844'],[63,9,3,3,'#88aa44'],[68,9,4,3,'#4488aa'],
+      [45,9,6,6,'#4a3020'],[46,10,4,4,'#88aa88'],
+      [20,28,30,3,'#5a4028'],
+      [22,31,2,8,'#4a3018'],[46,31,2,8,'#4a3018'],
+      [28,26,3,2,'#e8e0d0'],[38,26,3,2,'#e8e0d0'],
+      [29,25,1,1,'#8a6a4a'],[39,25,1,1,'#8a6a4a'],
+      [0,28,80,22,'#3a2a18'],
+      [0,34,80,1,'#2a1a08'],[0,42,80,1,'#2a1a08'],
+      [72,18,5,10,'#4a8838'],[73,16,3,4,'#5a9848'],[74,28,1,5,'#5a3a20'],
+    ]
+  },
+  night: {
+    charX: 26, charY: 14,
+    r: [
+      [0,0,80,20,'#0a0a2a'],
+      [0,16,80,4,'#1a1a3a'],
+      [5,2,1,1,'#f8f8ff'],[18,4,1,1,'#f8f8ff'],[62,3,1,1,'#f8f8ff'],
+      [45,1,1,1,'#f8f8ff'],[72,5,1,1,'#f8f8ff'],[30,2,1,1,'#d8d8ff'],
+      [70,2,4,4,'#e8e8cc'],[71,1,2,1,'#f0f0dd'],
+      [0,8,18,12,'#1a1a28'],[0,6,14,2,'#1a1a28'],
+      [62,6,18,14,'#1a1a28'],[66,4,10,2,'#1a1a28'],
+      [3,9,3,2,'#aa8844'],[8,9,3,2,'#8888aa'],[3,13,3,2,'#aa8844'],
+      [65,8,3,2,'#aa8844'],[70,8,3,2,'#8888aa'],[75,10,3,2,'#aa8844'],
+      [20,8,12,4,'#ff4466'],[21,9,10,2,'#ff6688'],
+      [45,10,14,3,'#44aaff'],[46,11,12,1,'#66ccff'],
+      [35,7,6,3,'#44ff88'],[36,8,4,1,'#66ffaa'],
+      [0,20,80,30,'#1a1a1a'],
+      [0,20,80,2,'#2a2a2a'],
+      [22,28,10,2,'rgba(255,68,102,0.12)'],
+      [47,30,12,2,'rgba(68,170,255,0.12)'],
+      [36,32,5,1,'rgba(68,255,136,0.08)'],
+      [25,34,8,1,'#3a3a3a'],[45,34,8,1,'#3a3a3a'],
+      [4,20,6,10,'#2a4a6a'],
+      [5,21,4,4,'#88aacc'],[5,26,4,3,'#aa6644'],
+      [5,21,4,1,'#aaccee'],
+      [20,14,30,6,'#e8e0d0'],
+      [21,15,28,4,'#aaccee'],
+      [20,14,30,1,'#44aa66'],
+      [0,6,80,1,'#2a2a3a'],
+    ]
+  },
+  temple: {
+    charX: 26, charY: 14,
+    r: [
+      [0,0,80,16,'#6a9ab8'],
+      [0,0,80,4,'#5a8aa8'],[0,12,80,4,'#7aaac8'],
+      [0,4,20,12,'#2a6a2a'],[60,2,20,14,'#2a6a2a'],
+      [2,6,16,8,'#3a7a3a'],[64,4,14,10,'#3a7a3a'],
+      [15,6,50,3,'#4a3a2a'],
+      [12,9,56,2,'#5a4a38'],
+      [10,11,60,1,'#6a5a48'],
+      [14,6,1,3,'#6a5a48'],[64,6,1,3,'#6a5a48'],
+      [16,7,48,1,'#6a5a48'],
+      [14,12,52,14,'#d8c8a0'],
+      [20,14,14,10,'#c0b890'],[20,14,14,1,'#6a5a48'],
+      [26,14,1,10,'#a09870'],
+      [40,14,14,10,'#c0b890'],[40,14,14,1,'#6a5a48'],
+      [46,14,1,10,'#a09870'],
+      [19,12,1,14,'#5a4a38'],[34,12,1,14,'#5a4a38'],
+      [39,12,1,14,'#5a4a38'],[55,12,1,14,'#5a4a38'],
+      [10,26,60,4,'#7a6a50'],[10,26,60,1,'#8a7a60'],
+      [30,30,20,20,'#a0a098'],
+      [32,31,4,3,'#909088'],[40,32,5,3,'#909088'],[35,36,4,3,'#909088'],
+      [42,38,4,3,'#909088'],[33,40,5,3,'#909088'],
+      [0,16,14,34,'#c8c0b0'],[66,16,14,34,'#c8c0b0'],
+      [2,20,10,1,'#b8b0a0'],[2,24,10,1,'#b8b0a0'],[2,28,10,1,'#b8b0a0'],
+      [68,22,10,1,'#b8b0a0'],[68,26,10,1,'#b8b0a0'],
+      [5,26,4,3,'#8a8a80'],[71,24,3,3,'#8a8a80'],
+      [14,30,52,20,'#6a8a48'],
+    ]
+  },
+  street: {
+    charX: 26, charY: 16,
+    r: [
+      [0,0,80,18,'#5a98cc'],
+      [0,0,80,5,'#4a88bb'],[0,14,80,4,'#6aa8dd'],
+      [15,3,14,3,'#d8e8f8'],[17,2,10,2,'#e8f0ff'],
+      [55,5,12,3,'#d8e8f8'],[57,4,8,2,'#e8f0ff'],
+      [0,6,22,12,'#c8b898'],[0,4,18,4,'#b8a888'],
+      [3,7,4,3,'#6088aa'],[10,7,4,3,'#6088aa'],
+      [3,12,4,3,'#6088aa'],[10,12,4,3,'#6088aa'],
+      [5,15,8,3,'#cc4444'],[6,16,6,1,'#e8d8c0'],
+      [58,4,22,14,'#d8c8a8'],[62,2,14,4,'#c8b898'],
+      [62,6,4,3,'#6088aa'],[70,6,4,3,'#6088aa'],
+      [62,12,4,3,'#6088aa'],[70,12,4,3,'#6088aa'],
+      [64,15,10,3,'#4466aa'],[65,16,8,1,'#e8d8c0'],
+      [22,14,36,4,'#cc6644'],[22,14,36,1,'#dd7755'],
+      [22,8,36,6,'#e8d8c0'],
+      [26,9,12,4,'#88bbdd'],[42,9,12,4,'#88bbdd'],
+      [0,18,80,32,'#a09888'],
+      [0,18,80,2,'#b0a898'],
+      [0,20,80,2,'#c0b8a0'],
+      [0,30,80,1,'#908878'],[0,38,80,1,'#908878'],
+      [0,3,80,1,'#4a4a4a'],[38,0,1,4,'#5a5a5a'],
+      [8,22,5,4,'#4a4a4a'],[9,22,1,2,'#888888'],[12,22,1,2,'#888888'],
+      [56,20,3,4,'#4a8838'],[57,24,1,2,'#6a5a4a'],
+    ]
+  },
+  taxi: {
+    charX: 26, charY: 12,
+    r: [
+      [0,0,80,50,'#444444'],
+      [0,0,80,8,'#888888'],
+      [0,7,80,2,'#666666'],
+      [0,9,80,18,'#4a78aa'],
+      [2,10,14,8,'#7a8a9a'],[18,12,10,6,'#6a7a8a'],[30,9,12,9,'#8a9aaa'],
+      [44,11,8,7,'#7a8a9a'],[54,10,12,8,'#6a7a8a'],[68,12,10,6,'#8a9aaa'],
+      [38,9,4,18,'#555555'],
+      [0,9,80,1,'#555555'],[0,26,80,1,'#555555'],
+      [5,12,2,2,'#ccaa66'],[10,13,2,2,'#ccaa66'],
+      [22,13,2,2,'#ccaa66'],[35,11,2,2,'#ccaa66'],
+      [48,12,2,2,'#ccaa66'],[58,13,2,2,'#ccaa66'],
+      [72,13,2,2,'#ccaa66'],
+      [0,27,80,6,'#3a3a3a'],[0,27,80,1,'#4a4a4a'],
+      [55,28,12,4,'#1a1a1a'],[56,29,10,2,'#44aa44'],
+      [0,33,80,17,'#6a5a4a'],[0,33,80,2,'#7a6a5a'],
+      [0,38,80,1,'#5a4a3a'],[0,43,80,1,'#5a4a3a'],
+      [5,28,14,5,'#7a6a5a'],[6,27,12,2,'#8a7a6a'],
+      [75,28,3,2,'#888888'],
+    ]
+  },
+  dojo: {
+    charX: 26, charY: 14,
+    r: [
+      [0,0,80,50,'#2a1a10'],
+      [0,0,80,6,'#3a2a18'],
+      [0,5,80,2,'#5a4830'],
+      [15,0,3,6,'#5a4830'],[40,0,3,6,'#5a4830'],[65,0,3,6,'#5a4830'],
+      [0,7,80,20,'#d8d0c0'],
+      [30,8,20,2,'#5a4830'],[32,10,16,3,'#d0c8b8'],
+      [38,10,4,3,'#cc4444'],
+      [8,9,8,12,'#f0e8d8'],[9,10,6,10,'#e8e0d0'],
+      [64,9,8,12,'#f0e8d8'],[65,10,6,10,'#e8e0d0'],
+      [11,11,2,1,'#2a2a2a'],[11,13,2,1,'#2a2a2a'],[11,15,2,1,'#2a2a2a'],
+      [67,11,2,1,'#2a2a2a'],[67,13,2,1,'#2a2a2a'],[67,15,2,1,'#2a2a2a'],
+      [72,14,6,12,'#5a4830'],
+      [73,15,1,10,'#888888'],[76,15,1,10,'#888888'],[74,16,1,8,'#aa8844'],
+      [0,27,80,23,'#8a7a58'],[0,27,80,1,'#9a8a68'],
+      [0,32,80,1,'#7a6a48'],[0,38,80,1,'#7a6a48'],[0,44,80,1,'#7a6a48'],
+      [20,28,40,1,'#a09a78'],
+      [15,30,50,18,'#9a8a68'],[15,30,50,1,'#a09a78'],
+    ]
+  }
+};
+
+function inferBackground(sc) {
+  const t = `${sc.id||''} ${sc.en||''} ${sc.ctx||''}`.toLowerCase();
+  if (/bath|sento|onsen|hot.spring|soaking/.test(t)) return 'bathhouse';
+  if (/ramen|soba|curry|tofu|noodle|stall|counter|bento|ekiben/.test(t)) return 'restaurant';
+  if (/park|cherry|hanami|blossom|shogi|bench|pier|fish/.test(t)) return 'park';
+  if (/book|pharmacy|recycle|souvenir|apprais|shop(?!.*coff)/.test(t)) return 'shop';
+  if (/caf[eé]|coffee|kissaten|machiya|tea.?house/.test(t)) return 'cafe';
+  if (/night|3am|konbini|arcade|karaoke|crane|ufo|neon/.test(t)) return 'night';
+  if (/temple|monk|rakugo|taiko|drum|shrine/.test(t)) return 'temple';
+  if (/taxi|cab.driv|chauffeur|ride/.test(t)) return 'taxi';
+  if (/gym|workout|fitness|dojo|martial|kendo|judo|changing/.test(t)) return 'dojo';
+  if (/izakaya|bar|pub|gokon|drink|beer/.test(t)) return 'restaurant';
+  if (/vet|clinic|hospital|doctor/.test(t)) return 'shop';
+  return 'street';
+}
+
+// Returns just the SVG rect elements for a scenario's character sprite (1px units)
+function getScenarioSpriteRects(sc) {
+  if (!sc?.voice) return '';
+  const baseType = VOICE_SPRITE_MAP[sc.voice] || 'adult_male';
+  const sp = CHAR_SPRITES[baseType];
+  const acc = inferAccessory(sc);
+  let mod = {};
+  if (acc === 'chef_hat') {
+    mod = baseType === 'mature_male'
+      ? {hatRows:['....KKKKKKKK....','...KKSSSSSSSKK..'], hatColor:'#F0F0F0', hatHl:'#D8D8D8'}
+      : {hatRows:['..KKKKKKKKKKKK..','..KSSSSSSSSSSK..'], hatColor:'#F0F0F0', hatHl:'#D8D8D8'};
+  } else if (acc) {
+    mod = ACCESSORY_KIT[acc] || {};
+  }
+  let rows = [...sp.pixels];
+  if (mod.hatRows) { rows[0] = mod.hatRows[0]; rows[1] = mod.hatRows[1]; }
+  const cm = {
+    '.':null,'S':'#EFC090','s':'#C89060',
+    'H':sp.hair,'h':sp.hairHl,
+    'K':mod.hatColor||sp.hair,'k':mod.hatHl||sp.hairHl,
+    'E':'#1A0800','W':'#F8F8F8','m':'#8B3030','n':'#D09060',
+    'B':sp.shirt,'b':sp.shirtHl,
+  };
+  let rects = '';
+  rows.forEach((row,y) => {
+    [...row].forEach((ch,x) => { const c=cm[ch]; if(c) rects+=`<rect x="${x}" y="${y}" width="1" height="1" fill="${c}"/>`; });
+  });
+  (mod.overlay||[]).forEach(({x,y,c}) => {
+    rects+=`<rect x="${x}" y="${y}" width="1" height="1" fill="${c}"/>`;
+  });
+  return rects;
+}
+
+// Full scene SVG: background + character positioned in the scene
+function renderScene(sc) {
+  if (!sc) return '';
+  const bgType = inferBackground(sc);
+  const bg = SCENE_BACKGROUNDS[bgType] || SCENE_BACKGROUNDS.street;
+
+  let svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 50" shape-rendering="crispEdges" preserveAspectRatio="xMidYMid slice">';
+  // Background layers
+  svg += bg.r.map(([x,y,w,h,c]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`).join('');
+  // Character sprite at 2× scale
+  const charRects = getScenarioSpriteRects(sc);
+  if (charRects) {
+    svg += `<g transform="translate(${bg.charX},${bg.charY}) scale(2)">${charRects}</g>`;
+  }
+  svg += '</svg>';
+  return svg;
+}
+
+// Portrait: cropped head view of the character sprite
+function renderPortrait(sc) {
+  if (!sc?.voice) return '';
+  const rects = getScenarioSpriteRects(sc);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="1 0 14 12" shape-rendering="crispEdges" preserveAspectRatio="xMidYMin meet">${rects}</svg>`;
+}
+
 function getScenarioSprite(sc, px) {
   if (!sc?.voice) return '';
   px = px || 2;
@@ -2595,10 +3110,13 @@ function getScenarioSprite(sc, px) {
 function scCard(sc) {
   const isFav = S.favorites.some(f => f.id === sc.id);
   const isSel = S.scenario?.id === sc.id;
+  const visual = S.sierraMode
+    ? `<div class="sc-scene-preview">${renderScene(sc)}</div>`
+    : `<div class="sc-sprite">${getScenarioSprite(sc, 3)}</div>`;
   return `
     <div class="scenario-card ${isSel ? 'sel' : ''} ${isFav && !isSel ? 'fav-card' : ''}" onclick="pickScenario('${sc.id}')">
       <button class="sc-fav ${isFav ? 'active' : ''}" onclick="toggleFavorite('${sc.id}');event.stopPropagation()" title="${isFav ? 'Remove from favorites' : 'Save to favorites'}">★</button>
-      <div class="sc-sprite">${getScenarioSprite(sc, 3)}</div>
+      ${visual}
       <div class="sc-jp">${sc.jp}</div>
       <div class="sc-en">${sc.en}</div>
       <div class="sc-char">${sc.char}</div>
@@ -2631,7 +3149,29 @@ function renderRoleplay() {
       </div>
     </div>
 
-    ${S.scenario ? `
+    ${S.scenario ? (S.sierraMode ? `
+      <div class="rpg-frame">
+        <div class="rpg-scene">
+          ${renderScene(S.scenario)}
+          <div class="rpg-scene-label">${S.scenario.jp} — ${S.scenario.en}</div>
+        </div>
+        <div class="rpg-dialogue-wrap">
+          <div class="rpg-head">
+            <div class="label">${escHtml(S.scenario.char)}</div>
+            <button class="btn" onclick="resetChat()">Reset</button>
+          </div>
+          <div class="rpg-dialogue" id="chatWin">${renderMessages()}</div>
+          <div class="rpg-input-area">
+            <textarea class="rpg-input" id="chatIn" rows="1"
+              placeholder="日本語か romaji で…"
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"
+            ></textarea>
+            <button class="rpg-send" id="sendBtn" onclick="sendMsg()">→</button>
+          </div>
+          <div class="rpg-tip">Enter to send · Shift+Enter for new line · romaji auto-converted</div>
+        </div>
+      </div>
+    ` : `
       <div class="chat-wrap">
         <div class="chat-head">
           <div class="label">${S.scenario.jp} — ${S.scenario.en}</div>
@@ -2647,24 +3187,58 @@ function renderRoleplay() {
         </div>
         <div class="chat-tip">Enter to send · Shift+Enter for new line · romaji auto-converted</div>
       </div>
-    ` : ''}
+    `) : ''}
   `;
 
   scrollChat();
 }
 
 function renderMessages() {
-  if (!S.convo.length) return '<div style="color:var(--muted);font-size:12px;margin:auto;text-align:center">Starting…</div>';
+  if (!S.convo.length) {
+    return S.sierraMode
+      ? '<div style="color:#4a4a6a;font-size:12px;margin:auto;text-align:center;font-family:Courier New,monospace">Starting…</div>'
+      : '<div style="color:var(--muted);font-size:12px;margin:auto;text-align:center">Starting…</div>';
+  }
   return S.convo.map((msg, i) => {
     const isReal = msg.role === 'assistant' && msg.content && msg.content !== '…';
     const body = msg.role === 'assistant'
       ? (msg.display || safeAnnotated(buildAnnotated(msg.content)))
       : (msg.display || escHtml(msg.content));
-    // Show correction under the user message (correction lives on the next assistant msg)
     const nextMsg = S.convo[i + 1];
     const correctionHere = msg.role === 'user' && nextMsg?.correction
       ? `<div class="msg-correction">↳ ${escHtml(nextMsg.correction)}</div>` : '';
     const hasBd = isReal && msg.breakdown;
+
+    if (S.sierraMode) {
+      const portraitHtml = msg.role === 'assistant' && S.scenario
+        ? `<div class="rpg-portrait-frame">${renderPortrait(S.scenario)}</div>` : '';
+      const charName = S.scenario ? escHtml(S.scenario.char.split(',')[0]) : '';
+      const nameHtml = msg.role === 'assistant'
+        ? `<div class="rpg-name">${charName}</div>`
+        : `<div class="rpg-name">You</div>`;
+      return `
+        <div class="rpg-msg msg ${msg.role}${hasBd ? ' has-breakdown' : ''}">
+          ${portraitHtml}
+          <div class="rpg-bubble">
+            ${nameHtml}
+            <div class="msg-body">${body}</div>
+            ${correctionHere}
+            ${isReal ? `
+            <div class="msg-foot rpg-foot">
+              <button class="speak-btn" data-mi="${i}" title="Speak aloud">🔊</button>
+              <button class="breakdown-btn" data-mi="${i}" title="Break down">📖</button>
+            </div>
+            <div class="audio-player" id="ap-${i}" style="display:none">
+              <button class="ap-btn" data-ap="${i}" title="Play/Pause">▶</button>
+              <div class="ap-track" data-ap-track="${i}"><div class="ap-fill"></div></div>
+              <span class="ap-time">0:00</span>
+            </div>` : ''}
+            ${hasBd ? `<div class="msg-breakdown">${msg.breakdown}</div>` : ''}
+          </div>
+        </div>`;
+    }
+
+    // Classic style
     const avatarHtml = msg.role === 'assistant' && S.scenario
       ? `<div class="msg-avatar">${getScenarioSprite(S.scenario, 2)}</div>` : '';
     const inner = `
@@ -2687,8 +3261,7 @@ function renderMessages() {
       <div class="msg ${msg.role}${hasBd ? ' has-breakdown' : ''}">
         ${avatarHtml}
         ${msg.role === 'assistant' ? `<div class="msg-main">${inner}</div>` : inner}
-      </div>
-    `;
+      </div>`;
   }).join('');
 }
 
