@@ -1677,7 +1677,7 @@ function buildWordMap(msgBodyEl) {
   return map;
 }
 
-function speakJapanese(rawText, btn, msgIdx) {
+async function speakJapanese(rawText, btn, msgIdx) {
   // If this message already has audio loaded, just toggle play
   if (msgIdx != null && _currentMsgId === msgIdx && _currentAudio) {
     if (_currentAudio.paused) {
@@ -3877,7 +3877,7 @@ async function sendEngMsg() {
 
 // ── English TTS ──────────────────────────────────────────────────────────
 
-function speakEnglish(rawText, btn, msgIdx) {
+async function speakEnglish(rawText, btn, msgIdx) {
   // Toggle play if already loaded for this message
   if (msgIdx != null && _currentMsgId === msgIdx && _currentAudio) {
     if (_currentAudio.paused) {
