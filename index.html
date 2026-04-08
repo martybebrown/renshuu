@@ -41,6 +41,15 @@ header {
 }
 .logo { font-family: 'Shippori Mincho', serif; font-size: 18px; letter-spacing: 0.08em; }
 .logo em { color: var(--red); font-style: normal; }
+.lang-toggle {
+  background: none; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 18px; cursor: pointer; padding: 2px 6px; line-height: 1;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.lang-toggle:hover { border-color: var(--muted); transform: scale(1.1); }
+.layout.eng-mode { grid-template-columns: 0px 1fr !important; }
+.layout.eng-mode aside { width: 0 !important; min-width: 0 !important; padding: 0 !important; overflow: hidden !important; border-right: none !important; visibility: hidden; }
+.layout.eng-mode .sidebar-toggle { display: none !important; }
 .status { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); }
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink:0; }
 .dot.on { background: var(--green); }
@@ -935,6 +944,7 @@ pre.code {
       <div class="dot" id="dot"></div>
       <span id="statusText">not connected</span>
     </div>
+    <button class="lang-toggle" id="langToggle" onclick="toggleLangMode()" title="日本語学習 ↔ English学習">🇯🇵</button>
     <button class="settings-btn" id="settingsBtn" onclick="toggleSettings()" title="Settings">⚙</button>
   </div>
 </header>
@@ -1089,6 +1099,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // Use fallback until generation completes
     S.scenarios = fallbackScenarios();
   }
+  // English roleplay scenarios
+  const savedEngSc = sessionStorage.getItem('renshuu_eng_scenarios');
+  if (savedEngSc) {
+    try {
+      const parsed = JSON.parse(savedEngSc);
+      if (Array.isArray(parsed) && parsed.length && typeof parsed[0] === 'object' && parsed[0].jp) {
+        S.engScenarios = parsed;
+      } else { sessionStorage.removeItem('renshuu_eng_scenarios'); }
+    } catch (_) { sessionStorage.removeItem('renshuu_eng_scenarios'); }
+  }
+  if (!S.engScenarios.length) {
+    generateEngScenarios().then(() => { if (S.mode === 'eng_roleplay') renderEngRoleplay(); });
+    S.engScenarios = engFallbackScenarios();
+  }
   loadCards();
 });
 
@@ -1124,8 +1148,13 @@ document.addEventListener('click', e => {
   const speakBtn = e.target.closest('.speak-btn[data-mi]');
   if (speakBtn) {
     const mi = parseInt(speakBtn.dataset.mi, 10);
-    const msg = S.convo[mi];
-    if (msg) speakJapanese(msg.content, speakBtn, mi);
+    if (S.mode === 'eng_roleplay') {
+      const msg = S.engConvo[mi];
+      if (msg) speakEnglish(msg.content, speakBtn, mi);
+    } else {
+      const msg = S.convo[mi];
+      if (msg) speakJapanese(msg.content, speakBtn, mi);
+    }
     return;
   }
 
@@ -1178,8 +1207,13 @@ document.addEventListener('click', e => {
   const bdBtn = e.target.closest('.breakdown-btn[data-mi]');
   if (bdBtn) {
     const mi = parseInt(bdBtn.dataset.mi, 10);
-    const msg = S.convo[mi];
-    if (msg) breakdownMessage(msg, bdBtn, mi);
+    if (S.mode === 'eng_roleplay') {
+      const msg = S.engConvo[mi];
+      if (msg) breakdownEngMessage(msg, bdBtn, mi);
+    } else {
+      const msg = S.convo[mi];
+      if (msg) breakdownMessage(msg, bdBtn, mi);
+    }
     return;
   }
 
@@ -1213,6 +1247,12 @@ const S = {
   sessionWords: [],
   story: null,
   sierraMode: localStorage.getItem('renshuu_sierra_mode') !== 'false',
+  // English roleplay (reverse mode)
+  engScenario: null,
+  engScenarios: [],
+  engFavorites: JSON.parse(localStorage.getItem('renshuu_eng_favorites') || '[]'),
+  engConvo: [],
+  engSysPrompt: '',
 };
 
 
@@ -1998,17 +2038,44 @@ function toggleFocus(tier) {
 function total() { return S.cards.new.length + S.cards.young.length + S.cards.mature.length; }
 
 // ── Mode ──────────────────────────────────────────────────────────────────────
+function toggleLangMode() {
+  const btn = document.getElementById('langToggle');
+  if (S.mode === 'eng_roleplay') {
+    // Switch back to Japanese learning mode
+    btn.textContent = '🇯🇵';
+    btn.title = '英語学習モードに切替';
+    S.mode = 'drill';
+    // Show sidebar
+    const layout = document.getElementById('layout');
+    layout.classList.remove('eng-mode');
+    document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-drill').classList.add('active');
+    if (total() > 0) renderMode();
+  } else {
+    // Switch to English learning mode
+    btn.textContent = '🇬🇧';
+    btn.title = '日本語学習モードに切替';
+    S.mode = 'eng_roleplay';
+    // Hide sidebar
+    const layout = document.getElementById('layout');
+    layout.classList.add('eng-mode');
+    document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.remove('active'));
+    renderMode();
+  }
+}
+
 function switchMode(m) {
   closeMenu();
   S.mode = m;
   document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.remove('active'));
-  document.getElementById(`tab-${m}`).classList.add('active');
-  if (total() > 0) renderMode();
+  document.getElementById(`tab-${m}`)?.classList.add('active');
+  if (m === 'eng_roleplay' || total() > 0) renderMode();
 }
 
 function renderMode() {
   if (S.mode === 'drill') renderDrills();
   else if (S.mode === 'roleplay') renderRoleplay();
+  else if (S.mode === 'eng_roleplay') renderEngRoleplay();
   else if (S.mode === 'story') renderStory();
 }
 
@@ -2504,6 +2571,15 @@ const VOICE_SPRITE_MAP = {
   'ja-JP-MayuNeural':   'adult_female',
   'ja-JP-ShioriNeural': 'young_female',
   'ja-JP-AoiNeural':    'young_female',
+  // English voices (for reverse roleplay)
+  'en-US-GuyNeural':      'adult_male',
+  'en-US-DavisNeural':    'young_male',
+  'en-US-JennyNeural':    'adult_female',
+  'en-US-AriaNeural':     'young_female',
+  'en-GB-RyanNeural':     'mature_male',
+  'en-GB-SoniaNeural':    'adult_female',
+  'en-AU-WilliamNeural':  'adult_male',
+  'en-AU-NatashaNeural':  'young_female',
 };
 
 function renderSprite(type, px) {
@@ -3007,7 +3083,16 @@ function inferBackground(sc) {
   if (/taxi|cab.driv|chauffeur|ride/.test(t)) return 'taxi';
   if (/gym|workout|fitness|dojo|martial|kendo|judo|changing/.test(t)) return 'dojo';
   if (/izakaya|bar|pub|gokon|drink|beer/.test(t)) return 'restaurant';
-  if (/vet|clinic|hospital|doctor/.test(t)) return 'shop';
+  if (/vet|clinic|hospital|doctor|emergency/.test(t)) return 'shop';
+  // Broader patterns for English roleplay scenarios
+  if (/diner|breakfast|brunch|thanksgiving/.test(t)) return 'restaurant';
+  if (/hotel|hostel|airbnb|lobby|reception|check.?in/.test(t)) return 'cafe';
+  if (/beach|bbq|barbecue|wildlife|campus|university/.test(t)) return 'park';
+  if (/concert|gig|stadium|baseball|game/.test(t)) return 'night';
+  if (/interview|office|corporate/.test(t)) return 'shop';
+  if (/bookshop|library|duty.free|shopping|garage.sale/.test(t)) return 'shop';
+  if (/cooking|class|lesson/.test(t)) return 'restaurant';
+  if (/subway|underground|station|train|bus/.test(t)) return 'street';
   return 'street';
 }
 
@@ -3432,6 +3517,636 @@ async function sendMsg() {
 function scrollChat() {
   const w = document.getElementById('chatWin');
   if (w) setTimeout(() => w.scrollTop = w.scrollHeight, 60);
+}
+
+// ── ENGLISH ROLEPLAY MODE (英語ロールプレイ — 逆バージョン) ──────────────────
+
+const ENG_AZURE_VOICES = [
+  'en-US-GuyNeural','en-US-DavisNeural','en-US-JennyNeural','en-US-AriaNeural',
+  'en-GB-RyanNeural','en-GB-SoniaNeural','en-AU-WilliamNeural','en-AU-NatashaNeural',
+];
+
+const ENG_SCENARIO_POOL = [
+  // American settings
+  { id:'eng-diner', jp:'ダイナー', en:'アメリカの食堂で朝食を注文', icon:'🍳', char:'Sally, a chatty waitress at a small-town diner who remembers every regular', charJp:'サリー — 常連客を全員覚えているおしゃべりなウェイトレス', ctx:'A small-town American diner at breakfast time. Sally comes to take the order with a pot of coffee already in hand. She has opinions about everything on the menu.', voice:'en-US-JennyNeural' },
+  { id:'eng-roadtrip', jp:'ガソリンスタンド', en:'ロードトリップ中の休憩', icon:'⛽', char:'Hank, a gas station attendant who has never left his hometown', charJp:'ハンク — 地元から出たことのないガソリンスタンドの店員', ctx:'A lonely gas station on a long American highway. Hank is curious about where you are from and where you are headed. He gives directions using landmarks only locals would know.', voice:'en-US-GuyNeural' },
+  { id:'eng-nyc-subway', jp:'NY地下鉄', en:'ニューヨークの地下鉄で道を聞く', icon:'🚇', char:'Marcus, a New Yorker who talks fast but means well', charJp:'マーカス — 早口だけど親切なニューヨーカー', ctx:'You are on the NYC subway trying to figure out which stop to get off at. Marcus notices your confused expression and starts helping — while also giving unsolicited advice about the best pizza in the city.', voice:'en-US-DavisNeural' },
+  { id:'eng-baseball', jp:'野球観戦', en:'アメリカの野球場で観戦', icon:'⚾', char:'Doug, a die-hard fan who has been coming to games for 30 years', charJp:'ダグ — 30年通いの熱狂的ファン', ctx:'You are at an American baseball game. The guy next to you, Doug, assumes you know nothing about baseball and enthusiastically explains every play. He also has strong opinions about hot dogs.', voice:'en-US-GuyNeural' },
+  { id:'eng-thanksgiving', jp:'感謝祭', en:'ホストファミリーの感謝祭ディナー', icon:'🦃', char:'Linda, a warm host mother who cooks way too much food', charJp:'リンダ — 料理を作りすぎる温かいホストマザー', ctx:'You are spending Thanksgiving with your American host family. Linda insists you try everything and keeps asking if you want more. The whole family is curious about Japanese holidays.', voice:'en-US-JennyNeural' },
+  { id:'eng-campus', jp:'キャンパス', en:'アメリカの大学キャンパスツアー', icon:'🎓', char:'Zoe, an enthusiastic student ambassador', charJp:'ゾーイ — テンション高めの学生アンバサダー', ctx:'You are touring an American university campus. Zoe is showing you around, using a lot of campus slang you might not know. She wants to know about universities in Japan.', voice:'en-US-AriaNeural' },
+  { id:'eng-garage-sale', jp:'ガレージセール', en:'ガレージセールで値段交渉', icon:'🏷️', char:'Barbara, who prices things based on how much she likes you', charJp:'バーバラ — 好感度で値段を変えるおばさん', ctx:'You have found some interesting items at a neighborhood garage sale. Barbara is chatty and curious about what life is like in Japan. Prices seem negotiable if you have good conversation.', voice:'en-US-JennyNeural' },
+  // British settings
+  { id:'eng-pub', jp:'パブ', en:'ロンドンのパブでクイズナイト', icon:'🍺', char:'Nigel, a pub quiz master with impossibly obscure questions', charJp:'ナイジェル — 超マニアックなクイズマスター', ctx:'You have wandered into a London pub quiz night. Nigel invites you to join his team because they need someone who knows about Japan. His British humour takes some getting used to.', voice:'en-GB-RyanNeural' },
+  { id:'eng-tea', jp:'アフタヌーンティー', en:'ホテルでアフタヌーンティー', icon:'🫖', char:'Mrs. Pemberton, who takes tea etiquette very seriously', charJp:'ペンバートン夫人 — ティーマナーに厳しい英国淑女', ctx:'You are having afternoon tea at a London hotel. Mrs. Pemberton at the next table notices your technique and politely begins coaching you on proper tea etiquette. She has thoughts on the scone-cream order debate.', voice:'en-GB-SoniaNeural' },
+  { id:'eng-kings-cross', jp:'キングスクロス駅', en:'ロンドンの駅で乗り換えを聞く', icon:'🚂', char:'Trevor, a helpful but slightly sarcastic station worker', charJp:'トレヴァー — 親切だけど少し皮肉屋な駅員', ctx:'You are at King\'s Cross station trying to figure out the Tube map. Trevor helps you but cannot resist making dry British jokes about tourists. He secretly loves recommending hidden London gems.', voice:'en-GB-RyanNeural' },
+  { id:'eng-fish-chips', jp:'フィッシュ＆チップス', en:'海辺のフィッシュ＆チップス屋', icon:'🐟', char:'Chip — yes, that is really his name — the shop owner', charJp:'チップ — 本名がチップの店主', ctx:'You are at a seaside fish and chips shop. The owner, who everyone calls Chip, is proud of his family recipe and wants to know what you think. He also has questions about Japanese seafood.', voice:'en-GB-RyanNeural' },
+  { id:'eng-village', jp:'イングランドの村', en:'のどかな村のマーケットで買い物', icon:'🏡', char:'Dorothy, a village market vendor who grows everything herself', charJp:'ドロシー — 全て自家栽培のマーケットおばあちゃん', ctx:'You are browsing a quaint English village market. Dorothy is selling vegetables and homemade preserves. She is fascinated by Japanese food and keeps asking how to cook with miso.', voice:'en-GB-SoniaNeural' },
+  // Australian settings
+  { id:'eng-beach-bbq', jp:'ビーチBBQ', en:'オーストラリアのビーチでバーベキュー', icon:'🏖️', char:'Shane, an Aussie who uses slang you have never heard of', charJp:'シェーン — 聞いたことのないスラングを連発するオージー', ctx:'You have been invited to a beach BBQ in Australia. Shane is manning the grill and speaks in heavy Australian slang. He thinks everything is no worries and keeps offering you prawns.', voice:'en-AU-WilliamNeural' },
+  { id:'eng-melbourne-cafe', jp:'メルボルンカフェ', en:'メルボルンのおしゃれなカフェ', icon:'☕', char:'Mia, a barista who takes coffee extremely seriously', charJp:'ミア — コーヒーに異常にこだわるバリスタ', ctx:'You are at a Melbourne specialty coffee shop. Mia asks detailed questions about your coffee preferences and is genuinely offended by the idea of instant coffee. She wants to know about Japanese kissaten.', voice:'en-AU-NatashaNeural' },
+  { id:'eng-wildlife', jp:'動物園', en:'オーストラリアの動物園ツアー', icon:'🦘', char:'Bruce, a wildlife guide who talks to animals', charJp:'ブルース — 動物に話しかける飼育員', ctx:'You are on a guided tour of an Australian wildlife park. Bruce introduces you to every animal by name and seems to understand their responses. He is curious whether you have kangaroos in Japan.', voice:'en-AU-WilliamNeural' },
+  { id:'eng-sydney-bus', jp:'シドニーバス', en:'シドニーのバスで隣の人と会話', icon:'🚌', char:'Emma, a uni student heading home from class', charJp:'エマ — 授業帰りの大学生', ctx:'You are on a bus in Sydney and the person next to you starts chatting. Emma is studying Japanese at university and is excited to practice, but keeps mixing up Japanese and English.', voice:'en-AU-NatashaNeural' },
+  // Japanese settings (practicing English in Japan)
+  { id:'eng-eikaiwa', jp:'英会話カフェ', en:'渋谷の英会話カフェ', icon:'💬', char:'Ryan, an American expat who runs conversation tables', charJp:'ライアン — 英会話テーブルを仕切るアメリカ人', ctx:'You are at an English conversation cafe in Shibuya. Ryan hosts a table for intermediate learners and keeps the conversation flowing with interesting topics. He has lived in Tokyo for 5 years.', voice:'en-US-DavisNeural' },
+  { id:'eng-tourist-help', jp:'道案内', en:'迷子の外国人観光客を助ける', icon:'🗺️', char:'Oliver, a confused but cheerful tourist', charJp:'オリバー — 迷子だけど陽気な観光客', ctx:'A tourist approaches you near a train station in Tokyo, looking lost. Oliver cannot read any signs and needs help finding his hotel. He only speaks English and is very grateful for any help.', voice:'en-GB-RyanNeural' },
+  { id:'eng-hotel', jp:'ホテル受付', en:'海外のホテルでチェックイン', icon:'🏨', char:'Catherine, a precise and professional front desk agent', charJp:'キャサリン — きっちりしたフロント係', ctx:'You are checking into a hotel abroad. Catherine needs to verify your reservation details, explain the hotel facilities, and give you directions to your room. She speaks clearly but uses hotel-specific vocabulary.', voice:'en-US-JennyNeural' },
+  { id:'eng-interview', jp:'面接', en:'外資系企業の英語面接', icon:'💼', char:'David Chen, a hiring manager who asks tricky questions', charJp:'デイビッド・チェン — トリッキーな質問をする面接官', ctx:'You are in an English job interview at an international company. David is friendly but professional, and asks both standard interview questions and some surprising ones. He wants to understand your experience and motivation.', voice:'en-US-GuyNeural' },
+  { id:'eng-airport', jp:'空港', en:'海外の空港で入国審査', icon:'✈️', char:'Officer Martinez, thorough but not unfriendly', charJp:'マルティネス審査官 — 厳格だけど悪い人ではない', ctx:'You are going through immigration at an international airport. Officer Martinez asks about the purpose of your visit, how long you are staying, and where you will be. Direct answers work best.', voice:'en-US-GuyNeural' },
+  { id:'eng-airbnb', jp:'Airbnb', en:'Airbnbのホストとやり取り', icon:'🏠', char:'Sophie, a chatty Airbnb host who loves hosting Japanese guests', charJp:'ソフィー — 日本人ゲスト大好きなAirbnbホスト', ctx:'You have just arrived at your Airbnb. Sophie shows you around, explains the house rules, recommends local restaurants, and asks about your travel plans. She has hosted many Japanese guests before.', voice:'en-GB-SoniaNeural' },
+  { id:'eng-hostel', jp:'ホステル', en:'ホステルのラウンジで友達作り', icon:'🛏️', char:'Luca, a backpacker from Italy who speaks English as a second language too', charJp:'ルカ — 英語が第二言語のイタリア人バックパッカー', ctx:'You are in a hostel common room. Luca starts chatting — his English is not perfect either, which makes you feel more relaxed. He wants to compare travel stories and share tips.', voice:'en-US-DavisNeural' },
+  { id:'eng-doctor', jp:'病院', en:'海外の病院で症状を説明', icon:'🏥', char:'Dr. Williams, a patient and understanding GP', charJp:'ウィリアムズ先生 — 辛抱強くて理解のある医師', ctx:'You are feeling unwell while traveling and visit a local clinic. Dr. Williams needs you to describe your symptoms in English. She speaks slowly and clearly, and asks follow-up questions to understand your condition.', voice:'en-GB-SoniaNeural' },
+  { id:'eng-duty-free', jp:'免税店', en:'空港の免税店でお土産選び', icon:'🛍️', char:'Priya, a sales associate with strong opinions about gifts', charJp:'プリヤ — お土産選びに強いこだわりを持つ店員', ctx:'You are shopping for souvenirs at an airport duty-free shop. Priya asks who the gifts are for and has very specific recommendations. She is curious about omiyage culture in Japan.', voice:'en-US-AriaNeural' },
+  { id:'eng-emergency', jp:'緊急事態', en:'海外で助けを求める', icon:'🆘', char:'Kate, a helpful stranger who stops to help', charJp:'ケイト — たまたま居合わせた親切な人', ctx:'You have lost your wallet while traveling. A kind stranger named Kate stops to help. She helps you figure out what to do — cancel cards, contact the embassy, file a police report. She speaks clearly and patiently.', voice:'en-AU-NatashaNeural' },
+  { id:'eng-cooking', jp:'料理教室', en:'英語の料理教室に参加', icon:'👨‍🍳', char:'Chef Marco, passionate about teaching through food', charJp:'マルコシェフ — 料理を通じて教えることに情熱を注ぐ', ctx:'You have joined an English-language cooking class abroad. Chef Marco explains each step while you cook together. He is interested in Japanese cooking techniques and keeps asking about dashi.', voice:'en-US-GuyNeural' },
+  { id:'eng-bookshop', jp:'洋書店', en:'海外の本屋でおすすめを聞く', icon:'📚', char:'Alice, a bookshop owner who reads three books a week', charJp:'アリス — 週3冊読む本屋のオーナー', ctx:'You are browsing an English bookshop and ask for recommendations. Alice wants to know what genres you like and starts pulling books off shelves faster than you can keep up. She has read everything.', voice:'en-GB-SoniaNeural' },
+  { id:'eng-concert', jp:'コンサート', en:'海外のコンサート会場で隣の人と', icon:'🎵', char:'Jake, who has seen this band seventeen times', charJp:'ジェイク — このバンドを17回見ているファン', ctx:'You are at a concert abroad waiting for the show to start. Jake notices your excitement and starts sharing trivia about the band. He wants to know about the Japanese music scene.', voice:'en-US-DavisNeural' },
+  { id:'eng-gym', jp:'ジム', en:'海外のジムでトレーニング仲間と', icon:'🏋️', char:'Tom, a personal trainer who gives free unsolicited advice', charJp:'トム — 頼んでもいないアドバイスをくれるトレーナー', ctx:'You have joined a gym while abroad. Tom watches your form and cannot help but offer suggestions. He is curious about Japanese fitness culture and martial arts.', voice:'en-AU-WilliamNeural' },
+];
+
+function engFallbackScenarios() {
+  const favIds = S.engFavorites.map(f => f.id);
+  const pool = ENG_SCENARIO_POOL.filter(s => !favIds.includes(s.id));
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, 6);
+}
+
+async function generateEngScenarios() {
+  const key = document.getElementById('apiKey')?.value?.trim();
+  if (!key) { S.engScenarios = engFallbackScenarios(); return; }
+
+  try {
+    const reply = await claude([{ role: 'user', content: `Generate 6 unique English conversation roleplay scenarios for a Japanese person learning English. Each should have a vivid character and an interesting situation.
+
+Mix settings: some in Japan (talking to foreigners), some in America, some in UK, some in Australia.
+
+Return ONLY a JSON array where each object has:
+- "id": short kebab-case identifier (prefix with "eng-")
+- "jp": location name in Japanese/katakana (2-6 chars)
+- "en": short description IN JAPANESE (一言で場面を説明)
+- "icon": a single emoji
+- "char": one-line character description in English (name + personality)
+- "charJp": same character description in Japanese
+- "ctx": 2-3 sentence scene setup in English (for AI system prompt)
+- "gender": "male_old", "male_young", "male_adult", "female_young", "female_adult", "female_soft"
+- "accent": "american", "british", or "australian"` }],
+    'You are a creative scenario designer for an English learning app aimed at Japanese speakers. Output valid JSON only.',
+    2000);
+
+    const parsed = JSON.parse(reply.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
+    if (!Array.isArray(parsed) || parsed.length < 1) throw new Error('Bad format');
+
+    const voiceMap = {
+      male_old:    { american:'en-US-GuyNeural',    british:'en-GB-RyanNeural',  australian:'en-AU-WilliamNeural' },
+      male_young:  { american:'en-US-DavisNeural',  british:'en-GB-RyanNeural',  australian:'en-AU-WilliamNeural' },
+      male_adult:  { american:'en-US-GuyNeural',    british:'en-GB-RyanNeural',  australian:'en-AU-WilliamNeural' },
+      female_young:{ american:'en-US-AriaNeural',   british:'en-GB-SoniaNeural', australian:'en-AU-NatashaNeural' },
+      female_adult:{ american:'en-US-JennyNeural',  british:'en-GB-SoniaNeural', australian:'en-AU-NatashaNeural' },
+      female_soft: { american:'en-US-AriaNeural',   british:'en-GB-SoniaNeural', australian:'en-AU-NatashaNeural' },
+    };
+
+    S.engScenarios = parsed.map(s => ({
+      id: s.id || ('eng_' + Math.random().toString(36).slice(2, 8)),
+      jp: s.jp, en: s.en, icon: s.icon || '🎭',
+      char: s.char, charJp: s.charJp || s.char, ctx: s.ctx,
+      voice: voiceMap[s.gender]?.[s.accent] || ENG_AZURE_VOICES[Math.floor(Math.random() * ENG_AZURE_VOICES.length)],
+    }));
+    sessionStorage.setItem('renshuu_eng_scenarios', JSON.stringify(S.engScenarios));
+  } catch (e) {
+    console.warn('Failed to generate English scenarios, using fallback:', e);
+    S.engScenarios = engFallbackScenarios();
+  }
+}
+
+async function refreshEngScenarios() {
+  const grid = document.querySelector('.scenario-grid:last-of-type');
+  if (grid) grid.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">新しいシナリオを生成中…</div>';
+  await generateEngScenarios();
+  if (S.engScenario && !S.engScenarios.find(s => s.id === S.engScenario.id) && !S.engFavorites.find(f => f.id === S.engScenario.id)) {
+    S.engScenario = null;
+    S.engConvo = [];
+  }
+  renderEngRoleplay();
+}
+
+function toggleEngFavorite(id) {
+  const idx = S.engFavorites.findIndex(f => f.id === id);
+  if (idx === -1) {
+    const sc = S.engScenarios.find(s => s.id === id) || ENG_SCENARIO_POOL.find(s => s.id === id);
+    if (sc) {
+      const fav = { ...sc };
+      if (S.engScenario?.id === id && S.engConvo.length) {
+        fav.convo = S.engConvo.map(m => ({ role: m.role, content: m.content, correction: m.correction || undefined }));
+      }
+      S.engFavorites.push(fav);
+    }
+  } else {
+    S.engFavorites.splice(idx, 1);
+  }
+  saveEngFavorites();
+  renderEngRoleplay();
+  if (S.engScenario) scrollChat();
+}
+
+function saveEngFavorites() {
+  localStorage.setItem('renshuu_eng_favorites', JSON.stringify(S.engFavorites));
+}
+
+function saveEngConvoToFavorite() {
+  if (!S.engScenario) return;
+  const fav = S.engFavorites.find(f => f.id === S.engScenario.id);
+  if (fav) {
+    fav.convo = S.engConvo
+      .filter(m => m.content !== '…')
+      .map(m => ({ role: m.role, content: m.content, _id: m._id, correction: m.correction || undefined }));
+    saveEngFavorites();
+  }
+}
+
+function engScCard(sc) {
+  const isFav = S.engFavorites.some(f => f.id === sc.id);
+  const isSel = S.engScenario?.id === sc.id;
+  const visual = S.sierraMode
+    ? `<div class="sc-scene-preview">${renderScene(sc)}</div>`
+    : `<div class="sc-sprite">${getScenarioSprite(sc, 3)}</div>`;
+  return `
+    <div class="scenario-card ${isSel ? 'sel' : ''} ${isFav && !isSel ? 'fav-card' : ''}" onclick="pickEngScenario('${sc.id}')">
+      <button class="sc-fav ${isFav ? 'active' : ''}" onclick="toggleEngFavorite('${sc.id}');event.stopPropagation()" title="${isFav ? 'お気に入り解除' : 'お気に入り登録'}">★</button>
+      ${visual}
+      <div class="sc-jp">${sc.jp}</div>
+      <div class="sc-en">${sc.en}</div>
+      <div class="sc-char">${sc.charJp || sc.char}</div>
+    </div>`;
+}
+
+function renderEngRoleplay() {
+  const m = document.getElementById('mainContent');
+  const favScenarios = S.engFavorites;
+
+  m.innerHTML = `
+    <div>
+      ${favScenarios.length ? `
+        <div class="sc-section-head">
+          <div class="label">★ お気に入り</div>
+        </div>
+        <div class="scenario-grid" style="margin-bottom:18px">
+          ${favScenarios.map(engScCard).join('')}
+        </div>
+      ` : ''}
+      <div class="sc-section-head">
+        <div class="label">シナリオ</div>
+        <button class="btn" style="font-size:10px;padding:4px 10px" onclick="refreshEngScenarios()">↻ 更新</button>
+      </div>
+      <div style="color:var(--muted);font-size:11px;margin-bottom:10px">
+        英語で会話の練習をしましょう。AIが英語で返答し、間違いを直してくれます。
+      </div>
+      <div class="scenario-grid">
+        ${S.engScenarios.map(engScCard).join('')}
+      </div>
+    </div>
+
+    ${S.engScenario ? (S.sierraMode ? `
+      <div class="rpg-frame">
+        <div class="rpg-scene">
+          ${renderScene(S.engScenario)}
+          <div class="rpg-scene-label">${S.engScenario.jp} — ${S.engScenario.en}</div>
+        </div>
+        <div class="rpg-dialogue-wrap">
+          <div class="rpg-head">
+            <div class="label">${escHtml(S.engScenario.charJp || S.engScenario.char)}</div>
+            <button class="btn" onclick="resetEngChat()">リセット</button>
+          </div>
+          <div class="rpg-dialogue" id="chatWin">${renderEngMessages()}</div>
+          <div class="rpg-input-area">
+            <textarea class="rpg-input" id="chatIn" rows="1"
+              placeholder="英語で入力… (日本語でもOK)"
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendEngMsg()}"
+            ></textarea>
+            <button class="rpg-send" id="sendBtn" onclick="sendEngMsg()">→</button>
+          </div>
+          <div class="rpg-tip">Enterで送信 · Shift+Enterで改行</div>
+        </div>
+      </div>
+    ` : `
+      <div class="chat-wrap">
+        <div class="chat-head">
+          <div class="label">${S.engScenario.jp} — ${S.engScenario.en}</div>
+          <button class="btn" onclick="resetEngChat()">リセット</button>
+        </div>
+        <div class="chat-window" id="chatWin">${renderEngMessages()}</div>
+        <div class="chat-foot">
+          <textarea class="chat-input" id="chatIn" rows="1"
+            placeholder="英語で入力… (日本語でもOK)"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendEngMsg()}"
+          ></textarea>
+          <button class="send-btn" id="sendBtn" onclick="sendEngMsg()">→</button>
+        </div>
+        <div class="chat-tip">Enterで送信 · Shift+Enterで改行</div>
+      </div>
+    `) : ''}
+  `;
+
+  scrollChat();
+}
+
+function renderEngMessages() {
+  if (!S.engConvo.length) {
+    return S.sierraMode
+      ? '<div style="color:#4a4a6a;font-size:12px;margin:auto;text-align:center;font-family:Courier New,monospace">準備中…</div>'
+      : '<div style="color:var(--muted);font-size:12px;margin:auto;text-align:center">準備中…</div>';
+  }
+  return S.engConvo.map((msg, i) => {
+    const isReal = msg.role === 'assistant' && msg.content && msg.content !== '…';
+    const body = msg.role === 'assistant'
+      ? (msg.display || safeAnnotated(buildAnnotated(msg.content)))
+      : (msg.display || escHtml(msg.content));
+    const nextMsg = S.engConvo[i + 1];
+    const correctionHere = msg.role === 'user' && nextMsg?.correction
+      ? `<div class="msg-correction">↳ ${escHtml(nextMsg.correction)}</div>` : '';
+    const hasBd = isReal && msg.breakdown;
+
+    if (S.sierraMode) {
+      const portraitHtml = msg.role === 'assistant' && S.engScenario
+        ? `<div class="rpg-portrait-frame">${renderPortrait(S.engScenario)}</div>` : '';
+      const charName = S.engScenario ? escHtml((S.engScenario.charJp || S.engScenario.char).split(/[,—]/)[0].trim()) : '';
+      const nameHtml = msg.role === 'assistant'
+        ? `<div class="rpg-name">${charName}</div>`
+        : `<div class="rpg-name">あなた</div>`;
+      return `
+        <div class="rpg-msg msg ${msg.role}${hasBd ? ' has-breakdown' : ''}">
+          ${portraitHtml}
+          <div class="rpg-bubble">
+            ${nameHtml}
+            <div class="msg-body">${body}</div>
+            ${correctionHere}
+            ${isReal ? `
+            <div class="msg-foot rpg-foot">
+              <button class="speak-btn" data-mi="${i}" title="読み上げ">🔊</button>
+              <button class="breakdown-btn" data-mi="${i}" title="文法解説">📖</button>
+            </div>
+            <div class="audio-player" id="ap-${i}" style="display:none">
+              <button class="ap-btn" data-ap="${i}" title="再生/一時停止">▶</button>
+              <div class="ap-track" data-ap-track="${i}"><div class="ap-fill"></div></div>
+              <span class="ap-time">0:00</span>
+            </div>` : ''}
+            ${hasBd ? `<div class="msg-breakdown">${msg.breakdown}</div>` : ''}
+          </div>
+        </div>`;
+    }
+
+    // Classic style
+    const avatarHtml = msg.role === 'assistant' && S.engScenario
+      ? `<div class="msg-avatar">${getScenarioSprite(S.engScenario, 2)}</div>` : '';
+    const inner = `
+        <div class="msg-inner">
+          <div class="msg-body">${body}</div>
+          ${correctionHere}
+          ${isReal ? `
+          <div class="msg-foot">
+            <button class="speak-btn" data-mi="${i}" title="読み上げ">🔊</button>
+            <button class="breakdown-btn" data-mi="${i}" title="文法解説">📖</button>
+          </div>
+          <div class="audio-player" id="ap-${i}" style="display:none">
+            <button class="ap-btn" data-ap="${i}" title="再生/一時停止">▶</button>
+            <div class="ap-track" data-ap-track="${i}"><div class="ap-fill"></div></div>
+            <span class="ap-time">0:00</span>
+          </div>` : ''}
+        </div>
+        ${hasBd ? `<div class="msg-breakdown">${msg.breakdown}</div>` : ''}`;
+    return `
+      <div class="msg ${msg.role}${hasBd ? ' has-breakdown' : ''}">
+        ${avatarHtml}
+        ${msg.role === 'assistant' ? `<div class="msg-main">${inner}</div>` : inner}
+      </div>`;
+  }).join('');
+}
+
+function pickEngScenario(id) {
+  const fav = S.engFavorites.find(f => f.id === id);
+  if (fav && fav.convo && fav.convo.length) {
+    S.engScenario = fav;
+    S.engConvo = fav.convo;
+    renderEngRoleplay();
+    buildEngSysPrompt(S.engScenario);
+    scrollChat();
+    return;
+  }
+  S.engScenario = S.engScenarios.find(s => s.id === id) || S.engFavorites.find(f => f.id === id) || ENG_SCENARIO_POOL.find(s => s.id === id) || null;
+  S.engConvo = [];
+  renderEngRoleplay();
+  startEngChat();
+}
+
+function resetEngChat() {
+  S.engConvo = [];
+  renderEngRoleplay();
+  startEngChat();
+}
+
+function buildEngSysPrompt(sc) {
+  S.engSysPrompt = `You are playing the role of ${sc.char}. Context: ${sc.ctx}
+
+Rules:
+1. Respond in English only. IMPORTANT: Vary your reply length naturally — sometimes short (one word, a question, a brief reaction), sometimes 2–3 sentences. Do NOT always write the same length. Sound natural and conversational.
+2. Stay in character. Ask natural follow-up questions (but not every single turn — sometimes just react).
+3. Keep your English at a natural but accessible level for a beginner-intermediate Japanese learner. Avoid overly complex vocabulary or rare idioms unless they fit the character. Use common, everyday English.
+4. After your English response, if the student made ANY error in their English (grammar, vocabulary, spelling, word order, unnatural phrasing, article usage, preposition mistakes, tense errors), add: [Correction: explain in Japanese what was wrong, what it should be, and briefly why. Cover EVERY mistake — don't skip any. Be specific: show wrong text → correct text. Write the explanation entirely in Japanese. Example: "I go to school yesterday → I went to school yesterday（過去の出来事なので過去形 went を使います）"]
+5. Mark EVERY English word with [[word|カタカナ読み|日本語訳]] pipe markers. Include articles, prepositions, pronouns, and common words. Every single word must be annotated — do NOT leave any word unmarked. Example: [[Hello|ハロー|こんにちは]]! [[How|ハウ|どのように]] [[are|アー|〜です]] [[you|ユー|あなた]] [[doing|ドゥーイング|している]] [[today|トゥデイ|今日]]?
+6. The student may write in Japanese or broken English — understand their intent and respond naturally in English. Only correct actual English mistakes in the [Correction:] block, not Japanese input.
+7. If the student writes entirely in Japanese, that is fine — understand it and continue the conversation in English. Gently encourage them to try English by keeping your responses simple and inviting.`;
+}
+
+async function startEngChat() {
+  const chatWin = document.getElementById('chatWin');
+  if (!chatWin) return;
+  chatWin.innerHTML = '<div class="loading-row"><span class="spin"></span> シーンを準備中…</div>';
+
+  const sc = S.engScenario;
+  buildEngSysPrompt(sc);
+
+  try {
+    const opening = await claude(
+      [{ role: 'user', content: '[Open the scenario with a natural, brief English greeting or question — 1–2 sentences only. Remember to annotate every English word with [[word|katakana|japanese]] markers.]' }],
+      S.engSysPrompt
+    );
+    S.engConvo = [{ role: 'assistant', content: opening, _id: msgId() }];
+    updateEngChat();
+    saveEngConvoToFavorite();
+  } catch (e) {
+    chatWin.innerHTML = `<div style="color:var(--red);font-size:12px">エラー: ${e.message}</div>`;
+  }
+}
+
+function updateEngChat() {
+  const chatWin = document.getElementById('chatWin');
+  if (!chatWin) return;
+  chatWin.innerHTML = renderEngMessages();
+  restoreAudioPlayer();
+  scrollChat();
+}
+
+async function sendEngMsg() {
+  const inp = document.getElementById('chatIn');
+  const sendBtn = document.getElementById('sendBtn');
+  const raw = inp?.value.trim();
+  if (!raw) return;
+
+  inp.value = '';
+  if (sendBtn) sendBtn.disabled = true;
+
+  S.engConvo.push({ role: 'user', content: raw, display: escHtml(raw), _id: msgId() });
+  S.engConvo.push({ role: 'assistant', content: '…', display: '<span class="spin"></span>', _id: 'spinner' });
+  updateEngChat();
+
+  try {
+    const msgs = S.engConvo
+      .filter(m => m.content !== '…')
+      .map(m => ({ role: m.role, content: m.content }));
+
+    const reply = await claude(msgs, S.engSysPrompt);
+
+    // Parse optional [Correction: ...] — greedy match to final ]
+    const corrRx = /\[Correction:\s*([\s\S]*)\]\s*$/i;
+    const corrMatch = reply.match(corrRx);
+    const clean = reply.replace(corrRx, '').trim();
+    const correction = corrMatch ? corrMatch[1].replace(/\[\[([^\[\]|]+)\|[^\[\]]+\]\]/g, '$1').trim() : null;
+
+    // Replace spinner
+    S.engConvo.pop();
+    S.engConvo.push({ role: 'assistant', content: clean, correction, _id: msgId() });
+    updateEngChat();
+    saveEngConvoToFavorite();
+  } catch (e) {
+    S.engConvo.pop();
+    S.engConvo.push({ role: 'assistant', content: `Error: ${e.message}`, display: `<span style="color:var(--red)">${escHtml(e.message)}</span>`, _id: msgId() });
+    updateEngChat();
+  }
+
+  const newSend = document.getElementById('sendBtn');
+  if (newSend) newSend.disabled = false;
+  const newInp = document.getElementById('chatIn');
+  if (newInp) newInp.focus();
+}
+
+// ── English TTS ──────────────────────────────────────────────────────────
+
+function speakEnglish(rawText, btn, msgIdx) {
+  // Toggle play if already loaded for this message
+  if (msgIdx != null && _currentMsgId === msgIdx && _currentAudio) {
+    if (_currentAudio.paused) {
+      _currentAudio.play();
+      const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
+      if (apBtn) { apBtn.textContent = '⏸'; apBtn.classList.add('playing'); }
+      btn?.classList.add('speaking');
+      updatePlayer(msgIdx);
+    } else {
+      _currentAudio.pause();
+      const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
+      if (apBtn) { apBtn.textContent = '▶'; apBtn.classList.remove('playing'); }
+      btn?.classList.remove('speaking');
+    }
+    return;
+  }
+
+  cancelSpeech();
+  const text = stripMarkers(rawText);
+  if (!text.trim()) return;
+  _currentMsgId = msgIdx != null ? msgIdx : null;
+
+  const azKey = localStorage.getItem('renshuu_azure_key');
+  const azRegion = localStorage.getItem('renshuu_azure_region');
+
+  // ── Azure Speech (premium) ──
+  if (azKey && azRegion && window.SpeechSDK) {
+    btn?.classList.add('speaking');
+    try {
+      const cfg = SpeechSDK.SpeechConfig.fromSubscription(azKey, azRegion);
+      const voiceName = S.engScenario?.voice || 'en-US-JennyNeural';
+      const lang = voiceName.startsWith('en-GB') ? 'en-GB' : voiceName.startsWith('en-AU') ? 'en-AU' : 'en-US';
+      cfg.speechSynthesisLanguage = lang;
+      cfg.speechSynthesisVoiceName = voiceName;
+      const speed = parseInt(localStorage.getItem('renshuu_speech_speed') || '100', 10);
+      const offset = speed - 100;
+      const rate = (offset >= 0 ? '+' : '') + offset + '%';
+      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${lang}">
+        <voice name="${voiceName}">
+          <prosody rate="${rate}">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</prosody>
+        </voice>
+      </speak>`;
+      const synth = new SpeechSDK.SpeechSynthesizer(cfg, null);
+      _azureSynth = synth;
+      const wordBounds = [];
+      synth.wordBoundary = (s, e) => {
+        wordBounds.push({ ms: e.audioOffset / 10000, text: e.text, ssmlOffset: e.textOffset, len: e.wordLength });
+      };
+      synth.speakSsmlAsync(ssml,
+        result => {
+          if (_currentMsgId !== msgIdx) { synth.close(); return; }
+          if (result.reason === SpeechSDK.ResultReason.SynthesizingAudioCompleted && result.audioData) {
+            const blob = new Blob([result.audioData], { type: 'audio/wav' });
+            const audio = new Audio(URL.createObjectURL(blob));
+            _currentAudio = audio;
+            audio.onended = audio.onerror = () => {
+              btn?.classList.remove('speaking');
+              if (_wordMap) _wordMap.forEach(m => m.el.classList.remove('w-active'));
+              if (msgIdx != null) {
+                const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
+                if (apBtn) { apBtn.textContent = '▶'; apBtn.classList.remove('playing'); }
+                updatePlayer(msgIdx);
+              } else { _currentAudio = null; }
+            };
+            // Build word map for karaoke highlighting
+            if (msgIdx != null && wordBounds.length) {
+              let plainPos = 0;
+              wordBounds.forEach(wb => {
+                const idx = text.indexOf(wb.text, plainPos);
+                if (idx !== -1) { wb.plainOffset = idx; wb.plainLen = wb.text.length; plainPos = idx + wb.text.length; }
+                else { wb.plainOffset = plainPos; wb.plainLen = wb.text.length; }
+              });
+              _wordBounds = wordBounds;
+              const msgBody = document.getElementById('ap-' + msgIdx)?.closest('.msg')?.querySelector('.msg-body');
+              if (msgBody) _wordMap = buildWordMap(msgBody);
+            }
+            if (msgIdx != null) {
+              const player = document.getElementById('ap-' + msgIdx);
+              if (player) player.style.display = 'flex';
+              const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
+              if (apBtn) { apBtn.textContent = '⏸'; apBtn.classList.add('playing'); }
+            }
+            audio.play();
+            if (msgIdx != null) updatePlayer(msgIdx);
+          } else { btn?.classList.remove('speaking'); }
+          synth.close();
+          _azureSynth = null;
+        },
+        err => {
+          if (_currentMsgId !== msgIdx) { synth.close(); return; }
+          console.warn('Azure English TTS failed, falling back to Web Speech:', err);
+          synth.close(); _azureSynth = null;
+          speakEnglishWebSpeech(text, btn);
+        }
+      );
+    } catch (e) {
+      console.warn('Azure English TTS error, falling back:', e);
+      speakEnglishWebSpeech(text, btn);
+    }
+    return;
+  }
+
+  // ── Web Speech (fallback) ──
+  speakEnglishWebSpeech(text, btn);
+}
+
+function speakEnglishWebSpeech(text, btn) {
+  if (!window.speechSynthesis) return;
+  const trySpeak = () => {
+    const voices = speechSynthesis.getVoices();
+    const engVoice =
+      voices.find(v => v.lang === 'en-US' && v.localService) ||
+      voices.find(v => v.lang.startsWith('en') && v.localService) ||
+      voices.find(v => v.lang.startsWith('en'));
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = 'en-US';
+    const speed = parseInt(localStorage.getItem('renshuu_speech_speed') || '100', 10);
+    utt.rate = speed / 100;
+    if (engVoice) utt.voice = engVoice;
+    btn?.classList.add('speaking');
+    utt.onend = utt.onerror = () => btn?.classList.remove('speaking');
+    speechSynthesis.speak(utt);
+  };
+  if (speechSynthesis.getVoices().length) trySpeak();
+  else { speechSynthesis.onvoiceschanged = () => { speechSynthesis.onvoiceschanged = null; trySpeak(); }; }
+}
+
+// ── English Grammar Breakdown (explained in Japanese) ────────────────────
+
+async function breakdownEngMessage(msg, btn, mi) {
+  // Toggle off if already shown
+  if (msg.breakdown) {
+    delete msg.breakdown;
+    updateEngChat();
+    return;
+  }
+
+  btn.classList.add('active');
+  btn.textContent = '⏳';
+
+  const plain = stripMarkers(msg.content);
+  try {
+    const reply = await claude([
+      { role: 'user', content: `以下の英語のメッセージを初中級レベルの日本人学習者向けに分析してください。
+
+以下の形式を正確に使ってください（見出しもこの通りに）：
+
+翻訳:
+[自然な日本語訳]
+
+分析:
+[各文について以下の形式で:]
+
+文: [英文]
+意味: [日本語訳]
+語彙: [重要な単語・表現（日本語で説明）、・で箇条書き]
+文法: [文法ポイント（日本語で説明）、・で箇条書き]
+
+簡潔にまとめてください。メッセージ:
+${plain}` }
+    ], 'あなたは英語教師です。日本語話者の生徒に向けて、英語の文法や表現を日本語でわかりやすく説明してください。', 1500);
+
+    const html = formatEngBreakdown(reply);
+    msg.breakdown = html;
+  } catch (err) {
+    msg.breakdown = `<span style="color:var(--red)">エラー: ${escHtml(err.message)}</span>`;
+  }
+
+  const chatWin = document.getElementById('chatWin');
+  if (chatWin) {
+    chatWin.innerHTML = renderEngMessages();
+    restoreAudioPlayer();
+    const bdEl = chatWin.querySelector(`[data-mi="${mi}"]`)?.closest('.msg')?.querySelector('.msg-breakdown');
+    if (bdEl) bdEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+function formatEngBreakdown(text) {
+  const clean = text.replace(/\*\*/g, '');
+  const lines = clean.split('\n');
+  const parts = [];
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || line === '---') continue;
+    const stripped = line.replace(/^#{1,3}\s*/, '');
+    if (/^翻訳:/i.test(stripped)) {
+      const content = stripped.replace(/^翻訳:\s*/i, '').trim();
+      parts.push(`<div class="bd-heading">翻訳</div>`);
+      if (content) parts.push(`<div class="bd-item">${escHtml(content)}</div>`);
+    } else if (/^分析:/i.test(stripped)) {
+      parts.push(`<div class="bd-heading" style="margin-top:8px">分析</div>`);
+    } else if (/^文:/i.test(stripped)) {
+      parts.push(`<div class="bd-sentence">${escHtml(stripped.replace(/^文:\s*/i, ''))}</div>`);
+    } else if (/^意味:/i.test(stripped)) {
+      parts.push(`<div class="bd-meaning">${escHtml(stripped.replace(/^意味:\s*/i, ''))}</div>`);
+    } else if (/^語彙:/i.test(stripped)) {
+      const content = stripped.replace(/^語彙:\s*/i, '').trim();
+      parts.push(`<div class="bd-label">語彙</div>`);
+      if (content) parts.push(`<div class="bd-item">${escHtml(content)}</div>`);
+    } else if (/^文法:/i.test(stripped)) {
+      const content = stripped.replace(/^文法:\s*/i, '').trim();
+      parts.push(`<div class="bd-label">文法</div>`);
+      if (content) parts.push(`<div class="bd-item">${escHtml(content)}</div>`);
+    } else {
+      const bulletText = line.replace(/^[・•\-\*]\s*/, '');
+      const last = parts.length - 1;
+      if (last >= 0 && parts[last].includes('bd-item')) {
+        parts[last] = parts[last].replace(/<\/div>$/, `<br>${escHtml(bulletText)}</div>`);
+      } else {
+        parts.push(`<div class="bd-item">${escHtml(bulletText)}</div>`);
+      }
+    }
+  }
+  return parts.join('');
 }
 
 // ── STORY TIME MODE ────────────────────────────────────────────────────────────
