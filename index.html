@@ -938,39 +938,33 @@ pre.code {
     <button class="settings-btn" id="settingsBtn" onclick="toggleSettings()" title="Settings">⚙</button>
   </div>
 </header>
+<!-- Hidden inputs for API keys (populated by defaults in JS) -->
+<input type="hidden" id="apiKey" />
+<input type="hidden" id="ghToken" />
+<input type="hidden" id="azureKey" />
+<input type="hidden" id="azureRegion" />
+
 <div class="settings-panel" id="settingsPanel" style="display:none">
-  <form onsubmit="submitSettings(); return false;">
-    <div class="label">Claude API Key</div>
-    <input class="field" id="apiKey" type="password" placeholder="sk-ant-…" enterkeyhint="next" oninput="localStorage.setItem('renshuu_api_key',this.value)" />
-    <div class="label" style="margin-top:12px">GitHub Token <span style="font-size:9px;color:var(--muted)">(gist scope — syncs cards across devices)</span></div>
-    <input class="field" id="ghToken" type="password" placeholder="ghp_…" enterkeyhint="done" oninput="localStorage.setItem('renshuu_gh_token',this.value)" />
-    <div class="label" style="margin-top:12px">Azure Speech <span style="font-size:9px;color:var(--muted)">(optional — premium Japanese TTS)</span></div>
-    <div style="display:flex;gap:6px">
-      <input class="field" id="azureKey" type="password" placeholder="Key" style="flex:2" oninput="localStorage.setItem('renshuu_azure_key',this.value)" />
-      <input class="field" id="azureRegion" type="text" placeholder="Region (e.g. eastus)" style="flex:1" oninput="localStorage.setItem('renshuu_azure_region',this.value)" />
-    </div>
-    <div class="label" style="margin-top:12px">Speech Speed <span id="speedVal" style="font-size:9px;color:var(--muted)">100%</span></div>
-    <div style="display:flex;align-items:center;gap:8px">
-      <span style="font-size:9px;color:var(--muted)">50%</span>
-      <input type="range" id="speechSpeed" min="50" max="150" value="100" step="5" style="flex:1;accent-color:var(--accent)" oninput="localStorage.setItem('renshuu_speech_speed',this.value);document.getElementById('speedVal').textContent=this.value+'%';cancelSpeech()" />
-      <span style="font-size:9px;color:var(--muted)">150%</span>
-    </div>
-    <div class="label" style="margin-top:12px">Roleplay Vocab Control</div>
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--fg)">
-      <input type="checkbox" id="vocabReinforce" checked onchange="localStorage.setItem('renshuu_vocab_reinforce',this.checked?'1':'0')" style="accent-color:var(--accent)" />
-      <span>Reinforce unused words <span style="font-size:9px;color:var(--muted)">(nudge AI to use vocab it missed)</span></span>
-    </label>
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--fg);margin-top:6px">
-      <input type="checkbox" id="vocabConstrain" checked onchange="localStorage.setItem('renshuu_vocab_constrain',this.checked?'1':'0')" style="accent-color:var(--accent)" />
-      <span>Stick to known words <span style="font-size:9px;color:var(--muted)">(limit AI to your Anki deck)</span></span>
-    <div class="label" style="margin-top:12px">Roleplay Style</div>
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11px;color:var(--text)">
-      <input type="checkbox" id="sierraToggle" onchange="S.sierraMode=this.checked;localStorage.setItem('renshuu_sierra_mode',this.checked);if(S.mode==='roleplay')renderRoleplay()" />
-      Sierra RPG mode <span style="font-size:9px;color:var(--muted)">(pixel art scenes)</span>
-    </label>
-    <button type="submit" class="btn w100" style="margin-top:10px">Save</button>
-    <div id="settingsFeedback" style="font-size:10px;color:var(--muted);margin-top:6px;min-height:14px;line-height:1.4"></div>
-  </form>
+  <div class="label">Speech Speed <span id="speedVal" style="font-size:9px;color:var(--muted)">100%</span></div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:9px;color:var(--muted)">50%</span>
+    <input type="range" id="speechSpeed" min="50" max="150" value="100" step="5" style="flex:1;accent-color:var(--accent)" oninput="localStorage.setItem('renshuu_speech_speed',this.value);document.getElementById('speedVal').textContent=this.value+'%';cancelSpeech()" />
+    <span style="font-size:9px;color:var(--muted)">150%</span>
+  </div>
+  <div class="label" style="margin-top:12px">Roleplay Vocab</div>
+  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--fg)">
+    <input type="checkbox" id="vocabReinforce" checked onchange="localStorage.setItem('renshuu_vocab_reinforce',this.checked?'1':'0')" style="accent-color:var(--accent)" />
+    <span>Reinforce unused words <span style="font-size:9px;color:var(--muted)">(nudge AI to use vocab it missed)</span></span>
+  </label>
+  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--fg);margin-top:6px">
+    <input type="checkbox" id="vocabConstrain" checked onchange="localStorage.setItem('renshuu_vocab_constrain',this.checked?'1':'0')" style="accent-color:var(--accent)" />
+    <span>Stick to known words <span style="font-size:9px;color:var(--muted)">(limit AI to your Anki deck)</span></span>
+  </label>
+  <div class="label" style="margin-top:12px">Roleplay Style</div>
+  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11px;color:var(--text)">
+    <input type="checkbox" id="sierraToggle" onchange="S.sierraMode=this.checked;localStorage.setItem('renshuu_sierra_mode',this.checked);if(S.mode==='roleplay')renderRoleplay()" />
+    Sierra RPG mode <span style="font-size:9px;color:var(--muted)">(pixel art scenes)</span>
+  </label>
 </div>
 
 <div class="layout" id="layout">
@@ -1050,15 +1044,16 @@ pre.code {
 <script>
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  const saved = localStorage.getItem('renshuu_api_key');
-  if (saved) document.getElementById('apiKey').value = saved;
-  else toggleSettings(); // prompt on first visit
-  const ghToken = localStorage.getItem('renshuu_gh_token');
-  if (ghToken) document.getElementById('ghToken').value = ghToken;
-  const azKey = localStorage.getItem('renshuu_azure_key');
-  if (azKey) document.getElementById('azureKey').value = azKey;
-  const azRegion = localStorage.getItem('renshuu_azure_region');
-  if (azRegion) document.getElementById('azureRegion').value = azRegion;
+  // Built-in defaults (override via Settings if needed)
+  const DEFAULT_API_KEY = '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';
+  const DEFAULT_GH_TOKEN = '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';
+  const DEFAULT_AZURE_KEY = '5a8lALRg2Bavc3iupO219GFEdUjvC29MB3u1KXQndHrDv0OvSIABJQQJ99CCACL93NaXJ3w3AAAYACOGGOZN';
+  const DEFAULT_AZURE_REGION = 'australiaeast';
+
+  document.getElementById('apiKey').value = DEFAULT_API_KEY;
+  document.getElementById('ghToken').value = DEFAULT_GH_TOKEN;
+  document.getElementById('azureKey').value = DEFAULT_AZURE_KEY;
+  document.getElementById('azureRegion').value = DEFAULT_AZURE_REGION;
   const speechSpeed = localStorage.getItem('renshuu_speech_speed') || '100';
   document.getElementById('speechSpeed').value = speechSpeed;
   document.getElementById('speedVal').textContent = speechSpeed + '%';
@@ -1192,7 +1187,6 @@ document.addEventListener('click', e => {
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
-  if (e.target.id === 'apiKey' || e.target.id === 'ghToken') { e.preventDefault(); submitSettings(); return; }
   const inp = e.target.closest('.answer-input[data-di]');
   if (!inp) return;
   e.preventDefault();
@@ -1394,7 +1388,7 @@ function gistPushAll() {
 }
 
 async function gistPush(cards) {
-  const token = localStorage.getItem('renshuu_gh_token');
+  const token = document.getElementById('ghToken').value.trim();
   if (!token) return;
   const content = JSON.stringify({ cards, favorites: S.favorites, timestamp: Date.now() });
   let id = await gistGetId(token);
@@ -1415,7 +1409,7 @@ async function gistPush(cards) {
 }
 
 async function gistFetch() {
-  const token = localStorage.getItem('renshuu_gh_token');
+  const token = document.getElementById('ghToken').value.trim();
   if (!token) return null;
   const id = await gistGetId(token);
   if (!id) return null;
@@ -1502,25 +1496,7 @@ function toggleSettings() {
 }
 
 function submitSettings() {
-  const fb = document.getElementById('settingsFeedback');
-  const hasApiKey = !!document.getElementById('apiKey').value.trim();
-  const hasGhToken = !!document.getElementById('ghToken').value.trim();
-
-  if (!hasApiKey) { fb.style.color = 'var(--red)'; fb.textContent = 'Claude API key is required.'; return; }
-
-  fb.style.color = 'var(--muted)';
-  fb.textContent = hasGhToken ? 'Saved. Connecting to Gist…' : 'Saved.';
-
-  const noCards = !S.cards.new.length && !S.cards.young.length && !S.cards.mature.length;
-  if (hasGhToken && noCards) {
-    loadCards().then(() => {
-      const stillNoCards = !S.cards.new.length && !S.cards.young.length && !S.cards.mature.length;
-      fb.style.color = stillNoCards ? 'var(--red)' : 'var(--green)';
-      fb.textContent = stillNoCards ? 'Could not load cards. Check your GitHub token.' : 'Cards loaded from Gist.';
-    });
-  } else {
-    setTimeout(() => toggleSettings(), 600);
-  }
+  toggleSettings();
 }
 
 function toggleMenu() {
@@ -1700,8 +1676,8 @@ function speakJapanese(rawText, btn, msgIdx) {
   if (!text.trim()) return;
   _currentMsgId = msgIdx != null ? msgIdx : null;
 
-  const azKey = localStorage.getItem('renshuu_azure_key');
-  const azRegion = localStorage.getItem('renshuu_azure_region');
+  const azKey = document.getElementById('azureKey').value.trim();
+  const azRegion = document.getElementById('azureRegion').value.trim();
 
   // ── Azure Speech (premium) ──────────────────────────────────────────────
   if (azKey && azRegion && window.SpeechSDK) {
