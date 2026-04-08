@@ -2004,9 +2004,14 @@ function toggleLangMode() {
     btn.textContent = '🇯🇵';
     btn.title = '英語学習モードに切替';
     S.mode = 'drill';
-    // Show sidebar
+    // Show sidebar and restore it
     const layout = document.getElementById('layout');
     layout.classList.remove('eng-mode');
+    if (localStorage.getItem('renshuu_sidebar') !== '0') {
+      layout.classList.remove('sidebar-collapsed');
+      const tb = document.getElementById('sidebarToggle');
+      if (tb) tb.textContent = '«';
+    }
     document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.remove('active'));
     document.getElementById('tab-drill').classList.add('active');
     if (total() > 0) renderMode();
@@ -2015,9 +2020,14 @@ function toggleLangMode() {
     btn.textContent = '🇬🇧';
     btn.title = '日本語学習モードに切替';
     S.mode = 'eng_roleplay';
-    // Hide sidebar
+    // Hide sidebar and collapse for split view
     const layout = document.getElementById('layout');
     layout.classList.add('eng-mode');
+    if (!layout.classList.contains('sidebar-collapsed')) {
+      layout.classList.add('sidebar-collapsed');
+      const tb = document.getElementById('sidebarToggle');
+      if (tb) tb.textContent = '»';
+    }
     document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.remove('active'));
     renderMode();
   }
