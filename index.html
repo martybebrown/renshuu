@@ -3270,6 +3270,7 @@ function escHtml(s) {
 }
 
 function pickScenario(id) {
+  cancelSpeech();
   // Check for saved conversation in favorites
   const fav = S.favorites.find(f => f.id === id);
   if (fav && fav.convo && fav.convo.length) {
@@ -3288,6 +3289,7 @@ function pickScenario(id) {
 }
 
 function resetChat() {
+  cancelSpeech();
   S.convo = [];
   renderRoleplay();
   startChat();
