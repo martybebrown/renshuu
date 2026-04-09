@@ -47,8 +47,8 @@ header {
   transition: border-color 0.15s, transform 0.15s;
 }
 .lang-toggle:hover { border-color: var(--muted); transform: scale(1.1); }
-.layout.eng-mode { grid-template-columns: 0px 1fr !important; }
-.layout.eng-mode aside { width: 0 !important; min-width: 0 !important; padding: 0 !important; overflow: hidden !important; border-right: none !important; visibility: hidden; }
+.layout.eng-mode { grid-template-columns: 1fr !important; }
+.layout.eng-mode aside { display: none !important; }
 .layout.eng-mode .sidebar-toggle { display: none !important; }
 .status { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); }
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); flex-shrink:0; }
