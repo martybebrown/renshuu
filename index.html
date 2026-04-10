@@ -72,11 +72,12 @@ aside {
   position: relative;
   transition: width 0.2s, padding 0.2s;
 }
+.layout { position: relative; }
 .sidebar-toggle {
   display: none;
   position: absolute;
   top: 10px;
-  right: -14px;
+  left: 226px;
   width: 28px;
   height: 28px;
   background: var(--surface);
@@ -106,7 +107,6 @@ aside {
     position: fixed;
     top: 60px;
     left: 6px;
-    right: auto;
   }
 }
 .label {
@@ -526,7 +526,7 @@ pre.code {
   background: rgba(201,79,60,0.12);
   border: 1px solid rgba(201,79,60,0.2);
 }
-.msg-correction { font-size: 10px; color: var(--red); padding: 0 4px; }
+.msg-correction { font-size: 10px; color: var(--red); padding: 4px 8px; line-height: 1.6; }
 .msg-foot { display: flex; align-items: center; gap: 6px; padding: 0 2px; }
 .speak-btn {
   background: none;
@@ -713,12 +713,13 @@ pre.code {
 .rpg-msg.user .msg-correction { text-align: right; }
 .rpg-msg .msg-foot { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
 .rpg-msg .msg-foot button {
-  background: none; border: 1px solid transparent; border-radius: 2px;
-  cursor: pointer; font-size: 11px; color: #5a5a7a; padding: 1px 5px; line-height: 1;
+  background: #1a1a2a; border: 1px solid #3a3a5a; border-radius: 4px;
+  cursor: pointer; font-size: 11px; color: #9090a8; padding: 4px 10px; line-height: 1.2;
+  display: inline-flex; align-items: center; gap: 4px;
 }
-.rpg-msg .msg-foot button:hover { border-color: #3a3a5a; color: #c0b080; }
-.rpg-msg .msg-foot button.speaking { color: #4a7aaa; border-color: #4a7aaa; }
-.rpg-msg .msg-foot button.active { color: #4a7aaa; border-color: #4a7aaa; }
+.rpg-msg .msg-foot button:hover { border-color: #5a5a7a; color: #d0c8a0; background: #22223a; }
+.rpg-msg .msg-foot button.speaking { color: #6aa0d0; border-color: #4a7aaa; background: rgba(74,122,170,0.15); }
+.rpg-msg .msg-foot button.active { color: #6aa0d0; border-color: #4a7aaa; background: rgba(74,122,170,0.15); }
 .rpg-msg .msg-breakdown {
   font-size: 10px; line-height: 1.5; color: #b0a888; background: #14141e;
   border: 1px solid #2a2a3a; border-radius: 3px; padding: 8px 10px; margin-top: 6px;
@@ -733,6 +734,10 @@ pre.code {
 .rpg-msg .audio-player .ap-track { background: #2a2a3a; }
 .rpg-msg .audio-player .ap-fill { background: #4a7aaa; }
 .rpg-msg .audio-player .ap-time { color: #5a5a7a; }
+.rpg-action {
+  display: block; font-style: italic; color: #8a8aaa; font-size: 13px;
+  margin: 4px 0; padding: 2px 0 2px 8px; border-left: 2px solid #3a3a5a;
+}
 .rpg-input-area {
   border-top: 1px solid #1a1a2a; padding: 8px 12px;
   display: flex; gap: 8px; align-items: flex-end; background: #0a0a16;
@@ -972,8 +977,8 @@ pre.code {
 </div>
 
 <div class="layout" id="layout">
+  <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Collapse sidebar">«</button>
   <aside>
-    <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Collapse sidebar">«</button>
     <!-- Deck filter -->
     <div>
       <div class="label">Deck</div>
@@ -1577,6 +1582,11 @@ function buildAnnotated(body) {
       /\[\[([^\[\]|]+)\|([^\[\]|]+)\]\]/g,
       (_, word, rt) => `<span data-rt="${rt.trim()}">${word.trim()}</span>`
     );
+}
+
+// Format *action* text as styled blocks (RPG mode only)
+function formatActions(html) {
+  return html.replace(/\*([^*]+)\*/g, '<span class="rpg-action">$1</span>');
 }
 
 // Strip [[word|reading|english]] markers, keeping just the surface word
@@ -3244,12 +3254,13 @@ function renderMessages() {
   }
   return S.convo.map((msg, i) => {
     const isReal = msg.role === 'assistant' && msg.content && msg.content !== '…';
-    const body = msg.role === 'assistant'
+    let body = msg.role === 'assistant'
       ? (msg.display || safeAnnotated(buildAnnotated(msg.content)))
       : (msg.display || escHtml(msg.content));
+    if (S.sierraMode && msg.role === 'assistant') body = formatActions(body);
     const nextMsg = S.convo[i + 1];
     const correctionHere = msg.role === 'user' && nextMsg?.correction
-      ? `<div class="msg-correction">↳ ${escHtml(nextMsg.correction)}</div>` : '';
+      ? `<div class="msg-correction">↳ ${formatCorrection(nextMsg.correction)}</div>` : '';
     const hasBd = isReal && msg.breakdown;
 
     if (S.sierraMode) {
@@ -3268,8 +3279,8 @@ function renderMessages() {
             ${correctionHere}
             ${isReal ? `
             <div class="msg-foot rpg-foot">
-              <button class="speak-btn" data-mi="${i}" title="Speak aloud">🔊</button>
-              <button class="breakdown-btn" data-mi="${i}" title="Break down">📖</button>
+              <button class="speak-btn" data-mi="${i}" title="Speak aloud">🔊 Listen</button>
+              <button class="breakdown-btn" data-mi="${i}" title="Break down">📖 Breakdown</button>
             </div>
             <div class="audio-player" id="ap-${i}" style="display:none">
               <button class="ap-btn" data-ap="${i}" title="Play/Pause">▶</button>
@@ -3310,6 +3321,14 @@ function renderMessages() {
 
 function escHtml(s) {
   return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function formatCorrection(s) {
+  // Escape HTML, then convert numbered points to line breaks and bold the error arrows
+  return escHtml(s || '')
+    .replace(/(\d+)\.\s/g, '<br><strong>$1.</strong> ')
+    .replace(/→/g, '<strong>→</strong>')
+    .replace(/^<br>/, '');
 }
 
 function pickScenario(id) {
@@ -3357,7 +3376,7 @@ Rules:
 1. Respond in Japanese only. IMPORTANT: Vary your reply length naturally like a real conversation — sometimes just a short reaction or one sentence (え？本当？ / そうだね。), sometimes 2–3 sentences, occasionally longer when the story demands it. Do NOT always write the same length. Short replies are good and natural.
 2. Weave in vocab from the list, especially the priority new words.
 3. Stay in character. Ask a natural follow-up question each turn (but not every single turn — sometimes just react).
-4. After your Japanese, if the student made ANY error (grammar, vocab, particle, conjugation, word choice, unnatural phrasing), add: [Correction: explain what was wrong, what it should be, and briefly why. Cover EVERY mistake — don't skip any. Be specific: show the wrong text → correct text. Example: "だれごらい → どのくらい (dono kurai) — だれごらい isn't a word; どのくらい means 'about how much/long'"]
+4. After your Japanese, if the student made errors in their MOST RECENT message ONLY (grammar, vocab, particle, conjugation, word choice, unnatural phrasing), add: [Correction: explain what was wrong, what it should be, and briefly why. Cover every mistake in that message — don't skip any. Be specific: show the wrong text → correct text. Use numbered points (1. 2. 3.) for multiple errors so each is clear. Do NOT correct errors from earlier messages — only the latest one. Example: "1. だれごらい → どのくらい (dono kurai) — だれごらい isn't a word; どのくらい means 'about how much/long'"]
 5. Aim for N4–N3 level.
 6. Mark EVERY Japanese word with [[word|reading|english]] pipe markers — this includes kanji compounds (with okurigana), katakana words, AND hiragana words/phrases (2+ chars). Use hiragana as the reading for both katakana and hiragana-only words. Do NOT leave any word unmarked — every content word needs a tooltip. Example: [[日本語|にほんご|Japanese]]は[[面白い|おもしろい|interesting]]し、[[コーヒー|こーひー|coffee]]も[[やっぱり|やっぱり|as expected]][[美味しい|おいしい|delicious]]。[[でも|でも|but]][[ちょっと|ちょっと|a little]][[むずかしい|むずかしい|difficult]][[ですね|ですね|isn't it]]。
 7. The student may write in rōmaji (e.g. "watashi wa gakusei desu") — understand it as Japanese and respond naturally. Only correct it if there is an actual grammar or vocab mistake, not just for using romaji.`;
@@ -3721,7 +3740,7 @@ function renderEngMessages() {
       : (msg.display || escHtml(msg.content));
     const nextMsg = S.engConvo[i + 1];
     const correctionHere = msg.role === 'user' && nextMsg?.correction
-      ? `<div class="msg-correction">↳ ${escHtml(nextMsg.correction)}</div>` : '';
+      ? `<div class="msg-correction">↳ ${formatCorrection(nextMsg.correction)}</div>` : '';
     const hasBd = isReal && msg.breakdown;
 
     if (S.sierraMode) {
@@ -3809,7 +3828,7 @@ Rules:
 1. Respond in English only. IMPORTANT: Vary your reply length naturally — sometimes short (one word, a question, a brief reaction), sometimes 2–3 sentences. Do NOT always write the same length. Sound natural and conversational.
 2. Stay in character. Ask natural follow-up questions (but not every single turn — sometimes just react).
 3. Keep your English at a natural but accessible level for a beginner-intermediate Japanese learner. Avoid overly complex vocabulary or rare idioms unless they fit the character. Use common, everyday English.
-4. After your English response, if the student made ANY error in their English (grammar, vocabulary, spelling, word order, unnatural phrasing, article usage, preposition mistakes, tense errors), add: [Correction: explain in Japanese what was wrong, what it should be, and briefly why. Cover EVERY mistake — don't skip any. Be specific: show wrong text → correct text. Write the explanation entirely in Japanese. Example: "I go to school yesterday → I went to school yesterday（過去の出来事なので過去形 went を使います）"]
+4. After your English response, if the student made errors in their MOST RECENT message ONLY (grammar, vocabulary, spelling, word order, unnatural phrasing, article usage, preposition mistakes, tense errors), add: [Correction: explain in Japanese what was wrong, what it should be, and briefly why. Cover every mistake in that message — don't skip any. Be specific: show wrong text → correct text. Use numbered points (1. 2. 3.) for multiple errors. Do NOT correct errors from earlier messages — only the latest one. Write the explanation entirely in Japanese. Example: "1. I go to school yesterday → I went to school yesterday（過去の出来事なので過去形 went を使います）"]
 5. Mark EVERY English word with [[word|カタカナ読み|日本語訳]] pipe markers. Include articles, prepositions, pronouns, and common words. Every single word must be annotated — do NOT leave any word unmarked. Example: [[Hello|ハロー|こんにちは]]! [[How|ハウ|どのように]] [[are|アー|〜です]] [[you|ユー|あなた]] [[doing|ドゥーイング|している]] [[today|トゥデイ|今日]]?
 6. The student may write in Japanese or broken English — understand their intent and respond naturally in English. Only correct actual English mistakes in the [Correction:] block, not Japanese input.
 7. If the student writes entirely in Japanese, that is fine — understand it and continue the conversation in English. Gently encourage them to try English by keeping your responses simple and inviting.`;
