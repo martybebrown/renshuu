@@ -1690,6 +1690,8 @@ function buildWordMap(msgBodyEl) {
 }
 
 async function speakJapanese(rawText, btn, msgIdx) {
+  // Normalize undefined → null so guards like (_currentMsgId !== msgIdx) work for drills
+  if (msgIdx == null) msgIdx = null;
   // If this message already has audio loaded, just toggle play
   if (msgIdx != null && _currentMsgId === msgIdx && _currentAudio) {
     if (_currentAudio.paused) {
@@ -3919,6 +3921,8 @@ async function sendEngMsg() {
 // ── English TTS ──────────────────────────────────────────────────────────
 
 async function speakEnglish(rawText, btn, msgIdx) {
+  // Normalize undefined → null so guards like (_currentMsgId !== msgIdx) work consistently
+  if (msgIdx == null) msgIdx = null;
   // Toggle play if already loaded for this message
   if (msgIdx != null && _currentMsgId === msgIdx && _currentAudio) {
     if (_currentAudio.paused) {
