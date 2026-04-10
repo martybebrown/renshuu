@@ -1589,9 +1589,11 @@ function formatActions(html) {
   return html.replace(/\*([^*]+)\*/g, '<span class="rpg-action">$1</span>');
 }
 
-// Strip [[word|reading|english]] markers, keeping just the surface word
+// Strip [[word|reading|english]] markers and *action* markers, keeping just the surface text
 function stripMarkers(text) {
-  return (text || '').replace(/\[\[([^\[\]|]+)\|[^\[\]]+\]\]/g, '$1');
+  return (text || '')
+    .replace(/\[\[([^\[\]|]+)\|[^\[\]]+\]\]/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1');
 }
 
 // Cancel any in-progress speech
@@ -1763,14 +1765,22 @@ async function speakJapanese(rawText, btn, msgIdx) {
               // Map word boundaries to plain text positions by sequential matching
               let plainPos = 0;
               wordBounds.forEach(wb => {
-                const idx = text.indexOf(wb.text, plainPos);
+                const wbText = wb.text.trim();
+                const idx = text.indexOf(wbText, plainPos);
                 if (idx !== -1) {
                   wb.plainOffset = idx;
-                  wb.plainLen = wb.text.length;
-                  plainPos = idx + wb.text.length;
+                  wb.plainLen = wbText.length;
+                  plainPos = idx + wbText.length;
                 } else {
-                  wb.plainOffset = plainPos;
-                  wb.plainLen = wb.text.length;
+                  // Try searching from start (Azure may reorder across punctuation)
+                  const fallback = text.indexOf(wbText);
+                  if (fallback !== -1) {
+                    wb.plainOffset = fallback;
+                    wb.plainLen = wbText.length;
+                  } else {
+                    wb.plainOffset = plainPos;
+                    wb.plainLen = wbText.length;
+                  }
                 }
               });
               _wordBounds = wordBounds;
@@ -3976,9 +3986,14 @@ async function speakEnglish(rawText, btn, msgIdx) {
             if (msgIdx != null && wordBounds.length) {
               let plainPos = 0;
               wordBounds.forEach(wb => {
-                const idx = text.indexOf(wb.text, plainPos);
-                if (idx !== -1) { wb.plainOffset = idx; wb.plainLen = wb.text.length; plainPos = idx + wb.text.length; }
-                else { wb.plainOffset = plainPos; wb.plainLen = wb.text.length; }
+                const wbText = wb.text.trim();
+                const idx = text.indexOf(wbText, plainPos);
+                if (idx !== -1) { wb.plainOffset = idx; wb.plainLen = wbText.length; plainPos = idx + wbText.length; }
+                else {
+                  const fallback = text.indexOf(wbText);
+                  if (fallback !== -1) { wb.plainOffset = fallback; wb.plainLen = wbText.length; }
+                  else { wb.plainOffset = plainPos; wb.plainLen = wbText.length; }
+                }
               });
               _wordBounds = wordBounds;
               const msgBody = document.getElementById('ap-' + msgIdx)?.closest('.msg')?.querySelector('.msg-body');
