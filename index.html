@@ -2337,6 +2337,54 @@ const SCENARIO_POOL = [
   { id: 'omiyage',    jp: 'お土産選び',   en: 'Choosing souvenirs',        icon: '🎁',  char: 'A shop assistant who knows everyone\'s preferences',   voice: 'ja-JP-NanamiNeural', ctx: 'You\'re at a souvenir shop trying to find the right gifts. The assistant remembers what previous customers liked and starts confidently directing you toward things you didn\'t know you needed.' },
   { id: 'yakkyoku',   jp: '薬局',         en: 'At the pharmacy',           icon: '💊',  char: 'A pharmacist who needs to know everything first',      voice: 'ja-JP-MayuNeural',   ctx: 'You\'ve come in for basic cold medicine. The pharmacist wants your full medical history, sleeping patterns, and diet before recommending anything. She is thorough. Very thorough.' },
   { id: 'sentou_furo',jp: 'ジム更衣室',  en: 'Gym changing room chat',    icon: '🏋️',  char: 'A gym regular who gives unsolicited training advice',  voice: 'ja-JP-NaokiNeural',  ctx: 'You\'re getting changed after a workout. A regular who\'s been coming here for years sizes you up immediately and starts offering very specific advice about your fitness routine.' },
+  // ── Seasonal & festival ──
+  { id: 'matsuri',    jp: '夏祭り',     en: 'Summer festival goldfish scoop', icon: '🎆', char: 'A festival vendor who bets you can\'t catch one',       voice: 'ja-JP-NaokiNeural',  ctx: 'The summer festival is packed. A goldfish scooping vendor watches you fail three times, then starts coaching you with dead-serious intensity — like a martial arts master, but for paper scoops.' },
+  { id: 'hatsumode',  jp: '初詣',       en: 'New Year shrine visit',         icon: '⛩️', char: 'An elderly woman who reads fortunes dramatically',      voice: 'ja-JP-MayuNeural',   ctx: 'January 1st, and the shrine line stretches forever. The woman behind you has already read her fortune and is narrating it like a movie trailer. She insists on interpreting yours too.' },
+  { id: 'obon',       jp: 'お盆',       en: 'Obon family gathering',         icon: '🏮', char: 'A cousin you\'ve never met who knows everything about you', voice: 'ja-JP-NanamiNeural', ctx: 'You\'re at a relative\'s house for Obon. A cousin you\'ve never met appears to know your entire life history and is eager to catch up on years of missed gossip.' },
+  { id: 'setsubun',   jp: '節分',       en: 'Bean-throwing at the temple',   icon: '👹', char: 'A child who takes demon-chasing very seriously',        voice: 'ja-JP-AoiNeural',    ctx: 'It\'s Setsubun and a child at the temple hands you a bag of beans with military precision. They have a tactical plan for maximum demon expulsion and need your cooperation.' },
+  { id: 'tanabata',   jp: '七夕',       en: 'Writing wishes at Tanabata',    icon: '🎋', char: 'A stranger who asks what you\'ll wish for',             voice: 'ja-JP-ShioriNeural', ctx: 'You\'re tying a wish to a bamboo branch at a Tanabata display. The person next to you wants to compare wishes and gets unexpectedly philosophical about what people really want.' },
+  // ── Work & office ──
+  { id: 'elevator',   jp: 'エレベーター', en: 'Awkward elevator small talk',  icon: '🛗', char: 'A department head you\'ve never spoken to',             voice: 'ja-JP-DaichiNeural', ctx: 'You step into the elevator and it\'s just you and the intimidating department head. 30 floors to go. They suddenly ask you a surprisingly personal question.' },
+  { id: 'nomikai',    jp: '飲み会',     en: 'Office drinking party',         icon: '🍶', char: 'Suzuki-buchou, who becomes a different person after beer', voice: 'ja-JP-DaichiNeural', ctx: 'At the office nomikai, your normally stern boss Suzuki-buchou is three beers in and telling stories about his failed dreams of becoming a rock musician. He wants to know your secret ambitions.' },
+  { id: 'shinsotsu',  jp: '新卒研修',   en: 'New employee training day',     icon: '👔', char: 'A fellow new hire who is hilariously over-prepared',    voice: 'ja-JP-KeitaNeural',  ctx: 'It\'s your first day of company training. The person next to you has color-coded notes, three pens, and has already memorized the company song. They want to form a study group.' },
+  { id: 'copying',    jp: 'コピー室',   en: 'Copier room confession',        icon: '🖨️', char: 'A senpai who only shares real talk by the copier',      voice: 'ja-JP-MayuNeural',   ctx: 'You\'re making copies and a senpai appears. Something about the copier room makes people honest — they start telling you things about the company they\'d never say at their desk.' },
+  // ── Transport & travel ──
+  { id: 'shinkansen', jp: '新幹線',     en: 'Shinkansen seatmate chat',      icon: '🚄', char: 'A businesswoman heading home after a long week',        voice: 'ja-JP-MayuNeural',   ctx: 'Three hours on the Shinkansen. The woman in the next seat has cracked open an ekiben and a beer at 2pm on a Friday. She\'s in a reflective mood and starts telling you about her week.' },
+  { id: 'ferry',      jp: 'フェリー',   en: 'Overnight ferry to an island',  icon: '⛴️', char: 'A fisherman returning home after selling his catch',    voice: 'ja-JP-DaichiNeural', ctx: 'You\'re on the overnight ferry. A weathered fisherman shares the deck with you, watching the stars. He talks about the sea like it\'s a person he\'s known his whole life.' },
+  { id: 'bus_rural',  jp: '路線バス',   en: 'Last bus in the countryside',   icon: '🚌', char: 'The only other passenger, a grandmother with a huge bag', voice: 'ja-JP-MayuNeural',   ctx: 'You\'re on the last bus through the mountains. The only other passenger is a grandmother with an enormous bag of vegetables. She insists on sharing them and telling you how to cook each one.' },
+  { id: 'bicycle',    jp: 'レンタサイクル', en: 'Lost on a rental bike tour', icon: '🚲', char: 'A local student who rescues lost cyclists regularly',   voice: 'ja-JP-NanamiNeural', ctx: 'You\'re hopelessly lost on a rental bike in a small town. A high school student pulls up alongside you — apparently this happens so often they\'ve become an unofficial guide.' },
+  // ── Food & drink deep cuts ──
+  { id: 'wagashi',    jp: '和菓子屋',   en: 'Traditional sweets workshop',   icon: '🍡', char: 'A 4th-generation wagashi artisan',                     voice: 'ja-JP-ShioriNeural', ctx: 'You\'ve signed up for a wagashi-making class. The artisan watches your hands like a hawk and has a story for every shape. She says the bean paste knows when you\'re anxious.' },
+  { id: 'sake',       jp: '酒蔵',       en: 'Sake brewery tour tasting',     icon: '🍶', char: 'A young toji who broke family tradition to innovate',   voice: 'ja-JP-KeitaNeural',  ctx: 'You\'re on a sake brewery tour. The young head brewer went against his father\'s recipes to create something new. He\'s pouring samples and explaining each one like introducing a friend.' },
+  { id: 'yatai',      jp: '屋台',       en: 'Fukuoka yatai food stall',      icon: '🍢', char: 'A yatai owner who seats strangers together on purpose',  voice: 'ja-JP-NaokiNeural',  ctx: 'You\'re squeezed onto a bench at a Fukuoka yatai. The owner has a talent for making strangers talk to each other. Tonight it\'s you and a salary man who just quit his job.' },
+  { id: 'kissaten2',  jp: '純喫茶',     en: 'Retro kissaten cream soda',     icon: '🍈', char: 'A university student writing a novel here every day',    voice: 'ja-JP-NanamiNeural', ctx: 'You ordered a cream soda at a retro kissaten. The student at the next table looks up from their manuscript and asks your opinion on a plot point, as if you\'ve been following along.' },
+  { id: 'depachika',  jp: 'デパ地下',   en: 'Department store food hall',     icon: '🎀', char: 'A sample lady with a PhD in persuasion',                voice: 'ja-JP-MayuNeural',   ctx: 'You\'re in the depachika just browsing. A sample lady intercepts you with a toothpick of wagyu. Before you know it, you\'re hearing the cow\'s life story and reaching for your wallet.' },
+  // ── Nature & outdoors ──
+  { id: 'hiking',     jp: '登山',       en: 'Mountain trail encounter',      icon: '⛰️', char: 'A 78-year-old hiker who summits weekly',                voice: 'ja-JP-DaichiNeural', ctx: 'You\'re struggling up a mountain trail when a 78-year-old passes you at twice your speed. They pause to wait for you and share trail wisdom accumulated over hundreds of climbs.' },
+  { id: 'hanabi',     jp: '花火大会',   en: 'Fireworks festival blanket',    icon: '🎇', char: 'A family who insists you share their spot and snacks',   voice: 'ja-JP-MayuNeural',   ctx: 'You\'re looking for a spot at the fireworks festival. A family waves you over to share their blanket. Within minutes you have a beer, edamame, and a seat. They want to know everything.' },
+  { id: 'neko_jima',  jp: '猫島',       en: 'Cat island ferry dock',         icon: '🐈', char: 'The island\'s self-appointed cat historian',             voice: 'ja-JP-ShioriNeural', ctx: 'You\'ve arrived at a cat island. An elderly resident appears and begins introducing you to specific cats by name, explaining their family trees and political alliances.' },
+  { id: 'onsen_town', jp: '温泉街',     en: 'Strolling an onsen town',       icon: '🌙', char: 'A ryokan worker on their break, in yukata and geta',    voice: 'ja-JP-NanamiNeural', ctx: 'You\'re strolling through an onsen town at dusk. A ryokan worker on break falls into step beside you, pointing out hidden spots that only locals know — a free foot bath, the best view.' },
+  // ── Culture & craft ──
+  { id: 'pottery',    jp: '陶芸教室',   en: 'Pottery wheel lesson',          icon: '🏺', char: 'A sensei who communicates mostly through sighs',        voice: 'ja-JP-DaichiNeural', ctx: 'Your clay is a disaster. The pottery sensei says nothing, sighs deeply, then gently reshapes it with one hand. Eventually words come — spare, precise, and oddly profound.' },
+  { id: 'manga_cafe', jp: '漫画喫茶',   en: 'Manga café late night',         icon: '📖', char: 'A regular who\'s read everything in here — literally',   voice: 'ja-JP-KeitaNeural',  ctx: 'It\'s 2am at a manga café. The person in the next booth leans over and asks what you\'re reading. They have frighteningly specific opinions about every series on the shelf.' },
+  { id: 'shodou',     jp: '書道',       en: 'Calligraphy class',             icon: '✒️', char: 'A sensei who reads personality from brushstrokes',       voice: 'ja-JP-MayuNeural',   ctx: 'You\'re in a calligraphy class. The sensei watches you write one character, then calmly explains what it reveals about your personality. It\'s uncomfortably accurate.' },
+  { id: 'kimono',     jp: '着物レンタル', en: 'Kimono rental fitting',        icon: '👘', char: 'A dresser with encyclopedic pattern knowledge',         voice: 'ja-JP-ShioriNeural', ctx: 'You\'re getting fitted for a rental kimono. The dresser holds up each option and explains the symbolism of every pattern — seasons, wishes, hidden messages woven into silk.' },
+  // ── Everyday quirky ──
+  { id: 'laundry',    jp: 'コインランドリー', en: 'Midnight laundromat',      icon: '🧺', char: 'A night-shift worker doing laundry and life reflection', voice: 'ja-JP-NaokiNeural',  ctx: 'Midnight at a coin laundry. The only other person is staring at the dryer like it contains the meaning of life. They start talking about their job, their dreams, and fabric softener preferences.' },
+  { id: 'jihanki',    jp: '自販機',     en: 'Vending machine in the mountains', icon: '🥤', char: 'A hiker amazed the machine exists here',               voice: 'ja-JP-KeitaNeural',  ctx: 'There\'s a vending machine on a mountain road in the middle of nowhere. Another hiker is standing in front of it in disbelief. This shared miracle becomes the basis for a long conversation.' },
+  { id: 'post_office',jp: '郵便局',     en: 'Sending a package home',        icon: '📮', char: 'A postal worker who treats every package like treasure', voice: 'ja-JP-MayuNeural',   ctx: 'You\'re sending a package overseas. The postal worker wants to know exactly what\'s inside — not for customs, but because they\'re genuinely curious. They have opinions about wrapping technique.' },
+  { id: 'barber',     jp: '床屋',       en: 'Old-school barber shop',        icon: '💈', char: 'A barber who\'s been cutting hair since the 60s',        voice: 'ja-JP-DaichiNeural', ctx: 'You\'ve walked into a barber shop that hasn\'t changed since 1965. The barber moves slowly, talks about how hairstyles reflect the era, and has a story for every decade on the wall.' },
+  { id: 'flea',       jp: '蚤の市',     en: 'Sunday flea market haggle',     icon: '🪙', char: 'A seller who prices things based on the story behind them', voice: 'ja-JP-NaokiNeural', ctx: 'At a Sunday flea market, a vendor has priced a chipped teacup at ¥5000 and a gold watch at ¥200. Every item has a story, and the price depends entirely on how good the story is.' },
+  { id: 'dentist',    jp: '歯医者',     en: 'Chatty dental hygienist',       icon: '🦷', char: 'A hygienist who asks questions while your mouth is full', voice: 'ja-JP-NanamiNeural', ctx: 'You\'re at the dentist. The hygienist asks you detailed questions about your life while both hands are in your mouth. She somehow understands your garbled responses perfectly.' },
+  // ── Night life & entertainment ──
+  { id: 'jazz_bar',   jp: 'ジャズバー', en: 'Tiny basement jazz bar',        icon: '🎷', char: 'A bartender who only speaks during song breaks',        voice: 'ja-JP-NaokiNeural',  ctx: 'A basement bar with eight seats. The bartender times all conversation to the gaps between songs. During music, silence is absolute. Between sets, he\'s surprisingly chatty.' },
+  { id: 'batting',    jp: 'バッティングセンター', en: 'Batting center rivalry', icon: '⚾', char: 'A salaryman who visits every night to de-stress',       voice: 'ja-JP-NaokiNeural',  ctx: 'You\'re at a batting center. The salaryman in the next cage has clearly been here every night this week. He notices your swing, offers tips, and eventually confesses this is his therapy.' },
+  { id: 'pachinko',   jp: 'パチンコ',   en: 'Outside the pachinko parlor',   icon: '🎰', char: 'A retiree who treats it as a social club',              voice: 'ja-JP-DaichiNeural', ctx: 'You\'re outside a pachinko parlor when a retiree exits triumphantly. He doesn\'t care about winning — he comes for the community. He explains the unwritten social rules of the regulars.' },
+  { id: 'escape_rm',  jp: '脱出ゲーム', en: 'Escape room with a stranger',   icon: '🔐', char: 'A stranger paired with you who is very competitive',    voice: 'ja-JP-NanamiNeural', ctx: 'You\'ve been paired with a stranger for a two-person escape room. They are treating it like a life-or-death mission and expect total cooperation. The clock is ticking.' },
+  // ── Neighborhood & community ──
+  { id: 'chounaikai',jp: '町内会',     en: 'Neighborhood association meeting', icon: '🏘️', char: 'The neighborhood chief who runs meetings like a general', voice: 'ja-JP-DaichiNeural', ctx: 'You\'ve been asked to attend the neighborhood association meeting. The chief has a 15-item agenda, strong opinions about garbage sorting, and a surprising amount of power over local parking.' },
+  { id: 'dagashi',    jp: '駄菓子屋',   en: 'Retro candy shop after school', icon: '🍬', char: 'The shop owner who\'s watched kids grow up for 40 years', voice: 'ja-JP-MayuNeural',   ctx: 'You\'ve wandered into a tiny dagashiya. The owner knows every child in the neighborhood by name and remembers what candy they bought 20 years ago. She gives you the newcomer treatment.' },
+  { id: 'shotengai',  jp: '商店街',     en: 'Dying shopping street revival',  icon: '🏪', char: 'A young shop owner trying to save the street',           voice: 'ja-JP-KeitaNeural',  ctx: 'Half the shops on this shotengai are shuttered. But one young owner has big plans to revive it. They rope you into taste-testing their new product and want your honest foreign perspective.' },
 ];
 
 const AZURE_VOICES = ['ja-JP-NanamiNeural','ja-JP-KeitaNeural','ja-JP-DaichiNeural','ja-JP-AoiNeural','ja-JP-MayuNeural','ja-JP-NaokiNeural','ja-JP-ShioriNeural'];
@@ -2351,41 +2399,135 @@ function fallbackScenarios() {
   return pool.slice(0, 6);
 }
 
+const JP_SCENARIO_THEMES = [
+  'seasonal festivals & traditions', 'workplace & office culture', 'trains, buses & travel mishaps',
+  'food artisans & hidden restaurants', 'nature, mountains & the sea', 'traditional arts & crafts',
+  'late-night encounters & nightlife', 'neighborhood life & community', 'medical & everyday errands',
+  'school & university life', 'sports & hobbies', 'family gatherings & relationships',
+  'rural Japan & countryside', 'temples, shrines & spirituality', 'shopping & markets',
+  'technology & modern life', 'music, art & performance', 'animals & pets',
+  'housing & moving', 'childhood nostalgia & memories',
+];
+
+function pickJpTheme() {
+  const used = JSON.parse(sessionStorage.getItem('renshuu_used_jp_themes') || '[]');
+  const available = JP_SCENARIO_THEMES.filter(t => !used.includes(t));
+  const pool = available.length > 0 ? available : JP_SCENARIO_THEMES;
+  const theme = pool[Math.floor(Math.random() * pool.length)];
+  const next = available.length > 1 ? [...used, theme] : [theme];
+  sessionStorage.setItem('renshuu_used_jp_themes', JSON.stringify(next));
+  return theme;
+}
+
 async function generateScenarios() {
-  try {
-    const reply = await claude([{ role: 'user', content: `Generate 6 unique, creative Japanese roleplay scenarios for a language learner. Each should have a vivid, memorable character and an interesting situation set in Japan.
+  // Try to load cached AI-generated scenarios first
+  const cached = sessionStorage.getItem('renshuu_scenarios_cache');
+  if (cached) {
+    try {
+      const arr = JSON.parse(cached);
+      if (Array.isArray(arr) && arr.length >= 6) {
+        S.scenarios = arr.slice(0, 6);
+        sessionStorage.removeItem('renshuu_scenarios_cache');
+        sessionStorage.setItem('renshuu_scenarios', JSON.stringify(S.scenarios));
+        // Pre-generate next batch in background
+        generateAndCacheJpScenarios();
+        return;
+      }
+    } catch (_) {}
+  }
+
+  const theme = pickJpTheme();
+  const maxRetries = 2;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const reply = await claude([{ role: 'user', content: `Generate 6 unique, creative Japanese roleplay scenarios for a language learner.
+
+THEME FOCUS for this batch: "${theme}"
+At least 4 of the 6 scenarios should relate to this theme. The other 2 can be wildcard — any setting.
+
+Each should have a vivid, memorable character and an interesting situation set in Japan. Vary the character ages, genders, and personality types. Include a mix of: funny, serious, heartwarming, and awkward situations. Avoid clichés like "helpful shopkeeper" or "friendly old man" — give characters specific quirks, secrets, or obsessions.
 
 Return ONLY a JSON array (no markdown, no explanation) where each object has:
 - "id": short kebab-case identifier
 - "jp": location/situation name in Japanese (2-4 characters)
 - "en": short English description (3-6 words)
 - "icon": a single emoji that fits the scene
-- "char": one-line character description (name + personality quirk)
-- "ctx": 2-3 sentence scene setup, written in second person, vivid and specific
+- "char": one-line character description (name + personality quirk — be specific!)
+- "ctx": 2-3 sentence scene setup, written in second person, vivid and cinematic
 - "gender": "male_old", "male_young", "male_adult", "female_young", "female_adult", "female_soft", or "child"
 
-Be creative! Avoid generic scenarios. Think: specific moments, unusual characters, unexpected situations. Each scenario should feel like the opening of a short film.` }],
-    'You are a creative scenario designer for a Japanese language learning app. Output valid JSON only.',
+Think: the opening of a short film. Surprise me.` }],
+      'You are a creative scenario designer for a Japanese language learning app. You specialize in creating vivid, culturally authentic scenarios with memorable characters. Output valid JSON only.',
+      2000);
+
+      const parsed = JSON.parse(reply.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
+      if (!Array.isArray(parsed) || parsed.length < 1) throw new Error('Bad format');
+
+      const voiceMap = {
+        male_old: 'ja-JP-DaichiNeural', male_young: 'ja-JP-KeitaNeural', male_adult: 'ja-JP-NaokiNeural',
+        female_young: 'ja-JP-NanamiNeural', female_adult: 'ja-JP-MayuNeural', female_soft: 'ja-JP-ShioriNeural',
+        child: 'ja-JP-AoiNeural',
+      };
+      S.scenarios = parsed.map(s => ({
+        id: s.id || ('gen_' + Math.random().toString(36).slice(2, 8)),
+        jp: s.jp, en: s.en, icon: s.icon || '🎭',
+        char: s.char, ctx: s.ctx,
+        voice: voiceMap[s.gender] || AZURE_VOICES[Math.floor(Math.random() * AZURE_VOICES.length)],
+      }));
+      sessionStorage.setItem('renshuu_scenarios', JSON.stringify(S.scenarios));
+      // Pre-generate next batch in background
+      generateAndCacheJpScenarios();
+      return;
+    } catch (e) {
+      console.warn(`Scenario generation attempt ${attempt + 1} failed:`, e);
+      if (attempt === maxRetries) {
+        console.warn('All retries exhausted, using fallback pool');
+        S.scenarios = fallbackScenarios();
+      }
+    }
+  }
+}
+
+async function generateAndCacheJpScenarios() {
+  try {
+    const theme = pickJpTheme();
+    const reply = await claude([{ role: 'user', content: `Generate 6 unique, creative Japanese roleplay scenarios for a language learner.
+
+THEME FOCUS for this batch: "${theme}"
+At least 4 of the 6 scenarios should relate to this theme. The other 2 can be wildcard — any setting.
+
+Each should have a vivid, memorable character and an interesting situation set in Japan. Vary the character ages, genders, and personality types. Include a mix of: funny, serious, heartwarming, and awkward situations. Avoid clichés like "helpful shopkeeper" or "friendly old man" — give characters specific quirks, secrets, or obsessions.
+
+Return ONLY a JSON array (no markdown, no explanation) where each object has:
+- "id": short kebab-case identifier
+- "jp": location/situation name in Japanese (2-4 characters)
+- "en": short English description (3-6 words)
+- "icon": a single emoji that fits the scene
+- "char": one-line character description (name + personality quirk — be specific!)
+- "ctx": 2-3 sentence scene setup, written in second person, vivid and cinematic
+- "gender": "male_old", "male_young", "male_adult", "female_young", "female_adult", "female_soft", or "child"
+
+Think: the opening of a short film. Surprise me.` }],
+    'You are a creative scenario designer for a Japanese language learning app. You specialize in creating vivid, culturally authentic scenarios with memorable characters. Output valid JSON only.',
     2000);
 
     const parsed = JSON.parse(reply.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
-    if (!Array.isArray(parsed) || parsed.length < 1) throw new Error('Bad format');
-
-    const voiceMap = {
-      male_old: 'ja-JP-DaichiNeural', male_young: 'ja-JP-KeitaNeural', male_adult: 'ja-JP-NaokiNeural',
-      female_young: 'ja-JP-NanamiNeural', female_adult: 'ja-JP-MayuNeural', female_soft: 'ja-JP-ShioriNeural',
-      child: 'ja-JP-AoiNeural',
-    };
-    S.scenarios = parsed.map(s => ({
-      id: s.id || ('gen_' + Math.random().toString(36).slice(2, 8)),
-      jp: s.jp, en: s.en, icon: s.icon || '🎭',
-      char: s.char, ctx: s.ctx,
-      voice: voiceMap[s.gender] || AZURE_VOICES[Math.floor(Math.random() * AZURE_VOICES.length)],
-    }));
-    sessionStorage.setItem('renshuu_scenarios', JSON.stringify(S.scenarios));
+    if (Array.isArray(parsed) && parsed.length >= 1) {
+      const voiceMap = {
+        male_old: 'ja-JP-DaichiNeural', male_young: 'ja-JP-KeitaNeural', male_adult: 'ja-JP-NaokiNeural',
+        female_young: 'ja-JP-NanamiNeural', female_adult: 'ja-JP-MayuNeural', female_soft: 'ja-JP-ShioriNeural',
+        child: 'ja-JP-AoiNeural',
+      };
+      const cached = parsed.map(s => ({
+        id: s.id || ('gen_' + Math.random().toString(36).slice(2, 8)),
+        jp: s.jp, en: s.en, icon: s.icon || '🎭',
+        char: s.char, ctx: s.ctx,
+        voice: voiceMap[s.gender] || AZURE_VOICES[Math.floor(Math.random() * AZURE_VOICES.length)],
+      }));
+      sessionStorage.setItem('renshuu_scenarios_cache', JSON.stringify(cached));
+    }
   } catch (e) {
-    console.warn('Failed to generate scenarios, using fallback:', e);
-    S.scenarios = fallbackScenarios();
+    console.warn('Background scenario cache generation failed:', e);
   }
 }
 
@@ -2747,6 +2889,84 @@ const ACCESSORY_KIT = {
       {x:14,y:2,c:'#CC8800'},{x:15,y:2,c:'#CC8800'},
     ]
   },
+  // ── New accessories for expanded scenarios ──
+  apron: {
+    overlay:[
+      {x:5,y:13,c:'#F0F0F0'},{x:6,y:13,c:'#F0F0F0'},{x:7,y:13,c:'#F0F0F0'},
+      {x:8,y:13,c:'#F0F0F0'},{x:9,y:13,c:'#F0F0F0'},{x:10,y:13,c:'#F0F0F0'},
+      {x:5,y:14,c:'#E8E8E8'},{x:6,y:14,c:'#F0F0F0'},{x:7,y:14,c:'#F0F0F0'},
+      {x:8,y:14,c:'#F0F0F0'},{x:9,y:14,c:'#F0F0F0'},{x:10,y:14,c:'#E8E8E8'},
+      {x:6,y:15,c:'#E8E8E8'},{x:7,y:15,c:'#F0F0F0'},{x:8,y:15,c:'#F0F0F0'},{x:9,y:15,c:'#E8E8E8'},
+    ]
+  },
+  straw_hat: {
+    hatRows:['.KKKKKKKKKKKKKK.','KkKkKkKkKkKkKkKK'],
+    hatColor:'#D4B06A', hatHl:'#C09850',
+  },
+  yukata: {
+    overlay:[
+      {x:6,y:13,c:'#3A5A8A'},{x:7,y:13,c:'#4A6A9A'},{x:8,y:13,c:'#4A6A9A'},{x:9,y:13,c:'#3A5A8A'},
+      {x:6,y:14,c:'#3A5A8A'},{x:7,y:14,c:'#4A6A9A'},{x:8,y:14,c:'#4A6A9A'},{x:9,y:14,c:'#3A5A8A'},
+      {x:7,y:12,c:'#C8A850'},{x:8,y:12,c:'#C8A850'},  // obi
+    ]
+  },
+  hair_ribbon: {
+    overlay:[
+      {x:12,y:1,c:'#CC3355'},{x:13,y:1,c:'#CC3355'},
+      {x:13,y:0,c:'#EE4466'},{x:14,y:0,c:'#CC3355'},
+      {x:12,y:2,c:'#EE4466'},{x:13,y:2,c:'#CC3355'},
+    ]
+  },
+  backpack: {
+    overlay:[
+      {x:1,y:12,c:'#2A6A2A'},{x:2,y:12,c:'#2A6A2A'},
+      {x:1,y:13,c:'#358035'},{x:2,y:13,c:'#358035'},
+      {x:1,y:14,c:'#358035'},{x:2,y:14,c:'#358035'},
+      {x:1,y:15,c:'#2A6A2A'},{x:2,y:15,c:'#2A6A2A'},
+    ]
+  },
+  headphones: {
+    overlay:[
+      {x:2,y:2,c:'#333333'},{x:3,y:2,c:'#333333'},
+      {x:12,y:2,c:'#333333'},{x:13,y:2,c:'#333333'},
+      {x:2,y:3,c:'#555555'},{x:3,y:3,c:'#555555'},
+      {x:12,y:3,c:'#555555'},{x:13,y:3,c:'#555555'},
+      {x:3,y:1,c:'#333333'},{x:4,y:0,c:'#333333'},{x:5,y:0,c:'#333333'},
+      {x:6,y:0,c:'#333333'},{x:7,y:0,c:'#333333'},{x:8,y:0,c:'#333333'},
+      {x:9,y:0,c:'#333333'},{x:10,y:0,c:'#333333'},{x:11,y:0,c:'#333333'},
+      {x:12,y:1,c:'#333333'},
+    ]
+  },
+  brush: {
+    overlay:[
+      {x:14,y:7,c:'#884400'},{x:14,y:8,c:'#884400'},
+      {x:14,y:9,c:'#884400'},{x:14,y:10,c:'#884400'},
+      {x:14,y:11,c:'#222222'},{x:14,y:12,c:'#222222'},
+    ]
+  },
+  lantern: {
+    overlay:[
+      {x:14,y:6,c:'#CC2222'},{x:15,y:6,c:'#CC2222'},
+      {x:13,y:7,c:'#CC2222'},{x:14,y:7,c:'#FF6644'},{x:15,y:7,c:'#CC2222'},
+      {x:13,y:8,c:'#CC2222'},{x:14,y:8,c:'#FF6644'},{x:15,y:8,c:'#CC2222'},
+      {x:14,y:9,c:'#CC2222'},{x:15,y:9,c:'#CC2222'},
+      {x:14,y:10,c:'#888844'},
+    ]
+  },
+  camera: {
+    overlay:[
+      {x:13,y:8,c:'#222222'},{x:14,y:8,c:'#222222'},{x:15,y:8,c:'#222222'},
+      {x:13,y:9,c:'#222222'},{x:14,y:9,c:'#4488CC'},{x:15,y:9,c:'#222222'},
+      {x:13,y:10,c:'#222222'},{x:14,y:10,c:'#222222'},{x:15,y:10,c:'#222222'},
+    ]
+  },
+  candy: {
+    overlay:[
+      {x:14,y:8,c:'#FF66AA'},{x:15,y:8,c:'#FFFFFF'},
+      {x:14,y:9,c:'#FFFFFF'},{x:15,y:9,c:'#FF66AA'},
+      {x:14,y:10,c:'#884400'},
+    ]
+  },
 };
 
 // ── Infer accessory from scenario text ───────────────────────────────────
@@ -2784,6 +3004,26 @@ function inferAccessory(sc) {
   if (/taiko|drum.*lesson|one stroke|one soul/.test(t))             return 'hachimaki';
   if (/karaoke|karaoke box|sing.*song/.test(t))                     return 'music_note';
   if (/gym|workout|fitness|dojo|martial art|kendo|judo/.test(t))    return 'headband';
+  // New scenario accessories
+  if (/wagashi|sweet.*shop|confection|dagashi|candy|駄菓子/.test(t))  return 'candy';
+  if (/sake.*brew|toji|brewery|酒蔵/.test(t))                       return 'apron';
+  if (/pottery|ceramic|陶芸|clay/.test(t))                          return 'apron';
+  if (/calligraph|書道|brush.*stroke/.test(t))                      return 'brush';
+  if (/kimono|着物|yukata|浴衣|ryokan|onsen.*town|温泉街/.test(t))   return 'yukata';
+  if (/festival|matsuri|夏祭り|goldfish|bon.odori|tanabata|七夕|obon|盆/.test(t)) return 'lantern';
+  if (/hik|mountain|trail|登山|climb/.test(t))                      return 'backpack';
+  if (/manga.*caf|漫画|comic|concert|jazz|music|バンド/.test(t))     return 'headphones';
+  if (/hair.*ribbon|school.*girl|dagashi.*owner|ribbon/.test(t))    return 'hair_ribbon';
+  if (/farm|rice.*field|rural|田舎|countryside|straw/.test(t))      return 'straw_hat';
+  if (/tourist|camera|photo|sightsee|travel/.test(t))               return 'camera';
+  if (/elevator|office|nomikai|shinsotsu|新卒|copying|copier/.test(t)) return 'tie';
+  if (/barber|床屋|hair.*cut|salon/.test(t))                        return 'glasses';
+  if (/dentist|歯|dental|hygienist/.test(t))                        return 'surgical_mask';
+  if (/escape.*room|脱出|batting|バッティング/.test(t))               return 'headband';
+  if (/flea.*market|蚤の市|market|商店街|shotengai/.test(t))         return 'straw_hat';
+  if (/laundry|コインランドリー|post.*office|郵便/.test(t))           return 'glasses';
+  if (/ferry|boat|フェリー|ship|sailor/.test(t))                    return 'fishing_hat';
+  if (/surf|サーフ|beach|ビーチ/.test(t))                           return 'sunglasses';
   return null;
 }
 
@@ -3048,31 +3288,165 @@ const SCENE_BACKGROUNDS = {
       [20,28,40,1,'#a09a78'],
       [15,30,50,18,'#9a8a68'],[15,30,50,1,'#a09a78'],
     ]
-  }
+  },
+  festival: {
+    charX: 24, charY: 16,
+    r: [
+      [0,0,80,50,'#0a0820'],  // night sky
+      [2,2,2,1,'#FFFFCC'],[18,1,1,1,'#FFFFCC'],[35,3,1,1,'#FFFFCC'],[55,1,2,1,'#FFFFCC'],[70,2,1,1,'#FFFFCC'],
+      // lantern strings
+      [5,6,3,4,'#CC2222'],[6,7,1,2,'#FF6644'],
+      [18,5,3,4,'#CC2222'],[19,6,1,2,'#FF6644'],
+      [33,6,3,4,'#CC2222'],[34,7,1,2,'#FF6644'],
+      [48,5,3,4,'#CC2222'],[49,6,1,2,'#FF6644'],
+      [63,6,3,4,'#CC2222'],[64,7,1,2,'#FF6644'],
+      [5,5,60,1,'#444444'],  // string
+      // stall frame left
+      [0,12,18,3,'#6A4020'],[0,15,18,35,'#3A2010'],
+      [2,16,14,2,'#5A3820'],[2,19,14,1,'#5A3820'],
+      [3,17,3,1,'#FFCC44'],[7,17,3,1,'#88CC44'],[11,17,3,1,'#FF8844'],
+      // stall frame right
+      [58,12,22,3,'#6A4020'],[58,15,22,35,'#3A2010'],
+      [60,16,18,2,'#5A3820'],[60,19,18,1,'#5A3820'],
+      [61,17,3,1,'#FF8844'],[65,17,3,1,'#4488FF'],[69,17,3,1,'#FFCC44'],
+      // ground
+      [0,45,80,5,'#3A2A1A'],[0,45,80,1,'#4A3A2A'],
+      // crowd silhouettes
+      [3,40,4,5,'#1A1020'],[10,41,3,4,'#1A1020'],[50,40,4,5,'#1A1020'],[60,41,3,4,'#1A1020'],
+      [70,40,5,5,'#1A1020'],
+    ]
+  },
+  office: {
+    charX: 24, charY: 14,
+    r: [
+      [0,0,80,50,'#E8E4DC'],  // beige walls
+      [0,0,80,4,'#D0CCC4'],   // ceiling
+      // fluorescent lights
+      [10,2,20,1,'#F8F8F0'],[50,2,20,1,'#F8F8F0'],
+      // window
+      [30,5,20,14,'#88AACC'],[30,5,20,1,'#666666'],[30,18,20,1,'#666666'],
+      [30,5,1,14,'#666666'],[49,5,1,14,'#666666'],[39,5,1,14,'#666666'],
+      // desks
+      [2,30,25,3,'#8A7A60'],[2,30,25,1,'#9A8A70'],
+      [53,30,25,3,'#8A7A60'],[53,30,25,1,'#9A8A70'],
+      // monitors on desks
+      [8,26,5,4,'#222222'],[9,27,3,2,'#4488AA'],
+      [60,26,5,4,'#222222'],[61,27,3,2,'#4488AA'],
+      // chairs
+      [10,33,4,6,'#333333'],[62,33,4,6,'#333333'],
+      // floor
+      [0,40,80,10,'#9A9080'],[0,40,80,1,'#AAA090'],
+      [0,45,80,1,'#8A8070'],
+      // potted plant
+      [74,24,4,6,'#228833'],[75,30,2,3,'#8A6A40'],
+    ]
+  },
+  train: {
+    charX: 24, charY: 12,
+    r: [
+      [0,0,80,50,'#D8D0C8'],  // interior ceiling
+      // overhead rack
+      [0,4,80,2,'#888888'],[0,4,80,1,'#999999'],
+      // window
+      [8,8,26,14,'#6688AA'],[38,8,26,14,'#6688AA'],
+      [8,8,26,1,'#555555'],[8,21,26,1,'#555555'],
+      [38,8,26,1,'#555555'],[38,21,26,1,'#555555'],
+      // scenery through windows
+      [12,12,8,4,'#558844'],[18,10,6,6,'#448833'],
+      [42,11,10,5,'#558844'],[50,13,8,3,'#448833'],
+      // seats
+      [0,26,16,8,'#2A5A8A'],[0,26,16,1,'#3A6A9A'],
+      [64,26,16,8,'#2A5A8A'],[64,26,16,1,'#3A6A9A'],
+      // floor
+      [0,38,80,12,'#8A8078'],[0,38,80,1,'#9A9088'],
+      [0,44,80,1,'#7A7068'],
+      // handles
+      [20,0,2,8,'#AAAAAA'],[40,0,2,8,'#AAAAAA'],[60,0,2,8,'#AAAAAA'],
+      [19,7,4,2,'#CCCCCC'],[39,7,4,2,'#CCCCCC'],[59,7,4,2,'#CCCCCC'],
+    ]
+  },
+  mountain: {
+    charX: 24, charY: 18,
+    r: [
+      [0,0,80,50,'#88AACC'],  // sky
+      // distant mountains
+      [0,10,20,15,'#6A8A6A'],[15,8,25,17,'#5A7A5A'],[35,12,20,13,'#7A9A7A'],
+      [50,9,30,16,'#5A7A5A'],
+      // snow caps
+      [22,8,6,3,'#E8E8E8'],[58,9,8,3,'#E8E8E8'],
+      // treeline
+      [0,22,80,4,'#3A6A3A'],
+      [5,20,4,4,'#2A5A2A'],[15,19,5,5,'#2A5A2A'],[28,20,4,4,'#3A6A3A'],
+      [45,19,5,5,'#2A5A2A'],[60,20,4,4,'#2A5A2A'],[72,19,5,5,'#3A6A3A'],
+      // trail / ground
+      [0,26,80,24,'#8A7A5A'],
+      [0,26,80,2,'#9A8A6A'],
+      [25,28,30,1,'#AA9A7A'],  // trail
+      [20,32,40,1,'#AA9A7A'],
+      [15,36,50,1,'#AA9A7A'],
+      // rocks
+      [5,30,4,3,'#7A7A6A'],[65,28,5,4,'#6A6A5A'],[45,34,3,2,'#7A7A6A'],
+      // small flowers
+      [10,27,1,1,'#FFCC44'],[35,29,1,1,'#FF88AA'],[55,27,1,1,'#FFCC44'],[70,30,1,1,'#FF88AA'],
+    ]
+  },
+  waterfront: {
+    charX: 22, charY: 14,
+    r: [
+      [0,0,80,50,'#CC8844'],  // sunset sky
+      [0,0,80,8,'#DD9955'],
+      [0,8,80,4,'#CC7733'],
+      // sun
+      [60,2,8,8,'#FFCC44'],[61,3,6,6,'#FFDD66'],
+      // water
+      [0,22,80,28,'#2A5A8A'],
+      [0,22,80,2,'#3A6A9A'],
+      [5,26,12,1,'#4A7AAA'],[30,28,15,1,'#4A7AAA'],[55,25,18,1,'#4A7AAA'],
+      [10,32,10,1,'#1A4A7A'],[40,34,12,1,'#1A4A7A'],[60,30,14,1,'#1A4A7A'],
+      // pier/dock
+      [0,20,55,3,'#6A5030'],[0,20,55,1,'#7A6040'],
+      // pier posts
+      [8,22,2,8,'#5A4020'],[25,22,2,8,'#5A4020'],[42,22,2,8,'#5A4020'],
+      // distant boats
+      [62,18,6,2,'#EEEEEE'],[64,16,2,2,'#AA3333'],
+      // railing
+      [0,18,50,1,'#5A4020'],[5,15,1,4,'#5A4020'],[15,15,1,4,'#5A4020'],
+      [25,15,1,4,'#5A4020'],[35,15,1,4,'#5A4020'],[45,15,1,4,'#5A4020'],
+    ]
+  },
 };
 
 function inferBackground(sc) {
   const t = `${sc.id||''} ${sc.en||''} ${sc.ctx||''}`.toLowerCase();
   if (/bath|sento|onsen|hot.spring|soaking/.test(t)) return 'bathhouse';
-  if (/ramen|soba|curry|tofu|noodle|stall|counter|bento|ekiben/.test(t)) return 'restaurant';
-  if (/park|cherry|hanami|blossom|shogi|bench|pier|fish/.test(t)) return 'park';
-  if (/book|pharmacy|recycle|souvenir|apprais|shop(?!.*coff)/.test(t)) return 'shop';
-  if (/caf[eé]|coffee|kissaten|machiya|tea.?house/.test(t)) return 'cafe';
-  if (/night|3am|konbini|arcade|karaoke|crane|ufo|neon/.test(t)) return 'night';
-  if (/temple|monk|rakugo|taiko|drum|shrine/.test(t)) return 'temple';
-  if (/taxi|cab.driv|chauffeur|ride/.test(t)) return 'taxi';
-  if (/gym|workout|fitness|dojo|martial|kendo|judo|changing/.test(t)) return 'dojo';
-  if (/izakaya|bar|pub|gokon|drink|beer/.test(t)) return 'restaurant';
+  if (/ramen|soba|curry|tofu|noodle|stall|counter|bento|ekiben|yatai/.test(t)) return 'restaurant';
+  if (/festival|matsuri|goldfish|firework|hanabi|tanabata|setsubun|obon|bon.odori|lantern/.test(t)) return 'festival';
+  if (/mountain|hik|trail|登山|climb|summit/.test(t)) return 'mountain';
+  if (/ferry|pier|fish|waterfront|harbour|harbor|dock|boat|island|cat.*island/.test(t)) return 'waterfront';
+  if (/shinkansen|train|railway|ferry|bus.*countryside|bus.*rural/.test(t)) return 'train';
+  if (/office|elevator|nomikai|shinsotsu|copier|copying|salaryman|cowork/.test(t)) return 'office';
+  if (/park|cherry|hanami|blossom|shogi|bench/.test(t)) return 'park';
+  if (/book|pharmacy|recycle|souvenir|apprais|shop(?!.*coff)|barber|dentist|post.office|flea.*market/.test(t)) return 'shop';
+  if (/caf[eé]|coffee|kissaten|machiya|tea.?house|cream.soda|onsen.*town/.test(t)) return 'cafe';
+  if (/night|3am|konbini|arcade|karaoke|crane|ufo|neon|jazz|pachinko|batting|escape.room|laundro|midnight/.test(t)) return 'night';
+  if (/temple|monk|rakugo|taiko|drum|shrine|hatsumode|calligraph|書道|pottery|陶芸/.test(t)) return 'temple';
+  if (/taxi|cab.driv|chauffeur|ride|uber|rideshare/.test(t)) return 'taxi';
+  if (/gym|workout|fitness|dojo|martial|kendo|judo|changing|surf/.test(t)) return 'dojo';
+  if (/izakaya|bar|pub|gokon|drink|beer|sake.*brew|nomikai/.test(t)) return 'restaurant';
   if (/vet|clinic|hospital|doctor|emergency/.test(t)) return 'shop';
+  if (/dagashi|wagashi|sweet|kimono|manga.*caf|depachika|shotengai|corner.shop/.test(t)) return 'shop';
+  if (/bicycle|rental.*bike|vending|自販機|neighborhood|chounaikai/.test(t)) return 'street';
   // Broader patterns for English roleplay scenarios
-  if (/diner|breakfast|brunch|thanksgiving/.test(t)) return 'restaurant';
+  if (/diner|breakfast|brunch|thanksgiving|food.truck|cooking|class|lesson/.test(t)) return 'restaurant';
   if (/hotel|hostel|airbnb|lobby|reception|check.?in/.test(t)) return 'cafe';
-  if (/beach|bbq|barbecue|wildlife|campus|university/.test(t)) return 'park';
-  if (/concert|gig|stadium|baseball|game/.test(t)) return 'night';
-  if (/interview|office|corporate/.test(t)) return 'shop';
-  if (/bookshop|library|duty.free|shopping|garage.sale/.test(t)) return 'shop';
-  if (/cooking|class|lesson/.test(t)) return 'restaurant';
+  if (/beach|bbq|barbecue|wildlife|campus|university|national.park|outback|farm/.test(t)) return 'park';
+  if (/concert|gig|stadium|baseball|game|quiz.night/.test(t)) return 'night';
+  if (/interview|office|corporate|cowork/.test(t)) return 'office';
+  if (/bookshop|library|duty.free|shopping|garage.sale|thrift|market|spice/.test(t)) return 'shop';
   if (/subway|underground|station|train|bus/.test(t)) return 'street';
+  if (/museum|gallery/.test(t)) return 'shop';
+  if (/canal|boat|sydney.*bus/.test(t)) return 'waterfront';
+  if (/rain|bus.stop|neighbor|laundromat/.test(t)) return 'street';
   return 'street';
 }
 
@@ -3552,6 +3926,29 @@ const ENG_SCENARIO_POOL = [
   { id:'eng-bookshop', jp:'洋書店', en:'海外の本屋でおすすめを聞く', icon:'📚', char:'Alice, a bookshop owner who reads three books a week', charJp:'アリス — 週3冊読む本屋のオーナー', ctx:'You are browsing an English bookshop and ask for recommendations. Alice wants to know what genres you like and starts pulling books off shelves faster than you can keep up. She has read everything.', voice:'en-GB-SoniaNeural' },
   { id:'eng-concert', jp:'コンサート', en:'海外のコンサート会場で隣の人と', icon:'🎵', char:'Jake, who has seen this band seventeen times', charJp:'ジェイク — このバンドを17回見ているファン', ctx:'You are at a concert abroad waiting for the show to start. Jake notices your excitement and starts sharing trivia about the band. He wants to know about the Japanese music scene.', voice:'en-US-DavisNeural' },
   { id:'eng-gym', jp:'ジム', en:'海外のジムでトレーニング仲間と', icon:'🏋️', char:'Tom, a personal trainer who gives free unsolicited advice', charJp:'トム — 頼んでもいないアドバイスをくれるトレーナー', ctx:'You have joined a gym while abroad. Tom watches your form and cannot help but offer suggestions. He is curious about Japanese fitness culture and martial arts.', voice:'en-AU-WilliamNeural' },
+  // ── American settings (additional) ──
+  { id:'eng-food-truck', jp:'フードトラック', en:'ポートランドのフードトラックで注文', icon:'🌮', char:'Miguel, a food truck owner who explains every ingredient', charJp:'ミゲル — 全材料を説明してくれるフードトラックオーナー', ctx:'You are at a Portland food truck pod with dozens of options. Miguel calls you over and walks you through his fusion menu. He wants to know about Japanese street food and is considering adding takoyaki.', voice:'en-US-DavisNeural' },
+  { id:'eng-uber', jp:'ライドシェア', en:'アメリカでUberに乗る', icon:'🚗', char:'DeShawn, a rideshare driver who moonlights as a comedian', charJp:'デショーン — 副業でコメディアンをしているドライバー', ctx:'Your Uber driver DeShawn is testing new material on you. His jokes require understanding American pop culture references you might not know. He patiently explains each one, which somehow makes them funnier.', voice:'en-US-DavisNeural' },
+  { id:'eng-thrift', jp:'古着屋', en:'アメリカのスリフトストアで掘り出し物', icon:'👕', char:'Jasmine, a vintage clothing expert with an eye for treasure', charJp:'ジャスミン — お宝を見つける達人のヴィンテージ通', ctx:'You are in a massive thrift store feeling overwhelmed. Jasmine notices and starts curating finds for you. She has a theory about what your style says about you and wants to know about Japanese fashion.', voice:'en-US-AriaNeural' },
+  { id:'eng-farmers-market', jp:'ファーマーズマーケット', en:'日曜朝のファーマーズマーケット', icon:'🍎', char:'Frank, an organic farmer who names all his chickens', charJp:'フランク — 鶏に全部名前をつけるオーガニック農家', ctx:'At a Sunday farmers market, Frank is selling eggs and vegetables. He tells you the name of the chicken that laid each egg. He is fascinated by Japanese farming and asks about rice cultivation.', voice:'en-US-GuyNeural' },
+  { id:'eng-laundromat', jp:'コインランドリー', en:'NYのコインランドリーで待ち時間', icon:'🧺', char:'Rosa, a grandmother who has been doing laundry here for 30 years', charJp:'ローザ — 30年通いのおばあちゃん', ctx:'You are waiting for your laundry in a New York laundromat. Rosa takes the seat next to you and immediately starts telling stories about the neighborhood. She offers you homemade cookies from a bag.', voice:'en-US-JennyNeural' },
+  { id:'eng-national-park', jp:'国立公園', en:'アメリカの国立公園でレンジャーと', icon:'🏞️', char:'Ranger Kim, who has seen a lot of tourists do dumb things', charJp:'キム・レンジャー — 観光客の愚行を見尽くした公園レンジャー', ctx:'You are hiking in an American national park. Ranger Kim stops you for a friendly chat about trail safety. She has incredible stories about wildlife encounters and is curious about hiking culture in Japan.', voice:'en-US-AriaNeural' },
+  // ── British settings (additional) ──
+  { id:'eng-museum', jp:'博物館', en:'大英博物館でボランティアガイドと', icon:'🏛️', char:'Harold, a retired professor who volunteers as a museum guide', charJp:'ハロルド — ボランティアガイドの退職教授', ctx:'You are at the British Museum staring at a display. Harold appears beside you and begins explaining the exhibit with the enthusiasm of someone who has waited all day for a curious visitor. He has questions about Japanese museums.', voice:'en-GB-RyanNeural' },
+  { id:'eng-canal', jp:'運河ボート', en:'ロンドンの運河でボートカフェ', icon:'🚤', char:'Gemma, who lives on a narrowboat and runs a floating café', charJp:'ジェマ — ナローボートに住むフローティングカフェのオーナー', ctx:'You have found a café on a canal boat in London. Gemma serves you tea while explaining why she gave up her office job to live on the water. She wants to know about houseboats in Japan.', voice:'en-GB-SoniaNeural' },
+  { id:'eng-corner-shop', jp:'角の商店', en:'イギリスの街角のショップで', icon:'🏪', char:'Raj, a corner shop owner who knows everything happening on the street', charJp:'ラジ — 通りの全てを把握している角の商店主', ctx:'You pop into a corner shop for a snack. Raj is a one-man information centre for the entire neighborhood. He recommends things based on what he thinks you look like you need today.', voice:'en-GB-RyanNeural' },
+  { id:'eng-rainy-bus', jp:'雨のバス停', en:'イギリスのバス停で雨宿り', icon:'🌧️', char:'Margaret, who has perfected the art of complaining about weather', charJp:'マーガレット — 天気への不満を芸術に昇華した女性', ctx:'You are at a British bus stop in the rain. Margaret begins a masterclass in complaining about weather while somehow making it charming. The bus is late, which gives her even more material.', voice:'en-GB-SoniaNeural' },
+  // ── Australian settings (additional) ──
+  { id:'eng-surf', jp:'サーフィン', en:'オーストラリアでサーフィンレッスン', icon:'🏄', char:'Taz, a surf instructor whose vocabulary is 60% slang', charJp:'タズ — 語彙の6割がスラングのサーフインストラクター', ctx:'You have signed up for a surf lesson. Taz uses so much Australian slang that it is basically a second language. He is patient with your surfing but baffled that you do not know what arvo means.', voice:'en-AU-WilliamNeural' },
+  { id:'eng-outback', jp:'アウトバック', en:'オーストラリアの田舎のパブで', icon:'🤠', char:'Bluey, a farmer who drove two hours for a cold beer', charJp:'ブルーイ — ビールのために2時間運転してきた農家', ctx:'You are at a pub in outback Australia. Bluey has driven two hours from his farm for a drink and some human contact. He is thrilled to have someone new to talk to and has endless questions about Japan.', voice:'en-AU-WilliamNeural' },
+  { id:'eng-market-aus', jp:'マーケット', en:'メルボルンのクイーンビクトリアマーケット', icon:'🛒', char:'Nina, a spice vendor who wants you to smell everything', charJp:'ニーナ — 全部匂いを嗅がせたいスパイス売り', ctx:'You are exploring Queen Victoria Market in Melbourne. Nina runs a spice stall and is on a mission to find the perfect spice blend for you. She asks about Japanese spices and is fascinated by shichimi.', voice:'en-AU-NatashaNeural' },
+  // ── Japan-based English practice (additional) ──
+  { id:'eng-lost-phone', jp:'落とし物', en:'外国人が電車にスマホを忘れた', icon:'📱', char:'Chris, a panicking tourist who left his phone on the train', charJp:'クリス — 電車にスマホを忘れてパニック中の観光客', ctx:'A tourist runs up to you at the station in a panic. Chris left his phone on the train and does not know how to talk to station staff. He needs your help navigating the lost-and-found process in English.', voice:'en-US-DavisNeural' },
+  { id:'eng-izakaya-tourists', jp:'居酒屋案内', en:'居酒屋で外国人に注文を助ける', icon:'🏮', char:'Sarah and Mike, a couple trying to order without pictures', charJp:'サラとマイク — 写真なしのメニューに苦戦するカップル', ctx:'A foreign couple at the next table in an izakaya is staring helplessly at a Japanese-only menu. They notice you and ask for help. They want recommendations and have many questions about Japanese food etiquette.', voice:'en-US-JennyNeural' },
+  { id:'eng-temple-guide', jp:'寺ガイド', en:'外国人に英語でお寺を案内', icon:'🛕', char:'Elena, a curious traveler who asks deep questions about Buddhism', charJp:'エレナ — 仏教について深い質問をする好奇心旺盛な旅行者', ctx:'You meet a traveler at a temple who asks if you can explain what she is seeing. Elena asks thoughtful questions about rituals, symbols, and beliefs. Explaining Japanese culture in English is harder than you thought.', voice:'en-US-AriaNeural' },
+  { id:'eng-cowork', jp:'コワーキング', en:'コワーキングスペースで外国人と', icon:'💻', char:'Patrick, a digital nomad who has worked from 30 countries', charJp:'パトリック — 30カ国で仕事してきたデジタルノマド', ctx:'You are at a coworking space and Patrick sits at your table. He is working remotely from Tokyo for a month and wants tips on where to go. He is also curious about Japanese work culture versus Western styles.', voice:'en-GB-RyanNeural' },
+  { id:'eng-bar-quiz', jp:'バークイズ', en:'六本木のバーで英語クイズナイト', icon:'🧠', char:'Yuki, a Japanese quiz master who runs everything in English', charJp:'ユキ — 全て英語で進行するクイズマスター', ctx:'You have joined a pub quiz at a bar in Roppongi. The quizmaster Yuki runs it entirely in English and the questions mix Japanese and Western culture. Your team needs someone who can bridge both worlds.', voice:'en-US-DavisNeural' },
+  { id:'eng-neighbor', jp:'隣人', en:'外国人の新しい隣人に挨拶', icon:'🏠', char:'Alex, who just moved to Japan and is overwhelmed by garbage rules', charJp:'アレックス — ゴミ出しルールに圧倒されている新しい隣人', ctx:'Your new neighbor Alex has just moved to Japan from abroad. They are completely confused by garbage sorting, neighborhood rules, and the mysterious calendar on their door. They need your help badly.', voice:'en-US-AriaNeural' },
 ];
 
 function engFallbackScenarios() {
@@ -3564,47 +3961,121 @@ function engFallbackScenarios() {
   return pool.slice(0, 6);
 }
 
-async function generateEngScenarios() {
-  try {
-    const reply = await claude([{ role: 'user', content: `Generate 6 unique English conversation roleplay scenarios for a Japanese person learning English. Each should have a vivid character and an interesting situation.
+const ENG_SCENARIO_THEMES = [
+  'travel emergencies & logistics', 'food, restaurants & cooking', 'making friends & socializing',
+  'work, interviews & professional life', 'shopping & bargaining', 'health & medical situations',
+  'cultural exchange & explaining Japan', 'sports, hobbies & outdoors', 'accommodation & living abroad',
+  'entertainment, music & nightlife', 'education & campus life', 'family, relationships & celebrations',
+  'transportation & getting around', 'technology & modern life', 'small talk & everyday encounters',
+  'volunteering & community', 'art, museums & galleries', 'nature, wildlife & environment',
+];
 
-Mix settings: some in Japan (talking to foreigners), some in America, some in UK, some in Australia.
+function pickEngTheme() {
+  const used = JSON.parse(sessionStorage.getItem('renshuu_used_eng_themes') || '[]');
+  const available = ENG_SCENARIO_THEMES.filter(t => !used.includes(t));
+  const pool = available.length > 0 ? available : ENG_SCENARIO_THEMES;
+  const theme = pool[Math.floor(Math.random() * pool.length)];
+  const next = available.length > 1 ? [...used, theme] : [theme];
+  sessionStorage.setItem('renshuu_used_eng_themes', JSON.stringify(next));
+  return theme;
+}
+
+const ENG_VOICE_MAP = {
+  male_old:    { american:'en-US-GuyNeural',    british:'en-GB-RyanNeural',  australian:'en-AU-WilliamNeural' },
+  male_young:  { american:'en-US-DavisNeural',  british:'en-GB-RyanNeural',  australian:'en-AU-WilliamNeural' },
+  male_adult:  { american:'en-US-GuyNeural',    british:'en-GB-RyanNeural',  australian:'en-AU-WilliamNeural' },
+  female_young:{ american:'en-US-AriaNeural',   british:'en-GB-SoniaNeural', australian:'en-AU-NatashaNeural' },
+  female_adult:{ american:'en-US-JennyNeural',  british:'en-GB-SoniaNeural', australian:'en-AU-NatashaNeural' },
+  female_soft: { american:'en-US-AriaNeural',   british:'en-GB-SoniaNeural', australian:'en-AU-NatashaNeural' },
+};
+
+function buildEngGenPrompt(theme) {
+  return `Generate 6 unique English conversation roleplay scenarios for a Japanese person learning English.
+
+THEME FOCUS for this batch: "${theme}"
+At least 4 of the 6 scenarios should relate to this theme. The other 2 can be wildcard — any setting.
+
+Mix settings: some in Japan (talking to foreigners), some in America, some in UK, some in Australia. Vary character ages, genders, accents, and personality types. Include a mix of: funny, awkward, heartwarming, and stressful situations. Give characters specific quirks, not generic friendliness.
 
 Return ONLY a JSON array where each object has:
 - "id": short kebab-case identifier (prefix with "eng-")
 - "jp": location name in Japanese/katakana (2-6 chars)
 - "en": short description IN JAPANESE (一言で場面を説明)
 - "icon": a single emoji
-- "char": one-line character description in English (name + personality)
+- "char": one-line character description in English (name + personality quirk — be specific!)
 - "charJp": same character description in Japanese
-- "ctx": 2-3 sentence scene setup in English (for AI system prompt)
+- "ctx": 2-3 sentence scene setup in English, vivid and cinematic
 - "gender": "male_old", "male_young", "male_adult", "female_young", "female_adult", "female_soft"
-- "accent": "american", "british", or "australian"` }],
-    'You are a creative scenario designer for an English learning app aimed at Japanese speakers. Output valid JSON only.',
+- "accent": "american", "british", or "australian"
+
+Think: the opening of a short film. Surprise me.`;
+}
+
+async function generateEngScenarios() {
+  // Try to load cached AI-generated scenarios first
+  const cached = sessionStorage.getItem('renshuu_eng_scenarios_cache');
+  if (cached) {
+    try {
+      const arr = JSON.parse(cached);
+      if (Array.isArray(arr) && arr.length >= 6) {
+        S.engScenarios = arr.slice(0, 6);
+        sessionStorage.removeItem('renshuu_eng_scenarios_cache');
+        sessionStorage.setItem('renshuu_eng_scenarios', JSON.stringify(S.engScenarios));
+        generateAndCacheEngScenarios();
+        return;
+      }
+    } catch (_) {}
+  }
+
+  const theme = pickEngTheme();
+  const maxRetries = 2;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const reply = await claude([{ role: 'user', content: buildEngGenPrompt(theme) }],
+      'You are a creative scenario designer for an English learning app aimed at Japanese speakers. You specialize in vivid, culturally rich scenarios with memorable characters. Output valid JSON only.',
+      2000);
+
+      const parsed = JSON.parse(reply.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
+      if (!Array.isArray(parsed) || parsed.length < 1) throw new Error('Bad format');
+
+      S.engScenarios = parsed.map(s => ({
+        id: s.id || ('eng_' + Math.random().toString(36).slice(2, 8)),
+        jp: s.jp, en: s.en, icon: s.icon || '🎭',
+        char: s.char, charJp: s.charJp || s.char, ctx: s.ctx,
+        voice: ENG_VOICE_MAP[s.gender]?.[s.accent] || ENG_AZURE_VOICES[Math.floor(Math.random() * ENG_AZURE_VOICES.length)],
+      }));
+      sessionStorage.setItem('renshuu_eng_scenarios', JSON.stringify(S.engScenarios));
+      generateAndCacheEngScenarios();
+      return;
+    } catch (e) {
+      console.warn(`English scenario generation attempt ${attempt + 1} failed:`, e);
+      if (attempt === maxRetries) {
+        console.warn('All retries exhausted, using fallback pool');
+        S.engScenarios = engFallbackScenarios();
+      }
+    }
+  }
+}
+
+async function generateAndCacheEngScenarios() {
+  try {
+    const theme = pickEngTheme();
+    const reply = await claude([{ role: 'user', content: buildEngGenPrompt(theme) }],
+    'You are a creative scenario designer for an English learning app aimed at Japanese speakers. You specialize in vivid, culturally rich scenarios with memorable characters. Output valid JSON only.',
     2000);
 
     const parsed = JSON.parse(reply.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
-    if (!Array.isArray(parsed) || parsed.length < 1) throw new Error('Bad format');
-
-    const voiceMap = {
-      male_old:    { american:'en-US-GuyNeural',    british:'en-GB-RyanNeural',  australian:'en-AU-WilliamNeural' },
-      male_young:  { american:'en-US-DavisNeural',  british:'en-GB-RyanNeural',  australian:'en-AU-WilliamNeural' },
-      male_adult:  { american:'en-US-GuyNeural',    british:'en-GB-RyanNeural',  australian:'en-AU-WilliamNeural' },
-      female_young:{ american:'en-US-AriaNeural',   british:'en-GB-SoniaNeural', australian:'en-AU-NatashaNeural' },
-      female_adult:{ american:'en-US-JennyNeural',  british:'en-GB-SoniaNeural', australian:'en-AU-NatashaNeural' },
-      female_soft: { american:'en-US-AriaNeural',   british:'en-GB-SoniaNeural', australian:'en-AU-NatashaNeural' },
-    };
-
-    S.engScenarios = parsed.map(s => ({
-      id: s.id || ('eng_' + Math.random().toString(36).slice(2, 8)),
-      jp: s.jp, en: s.en, icon: s.icon || '🎭',
-      char: s.char, charJp: s.charJp || s.char, ctx: s.ctx,
-      voice: voiceMap[s.gender]?.[s.accent] || ENG_AZURE_VOICES[Math.floor(Math.random() * ENG_AZURE_VOICES.length)],
-    }));
-    sessionStorage.setItem('renshuu_eng_scenarios', JSON.stringify(S.engScenarios));
+    if (Array.isArray(parsed) && parsed.length >= 1) {
+      const cached = parsed.map(s => ({
+        id: s.id || ('eng_' + Math.random().toString(36).slice(2, 8)),
+        jp: s.jp, en: s.en, icon: s.icon || '🎭',
+        char: s.char, charJp: s.charJp || s.char, ctx: s.ctx,
+        voice: ENG_VOICE_MAP[s.gender]?.[s.accent] || ENG_AZURE_VOICES[Math.floor(Math.random() * ENG_AZURE_VOICES.length)],
+      }));
+      sessionStorage.setItem('renshuu_eng_scenarios_cache', JSON.stringify(cached));
+    }
   } catch (e) {
-    console.warn('Failed to generate English scenarios, using fallback:', e);
-    S.engScenarios = engFallbackScenarios();
+    console.warn('Background English scenario cache generation failed:', e);
   }
 }
 
