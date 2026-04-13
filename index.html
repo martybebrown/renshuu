@@ -6104,8 +6104,9 @@ function renderStoryCard() {
 
     sceneView.classList.add('active');
 
-    // Build system prompt
-    rpg.dialogueState.sysPrompt = buildSysPrompt(sc);
+    // Build system prompt — buildSysPrompt sets S.sysPrompt (no return value)
+    buildSysPrompt(sc);
+    rpg.dialogueState.sysPrompt = S.sysPrompt;
 
     if (savedConvo && savedConvo.length > 0) {
       // Restore saved conversation — rebuild display annotations
@@ -6221,6 +6222,20 @@ function renderStoryCard() {
     // Build messages for Claude — send last 30 messages for context window efficiency
     const recentConvo = ds.convo.slice(-30);
     const messages = recentConvo.map(m => ({ role: m.role, content: m.content }));
+
+    // Vocab reinforcement — same logic as regular sendMsg
+    const reinforceOn = localStorage.getItem('renshuu_vocab_reinforce') !== '0';
+    if (reinforceOn && S.sessionWords?.length) {
+      const allText = ds.convo.filter(m => m.role === 'assistant' && m.content !== '…').map(m => m.content).join(' ');
+      for (const w of S.sessionWords) {
+        if (allText.includes(w.jp)) S.usedWords.add(w.jp);
+      }
+      const unused = S.sessionWords.filter(w => !S.usedWords.has(w.jp));
+      if (unused.length > 0) {
+        const nudge = `[System: You haven't used these vocab words yet — try to work them in naturally: ${unused.map(w => `${w.jp}（${w.en}）`).join('、')}]`;
+        messages.push({ role: 'user', content: nudge });
+      }
+    }
 
     claude(messages, ds.sysPrompt, 800).then(reply => {
       const { correction: corr, clean } = extractCorrection(reply);
