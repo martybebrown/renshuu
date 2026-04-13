@@ -806,6 +806,248 @@ pre.code {
   }
 }
 
+/* ── RPG World (fullscreen overworld) ──────────────────────────────────── */
+#rpgWorld {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  z-index: 9999; display: none; flex-direction: column;
+  background: #000; font-family: 'Courier New', monospace;
+  image-rendering: pixelated; cursor: default;
+}
+#rpgWorld.active { display: flex; }
+#rpgWorld * { box-sizing: border-box; }
+/* Sierra menu bar */
+.sierra-menu {
+  height: 24px; background: #c0c0c0; display: flex; align-items: center;
+  padding: 0 4px; gap: 0; flex-shrink: 0; border-bottom: 2px solid #808080;
+  z-index: 2;
+}
+.sierra-menu-item {
+  padding: 2px 10px; font-size: 12px; color: #000; cursor: pointer;
+  font-family: 'Courier New', monospace; letter-spacing: 0.5px;
+}
+.sierra-menu-item:hover { background: #000080; color: #fff; }
+.sierra-menu-title {
+  margin-left: auto; font-size: 11px; color: #444; letter-spacing: 1px;
+}
+/* Main canvas area */
+.rpg-viewport {
+  flex: 1; position: relative; overflow: hidden; background: #000;
+}
+.rpg-viewport canvas {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  image-rendering: pixelated; image-rendering: crisp-edges;
+}
+/* CRT scanline overlay */
+.rpg-viewport::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    transparent 0px, transparent 2px,
+    rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px
+  );
+  pointer-events: none; z-index: 1;
+}
+/* Vignette */
+.rpg-viewport::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.4) 100%);
+  pointer-events: none; z-index: 1;
+}
+/* Sierra status bar */
+.sierra-status {
+  display: none;
+}
+.sierra-status-score { font-weight: bold; }
+/* Dialogue overlay */
+.rpg-dialogue-overlay {
+  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+  width: min(640px, calc(100% - 32px)); z-index: 10;
+  display: none;
+}
+.rpg-dialogue-overlay.active { display: block; }
+.rpg-dialogue-box {
+  background: #1a1a2e; border: 3px solid #c0a060;
+  box-shadow: inset 0 0 0 1px #2a2a4a, 0 4px 24px rgba(0,0,0,0.7);
+  padding: 14px 18px; min-height: 80px;
+}
+.rpg-dialogue-speaker {
+  font-size: 11px; color: #c0a060; text-transform: uppercase;
+  letter-spacing: 2px; margin-bottom: 6px; font-weight: bold;
+}
+.rpg-dialogue-text {
+  font-family: 'Shippori Mincho', serif; font-size: 16px; line-height: 1.7;
+  color: #e0d8c8; min-height: 1.7em;
+}
+.rpg-dialogue-text .wt, .rpg-dialogue-text [data-rt] { cursor: pointer; }
+.rpg-dialogue-text .w-active { background: rgba(180,160,100,0.25); border-radius: 2px; }
+.rpg-dialogue-prompt {
+  font-size: 10px; color: #6a6a8a; margin-top: 8px;
+  text-align: right; letter-spacing: 1px;
+}
+/* Dialogue input mode */
+.rpg-dialogue-input-area {
+  display: none; margin-top: 8px; gap: 8px; align-items: flex-end;
+}
+.rpg-dialogue-input-area.active { display: flex; }
+.rpg-dialogue-input {
+  flex: 1; background: #12121e; border: 1px solid #3a3a5a; color: #e0d8c8;
+  padding: 8px 12px; border-radius: 2px;
+  font-family: 'Shippori Mincho', serif; font-size: 14px;
+  outline: none; resize: none; min-height: 36px;
+}
+.rpg-dialogue-input:focus { border-color: #5a5a8a; }
+.rpg-dialogue-input::placeholder { color: #3a3a5a; }
+.rpg-dialogue-send {
+  background: #2a2a3a; border: 1px solid #c0a060; color: #c0a060;
+  width: 36px; height: 36px; border-radius: 2px; cursor: pointer;
+  font-size: 14px; flex-shrink: 0;
+}
+.rpg-dialogue-send:hover { background: #3a3a5a; }
+/* Correction & breakdown in dialogue */
+.rpg-dialogue-correction {
+  font-size: 11px; color: #cc7744; padding: 4px 0; margin-top: 4px;
+  font-family: 'Courier New', monospace;
+}
+.rpg-dialogue-foot {
+  display: flex; gap: 6px; margin-top: 6px;
+}
+.rpg-dialogue-foot button {
+  background: #1a1a2a; border: 1px solid #3a3a5a; border-radius: 3px;
+  cursor: pointer; font-size: 11px; color: #9090a8; padding: 4px 10px;
+  font-family: 'Courier New', monospace;
+}
+.rpg-dialogue-foot button:hover { border-color: #5a5a7a; color: #c0a060; }
+/* Location label */
+.rpg-location-label {
+  position: absolute; top: 32px; left: 50%; transform: translateX(-50%);
+  font-size: 13px; color: #c0a060; letter-spacing: 2px;
+  text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+  font-family: 'Courier New', monospace; z-index: 5;
+  transition: opacity 0.3s; pointer-events: none;
+  text-transform: uppercase;
+}
+/* Interact prompt */
+.rpg-interact-prompt {
+  position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
+  font-size: 12px; color: #fff; background: rgba(0,0,0,0.85);
+  padding: 6px 18px; border: 1px solid #c0a060; border-radius: 2px;
+  font-family: 'Courier New', monospace; z-index: 5;
+  display: none; letter-spacing: 1px; white-space: nowrap;
+}
+.rpg-interact-prompt.active { display: block; }
+/* Description overlay (space to read) */
+.rpg-desc-overlay {
+  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+  width: min(640px, calc(100% - 32px)); z-index: 10; display: none;
+}
+.rpg-desc-overlay.active { display: block; }
+.rpg-desc-box {
+  background: #1a1a2e; border: 3px solid #5a5a8a;
+  box-shadow: inset 0 0 0 1px #2a2a4a, 0 4px 24px rgba(0,0,0,0.7);
+  padding: 14px 18px;
+}
+.rpg-desc-title {
+  font-size: 14px; color: #c0a060; font-family: 'Courier New', monospace;
+  letter-spacing: 1px; margin-bottom: 4px; font-weight: bold;
+}
+.rpg-desc-char {
+  font-size: 12px; color: #aaa0c0; font-family: 'Courier New', monospace;
+  margin-bottom: 8px; font-style: italic;
+}
+.rpg-desc-text {
+  font-family: 'Nunito Sans', sans-serif; font-size: 13px; line-height: 1.6;
+  color: #d0c8b8;
+}
+.rpg-desc-hint {
+  font-size: 10px; color: #6a6a8a; margin-top: 8px; text-align: right;
+  font-family: 'Courier New', monospace; letter-spacing: 1px;
+}
+/* Splitscreen scene view (replaces canvas during conversation) */
+.rpg-scene-view {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  display: none; z-index: 3;
+}
+.rpg-scene-view.active { display: flex; }
+.rpg-scene-view .rpg-scene-half {
+  width: 50%; height: 100%; position: relative; overflow: hidden;
+  background: #08080f;
+}
+.rpg-scene-view .rpg-scene-half > svg {
+  width: 100%; height: 100%; display: block;
+}
+.rpg-scene-view .rpg-scene-half::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(transparent 0px, transparent 2px, rgba(0,0,0,0.06) 2px, rgba(0,0,0,0.06) 4px);
+  pointer-events: none;
+}
+.rpg-scene-view .rpg-scene-half::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.35) 100%);
+  pointer-events: none;
+}
+.rpg-scene-view .rpg-scene-label {
+  position: absolute; top: 10px; left: 12px;
+  font-family: 'Courier New', monospace; font-size: 12px; color: #d0c890;
+  text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+  z-index: 2; letter-spacing: 1px;
+}
+.rpg-scene-view .rpg-chat-half {
+  width: 50%; height: 100%; display: flex; flex-direction: column;
+  background: #0a0a16; border-left: 2px solid #3a3a5a; overflow: hidden;
+}
+.rpg-scene-view .rpg-chat-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 14px; background: #0e0e1a; border-bottom: 1px solid #1a1a2a;
+  flex-shrink: 0;
+}
+.rpg-scene-view .rpg-chat-head .label {
+  color: #c0b080; font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.5px;
+}
+.rpg-scene-view .rpg-chat-head .btn {
+  background: #1a1a2a; border: 1px solid #3a3a5a; color: #8a8a9a;
+  font-size: 10px; padding: 3px 10px; border-radius: 2px; cursor: pointer;
+  font-family: 'Courier New', monospace;
+}
+.rpg-scene-view .rpg-chat-head .btn:hover { background: #2a2a3a; color: #c0b080; }
+.rpg-scene-view .rpg-chat-messages {
+  flex: 1; overflow-y: auto; padding: 12px 14px; scroll-behavior: smooth;
+}
+.rpg-scene-view .rpg-chat-input-area {
+  border-top: 1px solid #1a1a2a; padding: 8px 12px;
+  display: flex; gap: 8px; align-items: flex-end; background: #0a0a16; flex-shrink: 0;
+}
+.rpg-scene-view .rpg-chat-input {
+  flex: 1; background: #12121e; border: 1px solid #2a2a3a; color: #e0d8c8;
+  padding: 8px 12px; border-radius: 2px;
+  font-family: 'Shippori Mincho', serif; font-size: 14px;
+  outline: none; resize: none; min-height: 36px;
+}
+.rpg-scene-view .rpg-chat-input:focus { border-color: #4a4a6a; }
+.rpg-scene-view .rpg-chat-input::placeholder { color: #3a3a5a; }
+.rpg-scene-view .rpg-chat-send {
+  background: #2a2a3a; border: 1px solid #3a3a5a; color: #c0b080;
+  width: 36px; height: 36px; border-radius: 2px; cursor: pointer;
+  font-size: 14px; flex-shrink: 0;
+}
+.rpg-scene-view .rpg-chat-send:hover { background: #3a3a5a; }
+.rpg-scene-view .rpg-chat-tip {
+  font-size: 9px; color: #3a3a5a; padding: 4px 12px 8px;
+  background: #0a0a16; font-family: 'Courier New', monospace; flex-shrink: 0;
+}
+/* Explore button on scenario grid */
+.rpg-explore-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: #08080f; border: 2px solid #3a3a5a; color: #c0a060;
+  font-family: 'Courier New', monospace; font-size: 13px;
+  padding: 12px 24px; border-radius: 3px; cursor: pointer;
+  letter-spacing: 1px; margin: 16px auto; width: fit-content;
+  transition: all 0.2s;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+.rpg-explore-btn:hover { background: #12121e; border-color: #5a5a7a; color: #d0b870; }
+.rpg-explore-btn .pixel-icon {
+  width: 20px; height: 20px; image-rendering: pixelated;
+}
+
 /* Spinner */
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin {
@@ -974,6 +1216,55 @@ pre.code {
     <input type="checkbox" id="sierraToggle" onchange="S.sierraMode=this.checked;localStorage.setItem('renshuu_sierra_mode',this.checked);if(S.mode==='roleplay')renderRoleplay()" />
     Sierra RPG mode <span style="font-size:9px;color:var(--muted)">(pixel art scenes)</span>
   </label>
+</div>
+
+<!-- RPG World Overlay -->
+<div id="rpgWorld">
+  <div class="sierra-menu">
+    <span class="sierra-menu-item" onclick="rpgExit()">Exit</span>
+    <span class="sierra-menu-item" onclick="rpgToggleSpeed()">Speed</span>
+    <span class="sierra-menu-item" onclick="rpgReset()">Reset</span>
+    <span class="sierra-menu-title">練習 RPG — 日本の町</span>
+  </div>
+  <div class="rpg-viewport" id="rpgViewport">
+    <canvas id="rpgCanvas"></canvas>
+    <div class="rpg-location-label" id="rpgLocationLabel"></div>
+    <div class="rpg-interact-prompt" id="rpgInteract">SPACE info · ENTER talk</div>
+    <!-- Description overlay (space to preview) -->
+    <div class="rpg-desc-overlay" id="rpgDescOverlay">
+      <div class="rpg-desc-box">
+        <div class="rpg-desc-title" id="rpgDescTitle"></div>
+        <div class="rpg-desc-char" id="rpgDescChar"></div>
+        <div class="rpg-desc-text" id="rpgDescText"></div>
+        <div class="rpg-desc-hint">ENTER to talk · ESC to close</div>
+      </div>
+    </div>
+    <!-- Splitscreen scene view (replaces canvas during conversation) -->
+    <div class="rpg-scene-view" id="rpgSceneView">
+      <div class="rpg-scene-half" id="rpgSceneHalf">
+        <div class="rpg-scene-label" id="rpgSceneLabel"></div>
+      </div>
+      <div class="rpg-chat-half">
+        <div class="rpg-chat-head">
+          <div class="label" id="rpgChatCharName"></div>
+          <button class="btn" onclick="rpgLeaveChat()">← Back to town</button>
+        </div>
+        <div class="rpg-chat-messages" id="rpgChatMessages"></div>
+        <div class="rpg-chat-input-area">
+          <textarea class="rpg-chat-input" id="rpgChatInput" rows="1"
+            placeholder="日本語か romaji で…"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();rpgSendChatMsg()}"
+          ></textarea>
+          <button class="rpg-chat-send" onclick="rpgSendChatMsg()">→</button>
+        </div>
+        <div class="rpg-chat-tip">Enter to send · Shift+Enter for new line · ESC to leave</div>
+      </div>
+    </div>
+  </div>
+  <div class="sierra-status">
+    <span id="rpgScore">Score: 0 of 100</span>
+    <span id="rpgStatusMsg">Use arrow keys to walk. Approach characters to talk.</span>
+  </div>
 </div>
 
 <div class="layout" id="layout">
@@ -3568,6 +3859,10 @@ function renderRoleplay() {
 
   m.innerHTML = `
     <div>
+      <button class="rpg-explore-btn" onclick="rpgLaunch()">
+        <span style="font-size:18px">🗺</span> Explore Town — 町を探検する
+      </button>
+
       ${favScenarios.length ? `
         <div class="sc-section-head">
           <div class="label">★ Favorites</div>
@@ -4821,6 +5116,1342 @@ function renderStoryCard() {
     </div>
   `;
 }
+// ── RPG WORLD ENGINE ─────────────────────────────────────────────────────────
+// Sierra-style overworld: canvas-based, 320×200 virtual resolution scaled up
+(function() {
+  const VIRT_W = 320, VIRT_H = 200;
+  const TILE = 8; // 8px tiles in virtual space
+  const MAP_W = 80, MAP_H = 50; // map in tiles (640×400 pixels → scaled to 320×200)
+  // But we render at 320×200 and let CSS scale
+
+  // ── Player sprite (16×24 with walk frames) ──
+  // 4 directions × 3 frames (stand, walk1, walk2)
+  // Encoded as pixel rows: S=skin, H=hair, B=shirt(blue), P=pants, s=shoe, .=transparent
+  // ── Player sprite — dark hair, glasses, stubble, charcoal blazer ──
+  // G=glasses frame, J=stubble/jaw, B=blazer, b=black shirt
+  const PLAYER_FRAMES = {
+    down: [
+      [
+        '......HHHH......',
+        '....HHHHHHHHH...',
+        '....HSSSSSSH....',
+        '....HSGGSGGSH...',
+        '....HGEEGGEGH...',
+        '....HGSSGSSGH...',
+        '....HSSSSnSSH...',
+        '....HJJJJJJH....',
+        '....HJJmmJJH....',
+        '....HJJJJJJH....',
+        '.....JJJJJJ.....',
+        '....BBbbbbBB....',
+        '....BBBBBBBB....',
+        '...BBBBBBBBBB...',
+        '...BBBBBBBBBB...',
+        '....BBBBBBBB....',
+        '....BBbbbbBB....',
+        '....PPPPPPPP....',
+        '....PPPPPPPP....',
+        '....PPPPPPPP....',
+        '....PP....PP....',
+        '....PP....PP....',
+        '...sss...sss....',
+        '...sss...sss....',
+      ],
+      [
+        '......HHHH......',
+        '....HHHHHHHHH...',
+        '....HSSSSSSH....',
+        '....HSGGSGGSH...',
+        '....HGEEGGEGH...',
+        '....HGSSGSSGH...',
+        '....HSSSSnSSH...',
+        '....HJJJJJJH....',
+        '....HJJmmJJH....',
+        '....HJJJJJJH....',
+        '.....JJJJJJ.....',
+        '....BBbbbbBB....',
+        '....BBBBBBBB....',
+        '...BBBBBBBBBB...',
+        '...BBBBBBBBBB...',
+        '....BBBBBBBB....',
+        '....BBbbbbBB....',
+        '....PPPPPPPP....',
+        '...PPP....PP....',
+        '..PPP.....PP....',
+        '..PP......PP....',
+        '..sss.....PP....',
+        '..sss....sss....',
+        '.........sss....',
+      ],
+      [
+        '......HHHH......',
+        '....HHHHHHHHH...',
+        '....HSSSSSSH....',
+        '....HSGGSGGSH...',
+        '....HGEEGGEGH...',
+        '....HGSSGSSGH...',
+        '....HSSSSnSSH...',
+        '....HJJJJJJH....',
+        '....HJJmmJJH....',
+        '....HJJJJJJH....',
+        '.....JJJJJJ.....',
+        '....BBbbbbBB....',
+        '....BBBBBBBB....',
+        '...BBBBBBBBBB...',
+        '...BBBBBBBBBB...',
+        '....BBBBBBBB....',
+        '....BBbbbbBB....',
+        '....PPPPPPPP....',
+        '....PP....PPP...',
+        '....PP.....PPP..',
+        '....PP......PP..',
+        '....PP.....sss..',
+        '....sss....sss..',
+        '....sss.........',
+      ],
+    ],
+    up: [
+      [
+        '......HHHH......',
+        '....HHHHHHHHH...',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '.....HHHHHH.....',
+        '....BBBBBBBB....',
+        '....BBBBBBBB....',
+        '...BBBBBBBBBB...',
+        '...BBBBBBBBBB...',
+        '....BBBBBBBB....',
+        '....BBBBBBBB....',
+        '....PPPPPPPP....',
+        '....PPPPPPPP....',
+        '....PPPPPPPP....',
+        '....PP....PP....',
+        '....PP....PP....',
+        '...sss...sss....',
+        '...sss...sss....',
+      ],
+      [
+        '......HHHH......',
+        '....HHHHHHHHH...',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '.....HHHHHH.....',
+        '....BBBBBBBB....',
+        '....BBBBBBBB....',
+        '...BBBBBBBBBB...',
+        '...BBBBBBBBBB...',
+        '....BBBBBBBB....',
+        '....BBBBBBBB....',
+        '....PPPPPPPP....',
+        '...PPP....PP....',
+        '..PPP.....PP....',
+        '..PP......PP....',
+        '..sss.....PP....',
+        '..sss....sss....',
+        '.........sss....',
+      ],
+      [
+        '......HHHH......',
+        '....HHHHHHHHH...',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '.....HHHHHH.....',
+        '....BBBBBBBB....',
+        '....BBBBBBBB....',
+        '...BBBBBBBBBB...',
+        '...BBBBBBBBBB...',
+        '....BBBBBBBB....',
+        '....BBBBBBBB....',
+        '....PPPPPPPP....',
+        '....PP....PPP...',
+        '....PP.....PPP..',
+        '....PP......PP..',
+        '....PP.....sss..',
+        '....sss....sss..',
+        '....sss.........',
+      ],
+    ],
+    left: [
+      [
+        '......HHHH......',
+        '....HHHHHHHH....',
+        '....HSSSGHH.....',
+        '....HSSSSGH.....',
+        '....HGEESGH.....',
+        '....HG.SSGH.....',
+        '....HSSSnSH.....',
+        '....HJJJJH......',
+        '....HJmJJH......',
+        '....HJJJJH......',
+        '....JJJJJJ......',
+        '....bBBBBBB.....',
+        '....BBBBBBB.....',
+        '...BBBBBBBBB....',
+        '...BBBBBBBBB....',
+        '....BBBBBBB.....',
+        '....BBBBBBB.....',
+        '....PPPPPPP.....',
+        '....PPPPPPP.....',
+        '....PPPPPPP.....',
+        '....PPP.PPP.....',
+        '....PPP.PPP.....',
+        '...sss..sss.....',
+        '...sss..sss.....',
+      ],
+      [
+        '......HHHH......',
+        '....HHHHHHHH....',
+        '....HSSSGHH.....',
+        '....HSSSSGH.....',
+        '....HGEESGH.....',
+        '....HG.SSGH.....',
+        '....HSSSnSH.....',
+        '....HJJJJH......',
+        '....HJmJJH......',
+        '....HJJJJH......',
+        '....JJJJJJ......',
+        '....bBBBBBB.....',
+        '....BBBBBBB.....',
+        '...BBBBBBBBB....',
+        '...BBBBBBBBB....',
+        '....BBBBBBB.....',
+        '....BBBBBBB.....',
+        '...PPPPPPPP.....',
+        '..PPPPPPPP......',
+        '..PPPP.PPP......',
+        '..sss..PPP......',
+        '..sss..sss......',
+        '.......sss......',
+        '................',
+      ],
+      [
+        '......HHHH......',
+        '....HHHHHHHH....',
+        '....HSSSGHH.....',
+        '....HSSSSGH.....',
+        '....HGEESGH.....',
+        '....HG.SSGH.....',
+        '....HSSSnSH.....',
+        '....HJJJJH......',
+        '....HJmJJH......',
+        '....HJJJJH......',
+        '....JJJJJJ......',
+        '....bBBBBBB.....',
+        '....BBBBBBB.....',
+        '...BBBBBBBBB....',
+        '...BBBBBBBBB....',
+        '....BBBBBBB.....',
+        '....BBBBBBB.....',
+        '....PPPPPPPP....',
+        '....PPPPPPPP....',
+        '....PPP.PPPP....',
+        '....PPP..sss....',
+        '....sss..sss....',
+        '....sss.........',
+        '................',
+      ],
+    ],
+    right: [
+      [
+        '......HHHH......',
+        '......HHHHHHHH..',
+        '.....HHGSSSSH...',
+        '.....HGSSSSH....',
+        '.....HGSEEGH....',
+        '.....HGSS.GH....',
+        '.....HSnSSSH....',
+        '......HJJJJH....',
+        '......HJJmJH....',
+        '......HJJJJH....',
+        '......JJJJJJ....',
+        '.....BBBBBBb....',
+        '.....BBBBBBB....',
+        '....BBBBBBBBB...',
+        '....BBBBBBBBB...',
+        '.....BBBBBBB....',
+        '.....BBBBBBB....',
+        '.....PPPPPPP....',
+        '.....PPPPPPP....',
+        '.....PPPPPPP....',
+        '.....PPP.PPP....',
+        '.....PPP.PPP....',
+        '.....sss..sss...',
+        '.....sss..sss...',
+      ],
+      [
+        '......HHHH......',
+        '......HHHHHHHH..',
+        '.....HHGSSSSH...',
+        '.....HGSSSSH....',
+        '.....HGSEEGH....',
+        '.....HGSS.GH....',
+        '.....HSnSSSH....',
+        '......HJJJJH....',
+        '......HJJmJH....',
+        '......HJJJJH....',
+        '......JJJJJJ....',
+        '.....BBBBBBb....',
+        '.....BBBBBBB....',
+        '....BBBBBBBBB...',
+        '....BBBBBBBBB...',
+        '.....BBBBBBB....',
+        '.....BBBBBBB....',
+        '.....PPPPPPPP...',
+        '......PPPPPPPP..',
+        '......PPP.PPPP..',
+        '......PPP..sss..',
+        '......sss..sss..',
+        '.......sss......',
+        '................',
+      ],
+      [
+        '......HHHH......',
+        '......HHHHHHHH..',
+        '.....HHGSSSSH...',
+        '.....HGSSSSH....',
+        '.....HGSEEGH....',
+        '.....HGSS.GH....',
+        '.....HSnSSSH....',
+        '......HJJJJH....',
+        '......HJJmJH....',
+        '......HJJJJH....',
+        '......JJJJJJ....',
+        '.....BBBBBBb....',
+        '.....BBBBBBB....',
+        '....BBBBBBBBB...',
+        '....BBBBBBBBB...',
+        '.....BBBBBBB....',
+        '.....BBBBBBB....',
+        '....PPPPPPPP....',
+        '....PPPPPPPP....',
+        '....PPPP.PPP....',
+        '....sss..PPP....',
+        '....sss..sss....',
+        '.........sss....',
+        '................',
+      ],
+    ],
+  };
+
+  const PLAYER_COLORS = {
+    '.': null,
+    'S': '#E8C098',   // fair skin
+    'H': '#2A1808',   // dark brown hair
+    'G': '#6B4226',   // tortoiseshell glasses
+    'E': '#1A0800',   // eyes
+    'n': '#C88860',   // nose
+    'm': '#8B4040',   // mouth
+    'J': '#C8A070',   // stubble/jaw
+    'B': '#3A3A42',   // charcoal blazer
+    'b': '#1A1A22',   // black shirt
+    'P': '#2A2A3A',   // dark pants
+    's': '#1A1A1A',   // black shoes
+  };
+
+  // ── Town map (rendered as colored rectangles on canvas) ──
+  // Ground layer + buildings + decorations
+  // Map is 320×200 virtual pixels
+  // ── Zone-based world: each zone is one 320×200 screen ──
+  // Zone 0 = favorites, zone -1 = can't go further left
+  // Walking right generates new zones from scenario pool.
+
+  // Building slot templates — 4 top slots, 4 bottom slots per zone
+  // Each slot: { x, y, w, h } for the building footprint
+  const BSLOTS_TOP = [
+    { x: 8,   y: 72, w: 50, h: 38 },
+    { x: 68,  y: 74, w: 56, h: 36 },
+    { x: 182, y: 74, w: 52, h: 36 },
+    { x: 248, y: 70, w: 60, h: 40 },
+  ];
+  const BSLOTS_BOT = [
+    { x: 10,  y: 142, w: 48, h: 36 },
+    { x: 68,  y: 142, w: 48, h: 36 },
+    { x: 182, y: 142, w: 52, h: 36 },
+    { x: 248, y: 142, w: 64, h: 40 },
+  ];
+  const NPC_TOP_Y = 108, NPC_BOT_Y = 135;
+
+  // Building color palettes (randomized per building)
+  const BLDG_PALETTES = [
+    { fill: '#3A2A1A', roof: '#8A2020' },  // dark wood / red roof
+    { fill: '#C8B898', roof: '#5A4830' },  // beige / brown roof
+    { fill: '#E8E8DD', roof: '#228844' },  // white / green roof
+    { fill: '#D8C8A0', roof: '#4A3A2A' },  // cream / dark roof
+    { fill: '#5A4038', roof: '#3A2A1A' },  // dark brown
+    { fill: '#C8B080', roof: '#6A5030' },  // tan / brown
+    { fill: '#2A1A0A', roof: '#1A1008' },  // very dark (izakaya)
+    { fill: '#D0C0A0', roof: '#6A4A30' },  // light wood
+    { fill: '#B8A888', roof: '#4A3A28' },  // stone
+    { fill: '#E0D0B0', roof: '#3A6828' },  // pale / green roof
+  ];
+
+  // Shared backdrop elements (sky, ground, road) for any zone
+  function baseBackdrop(seed) {
+    // Use seed to vary mountains/clouds slightly
+    const mOff = (seed * 37) % 40;
+    return [
+      { x: 0, y: 0, w: 320, h: 70, fill: '#4A78AA', type: 'sky' },
+      { x: (0 + mOff) % 60, y: 30, w: 60, h: 40, fill: '#5A7A5A', type: 'mountain' },
+      { x: (40 + mOff) % 320, y: 20, w: 80, h: 50, fill: '#4A6A4A', type: 'mountain' },
+      { x: (130 + mOff) % 320, y: 35, w: 50, h: 35, fill: '#5A7A5A', type: 'mountain' },
+      { x: (200 + mOff * 2) % 320, y: 25, w: 70, h: 45, fill: '#4A6A4A', type: 'mountain' },
+      { x: (260 + mOff) % 320, y: 35, w: 70, h: 35, fill: '#5A8A5A', type: 'mountain' },
+      { x: (50 + mOff * 3) % 280, y: 10, w: 30, h: 8, fill: '#C8D8E8', type: 'cloud' },
+      { x: (55 + mOff * 3) % 280, y: 8, w: 20, h: 6, fill: '#D8E8F8', type: 'cloud' },
+      { x: (180 + mOff * 2) % 300, y: 14, w: 24, h: 7, fill: '#C8D8E8', type: 'cloud' },
+      { x: 0, y: 70, w: 320, h: 130, fill: '#8A7858', type: 'ground' },
+      { x: 0, y: 115, w: 320, h: 24, fill: '#6A6A5A', type: 'road' },
+      { x: 0, y: 126, w: 320, h: 2, fill: '#8A8A6A', type: 'road_line' },
+      // Vertical side road (varied position)
+      { x: 148, y: 70, w: 24, h: 130, fill: '#6A6A5A', type: 'road' },
+      { x: 159, y: 70, w: 2, h: 130, fill: '#8A8A6A', type: 'road_line' },
+      // Grass
+      { x: 0, y: 70, w: 148, h: 45, fill: '#4A7838', type: 'grass' },
+      { x: 172, y: 70, w: 148, h: 45, fill: '#4A7838', type: 'grass' },
+      { x: 0, y: 139, w: 148, h: 61, fill: '#4A7838', type: 'grass' },
+      { x: 172, y: 139, w: 148, h: 61, fill: '#4A7838', type: 'grass' },
+      // Street lamps
+      { x: 46, y: 108, w: 2, h: 12, fill: '#4A4A4A', type: 'decor' },
+      { x: 44, y: 106, w: 6, h: 3, fill: '#CCCC88', type: 'decor' },
+      { x: 135, y: 108, w: 2, h: 12, fill: '#4A4A4A', type: 'decor' },
+      { x: 133, y: 106, w: 6, h: 3, fill: '#CCCC88', type: 'decor' },
+      { x: 240, y: 108, w: 2, h: 12, fill: '#4A4A4A', type: 'decor' },
+      { x: 238, y: 106, w: 6, h: 3, fill: '#CCCC88', type: 'decor' },
+      // Vending machine
+      { x: 175, y: 108, w: 6, h: 10, fill: '#2244AA', type: 'decor' },
+      { x: 176, y: 109, w: 4, h: 4, fill: '#AACCEE', type: 'decor' },
+    ];
+  }
+
+  // Generate a zone from a list of scenarios (up to 8)
+  function buildZone(scenarios, zoneIdx, zoneName) {
+    const buildings = [...baseBackdrop(zoneIdx)];
+    const npcs = [];
+    const collisions = [
+      { x: -10, y: -10, w: 340, h: 12 },  // top
+      { x: -10, y: 195, w: 340, h: 20 },  // bottom
+      { x: 175, y: 108, w: 6, h: 10 },    // vending machine
+      // No left/right walls — allow zone transitions
+    ];
+    const slots = [...BSLOTS_TOP, ...BSLOTS_BOT];
+    const npcYs = [NPC_TOP_Y, NPC_TOP_Y, NPC_TOP_Y, NPC_TOP_Y, NPC_BOT_Y, NPC_BOT_Y, NPC_BOT_Y, NPC_BOT_Y];
+    const npcDirs = ['down','down','down','down','up','up','up','up'];
+
+    scenarios.forEach((sc, i) => {
+      if (i >= 8) return;
+      const slot = slots[i];
+      const pal = BLDG_PALETTES[(zoneIdx * 3 + i * 7) % BLDG_PALETTES.length];
+      const isBottom = i >= 4;
+      const isPark = i === 7; // last bottom-right slot can be a park
+
+      if (isPark && sc) {
+        buildings.push({ x: slot.x, y: slot.y, w: slot.w, h: slot.h, fill: '#3A6828', type: 'park',
+          label: sc.jp, scenarioId: sc.id });
+        // Cherry tree
+        buildings.push({ x: slot.x + 20, y: slot.y - 2, w: 20, h: 16, fill: '#DD88AA', type: 'decor' });
+        buildings.push({ x: slot.x + 22, y: slot.y - 4, w: 16, h: 8, fill: '#EE99BB', type: 'decor' });
+        buildings.push({ x: slot.x + 28, y: slot.y + 14, w: 4, h: 16, fill: '#5A3A20', type: 'decor' });
+      } else if (sc) {
+        buildings.push({ x: slot.x, y: slot.y, w: slot.w, h: slot.h, fill: pal.fill, type: 'building',
+          roof: pal.roof, door: { x: slot.x + Math.floor(slot.w/2) - 6, y: slot.y + slot.h - 10, w: 12, h: 10 },
+          label: sc.jp, scenarioId: sc.id });
+      }
+
+      // Collision for building
+      if (sc) {
+        collisions.push({ x: slot.x, y: slot.y - (slot.y < 115 ? 4 : 0), w: slot.w, h: slot.h + (slot.y < 115 ? 4 : 0) });
+      }
+
+      // NPC
+      if (sc) {
+        const npcX = slot.x + Math.floor(slot.w / 2);
+        const npcY = npcYs[i];
+        // Extract character name only — never show descriptions
+        let charName = '';
+        if (sc.char) {
+          const before = sc.char.split(',')[0].trim();
+          // Only use it if it looks like a name (short, contains -san/-kun/-chan/etc or is capitalized name)
+          if (before.length <= 18 && !before.startsWith('A ') && !before.startsWith('An ') && !before.startsWith('The ')) {
+            charName = before;
+          }
+        }
+        if (!charName) charName = sc.jp; // fall back to Japanese place name
+        npcs.push({ x: npcX, y: npcY, scenarioId: sc.id, dir: npcDirs[i], label: charName });
+      }
+    });
+
+    return { buildings, npcs, collisions, name: zoneName || `Zone ${zoneIdx}` };
+  }
+
+  // ── Gather scenarios for zone 0 (favorites first) ──
+  function buildZone0() {
+    const favs = [...S.favorites];
+    // Fill remaining slots with hardcoded scenarios not in favorites
+    const favIds = new Set(favs.map(f => f.id));
+    const defaults = ['ramen_ichi','sento','konbini3','temple','kissa','furuhon','izakaya','hanami'];
+    const fillers = defaults.filter(id => !favIds.has(id)).map(id => SCENARIO_POOL.find(s => s.id === id)).filter(Boolean);
+    const allSc = [...favs, ...fillers].slice(0, 8);
+    const zone = buildZone(allSc, 0, '★ お気に入り通り — Favorites Street');
+    // Mark favorite buildings and NPCs
+    zone.buildings.forEach(b => { if (b.scenarioId && favIds.has(b.scenarioId)) b.isFav = true; });
+    zone.npcs.forEach(n => { if (favIds.has(n.scenarioId)) n.isFav = true; });
+    return zone;
+  }
+
+  // Build zone N (N >= 1) from remaining scenario pool
+  function buildZoneN(n) {
+    // Gather all scenarios not already used in other zones
+    const usedIds = new Set();
+    Object.values(rpg.zones).forEach(z => {
+      z.npcs.forEach(npc => usedIds.add(npc.scenarioId));
+    });
+    // Combine pool + generated scenarios, skip used
+    const pool = [...SCENARIO_POOL, ...S.scenarios].filter(s => !usedIds.has(s.id));
+    // Shuffle deterministically based on zone index
+    const shuffled = [...pool];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.abs((n * 7919 + i * 31) % (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    const zoneSc = shuffled.slice(0, 8);
+    const streetNames = [
+      '桜通り — Sakura Street', '神社通り — Shrine Avenue', '夜市 — Night Market',
+      '港町 — Harbor District', '下町 — Shitamachi', '学生街 — Student Quarter',
+      '温泉通り — Onsen Road', '商店街 — Shopping Arcade', '裏路地 — Back Alley',
+      '祭り通り — Festival Lane',
+    ];
+    return buildZone(zoneSc, n, streetNames[(n - 1) % streetNames.length]);
+  }
+
+  // Get or create zone
+  function getZone(idx) {
+    if (!rpg.zones[idx]) {
+      rpg.zones[idx] = idx === 0 ? buildZone0() : buildZoneN(idx);
+    }
+    return rpg.zones[idx];
+  }
+
+  // Current zone accessor
+  function currentZone() { return getZone(rpg.zoneIdx); }
+
+  // ── RPG Game State ──
+  const rpg = {
+    active: false,
+    canvas: null,
+    ctx: null,
+    player: { x: 160, y: 126, dir: 'down', frame: 0, walking: false, speed: 1.5 },
+    keys: {},
+    walkTimer: 0,
+    animFrame: 0,
+    nearNpc: null,
+    inDialogue: false,
+    showingDesc: false,
+    dialogueState: null,
+    score: 0,
+    zoneIdx: 0,
+    zones: {},  // cached zone data by index
+    speedMultiplier: 1,
+    npcSprites: {},
+  };
+
+  // ── Render an NPC sprite from scenario data ──
+  function renderNpcToImageData(sc) {
+    if (!sc?.voice) return null;
+    const baseType = VOICE_SPRITE_MAP[sc.voice] || 'adult_male';
+    const sp = CHAR_SPRITES[baseType];
+    const acc = inferAccessory(sc);
+    let mod = {};
+    if (acc === 'chef_hat') {
+      mod = baseType === 'mature_male'
+        ? {hatRows:['....KKKKKKKK....','...KKSSSSSSSKK..'], hatColor:'#F0F0F0', hatHl:'#D8D8D8'}
+        : {hatRows:['..KKKKKKKKKKKK..','..KSSSSSSSSSSK..'], hatColor:'#F0F0F0', hatHl:'#D8D8D8'};
+    } else if (acc) {
+      mod = ACCESSORY_KIT[acc] || {};
+    }
+    let rows = [...sp.pixels];
+    if (mod.hatRows) { rows[0] = mod.hatRows[0]; rows[1] = mod.hatRows[1]; }
+    const cm = {
+      '.':null,'S':'#EFC090','s':'#C89060',
+      'H':sp.hair,'h':sp.hairHl,
+      'K':mod.hatColor||sp.hair,'k':mod.hatHl||sp.hairHl,
+      'E':'#1A0800','W':'#F8F8F8','m':'#8B3030','n':'#D09060',
+      'B':sp.shirt,'b':sp.shirtHl,
+    };
+    return { rows, cm, overlay: mod.overlay || [] };
+  }
+
+  // ── Draw a pixel sprite on canvas ──
+  // ── Crisp pixel text — no anti-aliasing ──
+  const _txtCache = {};
+  function drawCrispText(ctx, text, cx, cy, font, hexColor) {
+    const key = text + '|' + font + '|' + hexColor;
+    if (!_txtCache[key]) {
+      const tmp = document.createElement('canvas');
+      const tc = tmp.getContext('2d');
+      tc.font = font;
+      const m = tc.measureText(text);
+      const w = Math.ceil(m.width) + 2;
+      const h = parseInt(font) + 4;
+      tmp.width = w; tmp.height = h;
+      tc.font = font;
+      tc.fillStyle = hexColor;
+      tc.textBaseline = 'top';
+      tc.fillText(text, 1, 1);
+      // Threshold — snap to fully opaque or fully transparent
+      const img = tc.getImageData(0, 0, w, h);
+      const d = img.data;
+      const r = parseInt(hexColor.slice(1,3),16)||255;
+      const g = parseInt(hexColor.slice(3,5),16)||255;
+      const b = parseInt(hexColor.slice(5,7),16)||255;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i+3] > 100) { d[i]=r; d[i+1]=g; d[i+2]=b; d[i+3]=255; }
+        else { d[i]=0; d[i+1]=0; d[i+2]=0; d[i+3]=0; }
+      }
+      tc.putImageData(img, 0, 0);
+      _txtCache[key] = tmp;
+    }
+    const bmp = _txtCache[key];
+    ctx.drawImage(bmp, Math.round(cx - bmp.width / 2), Math.round(cy));
+  }
+
+  function drawPixelSprite(ctx, data, x, y, scale) {
+    if (!data) return;
+    const { rows, cm, overlay } = data;
+    rows.forEach((row, ry) => {
+      [...row].forEach((ch, rx) => {
+        const c = cm[ch];
+        if (c) {
+          ctx.fillStyle = c;
+          ctx.fillRect(Math.floor(x + rx * scale), Math.floor(y + ry * scale), scale, scale);
+        }
+      });
+    });
+    overlay.forEach(({ x: ox, y: oy, c }) => {
+      ctx.fillStyle = c;
+      ctx.fillRect(Math.floor(x + ox * scale), Math.floor(y + oy * scale), scale, scale);
+    });
+  }
+
+  // ── Draw player sprite ──
+  function drawPlayer(ctx) {
+    const p = rpg.player;
+    const frames = PLAYER_FRAMES[p.dir];
+    const frameIdx = p.walking ? (rpg.animFrame % 2) + 1 : 0;
+    const frame = frames[frameIdx];
+    const scale = 1; // 1:1 in virtual pixels (16×24 sprite)
+    const drawX = p.x - 8; // center sprite
+    const drawY = p.y - 20; // feet at player position
+    frame.forEach((row, ry) => {
+      [...row].forEach((ch, rx) => {
+        const c = PLAYER_COLORS[ch];
+        if (c) {
+          ctx.fillStyle = c;
+          ctx.fillRect(Math.floor(drawX + rx * scale), Math.floor(drawY + ry * scale), scale, scale);
+        }
+      });
+    });
+  }
+
+  // ── Draw the town map ──
+  function drawMap(ctx) {
+    // Clear
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, VIRT_W, VIRT_H);
+
+    // Draw all map elements
+    const zone = currentZone();
+    zone.buildings.forEach(b => {
+      ctx.fillStyle = b.fill;
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+
+      // Building roofs
+      if (b.roof) {
+        ctx.fillStyle = b.roof;
+        ctx.fillRect(b.x - 2, b.y - 4, b.w + 4, 6);
+      }
+
+      // Doors
+      if (b.door) {
+        ctx.fillStyle = '#2A1A0A';
+        ctx.fillRect(b.door.x, b.door.y, b.door.w, b.door.h);
+        // Door light
+        ctx.fillStyle = '#AA8844';
+        ctx.fillRect(b.door.x + 1, b.door.y + 1, b.door.w - 2, b.door.h - 2);
+      }
+
+      // Windows for buildings
+      if (b.type === 'building' && b.w >= 40) {
+        // Favorite buildings get warm golden windows
+        const winColor = b.isFav ? '#DDAA44' : '#6088AA';
+        const winGlow  = b.isFav ? '#FFCC66' : '#88AACC';
+        ctx.fillStyle = winColor;
+        ctx.fillRect(b.x + 4, b.y + 8, 8, 8);
+        ctx.fillRect(b.x + b.w - 12, b.y + 8, 8, 8);
+        ctx.fillStyle = winGlow;
+        ctx.fillRect(b.x + 5, b.y + 9, 6, 6);
+        ctx.fillRect(b.x + b.w - 11, b.y + 9, 6, 6);
+        ctx.fillStyle = '#4A3A2A';
+        ctx.fillRect(b.x + 7, b.y + 8, 2, 8);
+        ctx.fillRect(b.x + b.w - 9, b.y + 8, 2, 8);
+      }
+
+      // Favorite glow border — pulsing golden outline
+      if (b.isFav && (b.type === 'building' || b.type === 'park')) {
+        const pulse = Math.sin(Date.now() / 400) * 0.25 + 0.75;
+        // Outer glow (dithered golden pixels)
+        ctx.fillStyle = '#FFCC44';
+        ctx.globalAlpha = pulse * 0.5;
+        for (let gx = -2; gx < b.w + 2; gx += 2) {
+          ctx.fillRect(b.x + gx, b.y - 2, 1, 1);
+          ctx.fillRect(b.x + gx, b.y + b.h + 1, 1, 1);
+        }
+        for (let gy = -2; gy < b.h + 2; gy += 2) {
+          ctx.fillRect(b.x - 2, b.y + gy, 1, 1);
+          ctx.fillRect(b.x + b.w + 1, b.y + gy, 1, 1);
+        }
+        // Solid inner border
+        ctx.globalAlpha = pulse * 0.8;
+        // Top
+        ctx.fillRect(b.x - 1, b.y - 1, b.w + 2, 1);
+        // Bottom
+        ctx.fillRect(b.x - 1, b.y + b.h, b.w + 2, 1);
+        // Left
+        ctx.fillRect(b.x - 1, b.y - 1, 1, b.h + 2);
+        // Right
+        ctx.fillRect(b.x + b.w, b.y - 1, 1, b.h + 2);
+        ctx.globalAlpha = 1;
+      }
+    });
+
+    // Dithered shadows under buildings (Sierra-style)
+    zone.buildings.forEach(b => {
+      if (b.type !== 'building' && b.type !== 'park') return;
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      for (let sx = 0; sx < b.w + 6; sx += 2) {
+        for (let sy = 0; sy < 4; sy += 2) {
+          ctx.fillRect(b.x - 2 + sx, b.y + b.h + sy, 1, 1);
+        }
+      }
+    });
+
+    // Draw building labels — wooden sign style with crisp pixel text
+    const signFont = '8px monospace';
+    zone.buildings.forEach(b => {
+      if (!b.label) return;
+      ctx.font = signFont;
+      const labelText = b.isFav ? '★ ' + b.label : b.label;
+      const signY = Math.round(b.type === 'park' ? b.y + 2 : b.y - 12);
+      const tw = ctx.measureText(labelText).width;
+      const signW = Math.round(tw + 8);
+      const signX = Math.round(b.x + b.w / 2 - signW / 2);
+      // Sign board — golden tint for favorites
+      const signBg = b.isFav ? '#3A2A10' : '#3A2A18';
+      const signFg = b.isFav ? '#4A3820' : '#4A3A28';
+      const signHi = b.isFav ? '#5A4828' : '#5A4A38';
+      ctx.fillStyle = signBg;
+      ctx.fillRect(signX, signY, signW, 11);
+      ctx.fillStyle = signFg;
+      ctx.fillRect(signX + 1, signY + 1, signW - 2, 9);
+      ctx.fillStyle = signHi;
+      ctx.fillRect(signX + 1, signY + 1, signW - 2, 1);
+      // Crisp text — golden for favorites
+      const textColor = b.isFav ? '#FFD866' : '#F0E0C0';
+      drawCrispText(ctx, labelText, Math.round(b.x + b.w / 2), signY + 1, signFont, textColor);
+    });
+
+    // Draw zone transition arrows
+    ctx.fillStyle = '#C0A060';
+    ctx.font = 'bold 12px monospace';
+    // Right arrow — always show (infinite world)
+    ctx.textAlign = 'center';
+    const arrowPulse = Math.sin(Date.now() / 300) * 0.3 + 0.7;
+    ctx.globalAlpha = arrowPulse;
+    ctx.fillText('▶', 314, 128);
+    // Left arrow — only if not zone 0
+    if (rpg.zoneIdx > 0) {
+      ctx.fillText('◀', 6, 128);
+    }
+    ctx.globalAlpha = 1;
+
+    // Draw NPCs
+    zone.npcs.forEach(npc => {
+      const sc = findScenario(npc.scenarioId);
+      if (!sc) return;
+      const key = npc.scenarioId;
+      if (!rpg.npcSprites[key]) {
+        rpg.npcSprites[key] = renderNpcToImageData(sc);
+      }
+      const spriteData = rpg.npcSprites[key];
+      if (spriteData) {
+        drawPixelSprite(ctx, spriteData, npc.x - 8, npc.y - 14, 1);
+      }
+      // NPC name label — crisp pixel text
+      let nameText = npc.label.length > 16 ? npc.label.slice(0, 14) + '..' : npc.label;
+      if (npc.isFav) nameText = '★ ' + nameText;
+      const isNear = rpg.nearNpc === npc;
+      const npcFont = '7px monospace';
+      ctx.font = npcFont;
+      const tw = ctx.measureText(nameText).width + 6;
+      const labelY = Math.round(npc.y - 22);
+      const lx = Math.round(npc.x - tw/2);
+      // Background
+      ctx.fillStyle = isNear ? '#C0A060' : '#000000';
+      ctx.globalAlpha = isNear ? 0.9 : 0.7;
+      ctx.fillRect(lx, labelY, Math.round(tw), 10);
+      ctx.globalAlpha = 1;
+      // Border for nearby
+      if (isNear) {
+        ctx.strokeStyle = '#C0A060';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(lx, labelY, Math.round(tw), 10);
+      }
+      // Crisp text
+      const txtColor = isNear ? '#1A1008' : '#E8D8C0';
+      drawCrispText(ctx, nameText, Math.round(npc.x), labelY + 1, npcFont, txtColor);
+
+      // Show speech bubble indicator if there's a saved conversation
+      if (!rpg._convoCache) rpg._convoCache = loadAllConvos();
+      if (rpg._convoCache[npc.scenarioId]) {
+        const bx = Math.round(npc.x + 6);
+        const by = Math.round(npc.y - 18);
+        // Tiny speech bubble
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(bx, by, 5, 4);
+        ctx.fillRect(bx + 1, by + 4, 1, 1);
+        ctx.fillStyle = '#4488CC';
+        ctx.fillRect(bx + 1, by + 1, 3, 2);
+      }
+    });
+  }
+
+  // ── Find scenario by ID (from pool or generated) ──
+  function findScenario(id) {
+    return S.scenarios.find(s => s.id === id)
+      || S.favorites.find(s => s.id === id)
+      || SCENARIO_POOL.find(s => s.id === id);
+  }
+
+  // ── Collision detection ──
+  function canMove(nx, ny) {
+    // Player hitbox: 8×4 pixels at feet
+    const hx = nx - 4, hy = ny - 2, hw = 8, hh = 4;
+    for (const c of currentZone().collisions) {
+      if (hx < c.x + c.w && hx + hw > c.x && hy < c.y + c.h && hy + hh > c.y) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // ── Check if near an NPC ──
+  function checkNpcProximity() {
+    const p = rpg.player;
+    let closest = null;
+    let closestDist = 22; // interaction radius in virtual pixels
+    currentZone().npcs.forEach(npc => {
+      const dx = p.x - npc.x;
+      const dy = p.y - npc.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closest = npc;
+      }
+    });
+    rpg.nearNpc = closest;
+    const prompt = document.getElementById('rpgInteract');
+    if (closest && !rpg.inDialogue && !rpg.showingDesc) {
+      prompt.classList.add('active');
+    } else {
+      prompt.classList.remove('active');
+    }
+    // Hide description if we walk away
+    if (!closest && rpg.showingDesc) {
+      hideDescription();
+    }
+  }
+
+  // ── Show NPC description (Space key) ──
+  function showDescription(npc) {
+    const sc = findScenario(npc.scenarioId);
+    if (!sc) return;
+    rpg.showingDesc = true;
+    const overlay = document.getElementById('rpgDescOverlay');
+    document.getElementById('rpgDescTitle').textContent = sc.jp + ' — ' + sc.en;
+    document.getElementById('rpgDescChar').textContent = sc.char;
+    document.getElementById('rpgDescText').textContent = sc.ctx;
+    overlay.classList.add('active');
+    document.getElementById('rpgInteract').classList.remove('active');
+  }
+
+  function hideDescription() {
+    rpg.showingDesc = false;
+    document.getElementById('rpgDescOverlay').classList.remove('active');
+  }
+
+  // ── Game loop ──
+  function gameLoop() {
+    if (!rpg.active) return;
+    const ctx = rpg.ctx;
+
+    // Player movement
+    if (!rpg.inDialogue) {
+      let dx = 0, dy = 0;
+      const spd = rpg.player.speed * rpg.speedMultiplier;
+      if (rpg.keys['ArrowLeft'] || rpg.keys['KeyA']) { dx = -spd; rpg.player.dir = 'left'; }
+      if (rpg.keys['ArrowRight'] || rpg.keys['KeyD']) { dx = spd; rpg.player.dir = 'right'; }
+      if (rpg.keys['ArrowUp'] || rpg.keys['KeyW']) { dy = -spd; rpg.player.dir = 'up'; }
+      if (rpg.keys['ArrowDown'] || rpg.keys['KeyS']) { dy = spd; rpg.player.dir = 'down'; }
+
+      rpg.player.walking = dx !== 0 || dy !== 0;
+
+      if (dx !== 0 || dy !== 0) {
+        const nx = rpg.player.x + dx;
+        const ny = rpg.player.y + dy;
+        if (canMove(nx, rpg.player.y)) rpg.player.x = nx;
+        if (canMove(rpg.player.x, ny)) rpg.player.y = ny;
+
+        rpg.walkTimer++;
+        if (rpg.walkTimer % 8 === 0) {
+          rpg.animFrame = (rpg.animFrame + 1) % 4;
+        }
+      } else {
+        rpg.walkTimer = 0;
+      }
+
+      // Zone transitions — check every frame
+      if (rpg.player.x > 312) {
+        rpg.zoneIdx++;
+        rpg.player.x = 16;
+        rpg.nearNpc = null;
+        rpg.npcSprites = {};
+      } else if (rpg.player.x < 8 && rpg.zoneIdx > 0) {
+        rpg.zoneIdx--;
+        rpg.player.x = 304;
+        rpg.nearNpc = null;
+        rpg.npcSprites = {};
+      }
+
+      checkNpcProximity();
+    }
+
+    // Only draw the streetscape when not in splitscreen chat
+    if (!rpg.inDialogue) {
+      drawMap(ctx);
+      drawPlayer(ctx);
+      updateLocationLabel();
+    }
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  // ── Location label ──
+  function updateLocationLabel() {
+    const label = document.getElementById('rpgLocationLabel');
+    label.textContent = currentZone().name;
+  }
+
+  // ── Start dialogue with NPC (splitscreen mode) ──
+  function startNpcDialogue(npc) {
+    const sc = findScenario(npc.scenarioId);
+    if (!sc) return;
+
+    rpg.inDialogue = true;
+    hideDescription();
+
+    // Load any saved conversation for this scenario
+    const savedConvo = loadConvo(npc.scenarioId);
+    rpg.dialogueState = {
+      scenarioId: npc.scenarioId,
+      scenario: sc,
+      convo: [],
+      phase: 'loading',
+    };
+
+    document.getElementById('rpgInteract').classList.remove('active');
+    document.getElementById('rpgLocationLabel').style.display = 'none';
+
+    // Show splitscreen view — scene background on left, chat on right
+    const sceneView = document.getElementById('rpgSceneView');
+    const sceneHalf = document.getElementById('rpgSceneHalf');
+    const chatName = document.getElementById('rpgChatCharName');
+    const chatMessages = document.getElementById('rpgChatMessages');
+    const chatInput = document.getElementById('rpgChatInput');
+
+    // Render the scenario background SVG into the scene half
+    sceneHalf.innerHTML = renderScene(sc) +
+      `<div class="rpg-scene-label">${escHtml(sc.jp)} — ${escHtml(sc.en)}</div>`;
+    chatName.textContent = escHtml(sc.char);
+    chatInput.value = '';
+
+    sceneView.classList.add('active');
+
+    // Build system prompt
+    rpg.dialogueState.sysPrompt = buildSysPrompt(sc);
+
+    if (savedConvo && savedConvo.length > 0) {
+      // Restore saved conversation — rebuild display annotations
+      rpg.dialogueState.convo = savedConvo.map(m => ({
+        role: m.role,
+        content: m.content,
+        display: m.role === 'assistant' ? safeAnnotated(buildAnnotated(m.content)) : undefined,
+      }));
+      rpg.dialogueState.phase = 'chat';
+      rpgRenderChatMessages();
+      setTimeout(() => document.getElementById('rpgChatInput').focus(), 100);
+    } else {
+      // Fresh conversation — get opening line
+      chatMessages.innerHTML = '<div style="color:#5a5a7a;font-size:12px;text-align:center;padding:20px;font-family:Courier New,monospace">Starting conversation...</div>';
+
+      claude(
+        [{ role: 'user', content: 'Start the scene. Greet me in character.' }],
+        rpg.dialogueState.sysPrompt,
+        800
+      ).then(reply => {
+        const { correction: corr, clean } = extractCorrection(reply);
+        const msg = { role: 'assistant', content: clean, correction: corr, display: safeAnnotated(buildAnnotated(clean)) };
+        rpg.dialogueState.convo.push(msg);
+        rpg.dialogueState.phase = 'chat';
+        rpgRenderChatMessages();
+        saveConvo(npc.scenarioId, rpg.dialogueState.convo);
+        setTimeout(() => document.getElementById('rpgChatInput').focus(), 100);
+      }).catch(err => {
+        chatMessages.innerHTML = '<div style="color:#cc4444;font-size:12px;text-align:center;padding:20px;font-family:Courier New,monospace">Connection error. Press ESC to go back.</div>';
+      });
+    }
+  }
+
+  // ── Render chat messages in splitscreen ──
+  function rpgRenderChatMessages() {
+    const ds = rpg.dialogueState;
+    if (!ds) return;
+    const chatMessages = document.getElementById('rpgChatMessages');
+    const sc = ds.scenario;
+
+    chatMessages.innerHTML = ds.convo.map((msg, i) => {
+      const isAssistant = msg.role === 'assistant';
+      const isReal = isAssistant && msg.content && msg.content !== '…';
+      const body = isAssistant
+        ? (msg.display || safeAnnotated(buildAnnotated(msg.content)))
+        : escHtml(msg.content);
+      const bodyFormatted = isAssistant ? formatActions(body) : body;
+
+      // Check if next message has a correction for this user message
+      const nextMsg = ds.convo[i + 1];
+      const correctionHtml = msg.role === 'user' && nextMsg?.correction
+        ? `<div class="rpg-msg .msg-correction" style="font-size:10px;color:#cc7744;padding:2px 0;font-family:Courier New,monospace">↳ ${escHtml(nextMsg.correction)}</div>` : '';
+
+      const portraitHtml = isAssistant
+        ? `<div class="rpg-portrait-frame" style="width:44px;height:44px;border:2px solid #3a3a5a;background:#12121e;flex-shrink:0;padding:2px;image-rendering:pixelated">${renderPortrait(sc)}</div>` : '';
+      const charName = isAssistant
+        ? `<div style="font-family:Courier New,monospace;font-size:10px;font-weight:bold;color:#d0a850;margin-bottom:3px;text-transform:uppercase;letter-spacing:1px">${escHtml(sc.char.split(',')[0])}</div>`
+        : `<div style="font-family:Courier New,monospace;font-size:10px;font-weight:bold;color:#6090c0;margin-bottom:3px;text-align:right;letter-spacing:1px">YOU</div>`;
+      const footHtml = isReal ? `
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <button onclick="rpgSpeakMsg(${i})" style="background:#1a1a2a;border:1px solid #3a3a5a;border-radius:3px;cursor:pointer;font-size:11px;color:#9090a8;padding:3px 8px;font-family:Courier New,monospace">🔊</button>
+          <button onclick="rpgBreakdownMsg(${i})" style="background:#1a1a2a;border:1px solid #3a3a5a;border-radius:3px;cursor:pointer;font-size:11px;color:#9090a8;padding:3px 8px;font-family:Courier New,monospace">📖</button>
+        </div>
+        <div id="rpgBd-${i}" style="display:none"></div>` : '';
+
+      return `
+        <div class="rpg-msg msg ${msg.role}" style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start;${isAssistant ? '' : 'flex-direction:row-reverse'}">
+          ${portraitHtml}
+          <div style="flex:1;min-width:0">
+            ${charName}
+            <div class="msg-body" style="padding:0;background:none;font-family:Shippori Mincho,serif;font-size:15px;line-height:1.7;color:${isAssistant ? '#e0d8c8' : '#a0b8d0'};${isAssistant ? '' : 'text-align:right;font-size:14px'}">${bodyFormatted}</div>
+            ${correctionHtml}
+            ${footHtml}
+          </div>
+        </div>`;
+    }).join('');
+
+    // Auto-scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  // Helper: extract correction from Claude reply
+  function extractCorrection(reply) {
+    const match = reply.match(/\[Correction:\s*(.*?)\]/s);
+    return {
+      correction: match ? match[1].trim() : null,
+      clean: reply.replace(/\[Correction:.*?\]/s, '').trim(),
+    };
+  }
+
+  // ── Send player message in splitscreen chat ──
+  window.rpgSendChatMsg = function() {
+    const input = document.getElementById('rpgChatInput');
+    let txt = input.value.trim();
+    if (!txt || !rpg.dialogueState) return;
+
+    // Convert romaji to hiragana
+    if (/^[a-zA-Z\s.,!?]+$/.test(txt) && typeof wanakana !== 'undefined') {
+      txt = wanakana.toHiragana(txt, { IMEMode: true });
+    }
+
+    const ds = rpg.dialogueState;
+    ds.convo.push({ role: 'user', content: txt });
+    input.value = '';
+    saveConvo(ds.scenarioId, ds.convo);
+
+    // Show user message + loading indicator
+    rpgRenderChatMessages();
+    const chatMessages = document.getElementById('rpgChatMessages');
+    chatMessages.innerHTML += '<div style="color:#5a5a7a;font-size:12px;padding:8px;font-family:Courier New,monospace"><span class="spin" style="display:inline-block;width:12px;height:12px;border:1px solid #2a2a3a;border-top-color:#5a5a7a;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;margin-right:6px"></span>...</div>';
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    // Build messages for Claude — send last 30 messages for context window efficiency
+    const recentConvo = ds.convo.slice(-30);
+    const messages = recentConvo.map(m => ({ role: m.role, content: m.content }));
+
+    claude(messages, ds.sysPrompt, 800).then(reply => {
+      const { correction: corr, clean } = extractCorrection(reply);
+      const msg = { role: 'assistant', content: clean, correction: corr, display: safeAnnotated(buildAnnotated(clean)) };
+      ds.convo.push(msg);
+      // Rolling trim — keep last MAX_MSGS_PER_CONVO in memory
+      if (ds.convo.length > MAX_MSGS_PER_CONVO) {
+        ds.convo = ds.convo.slice(-MAX_MSGS_PER_CONVO);
+      }
+      rpgRenderChatMessages();
+      saveConvo(ds.scenarioId, ds.convo);
+    }).catch(err => {
+      ds.convo.push({ role: 'assistant', content: 'すみません、エラーが発生しました。もう一度お願いします。', display: '<span style="color:#cc4444">Error — try again</span>' });
+      rpgRenderChatMessages();
+    });
+  };
+
+  // ── Speak a specific message ──
+  window.rpgSpeakMsg = function(i) {
+    if (!rpg.dialogueState) return;
+    const msg = rpg.dialogueState.convo[i];
+    if (msg && msg.role === 'assistant') {
+      const btn = document.querySelector(`#rpgChatMessages .rpg-msg:nth-child(${i+1}) button`);
+      speakJapanese(msg.content, btn);
+    }
+  };
+
+  // ── Breakdown a specific message ──
+  window.rpgBreakdownMsg = function(i) {
+    if (!rpg.dialogueState) return;
+    const msg = rpg.dialogueState.convo[i];
+    if (!msg || msg.role !== 'assistant') return;
+    const bdEl = document.getElementById(`rpgBd-${i}`);
+    if (!bdEl) return;
+    if (bdEl.style.display !== 'none') { bdEl.style.display = 'none'; return; }
+    const words = [];
+    const regex = /\[\[([^|]*)\|([^|]*)\|([^\]]*)\]\]/g;
+    let m;
+    while ((m = regex.exec(msg.content)) !== null) {
+      words.push({ word: m[1], reading: m[2], meaning: m[3] });
+    }
+    if (words.length) {
+      let html = '<div style="margin-top:6px;padding:6px 8px;border:1px solid #2a2a3a;border-radius:3px;background:#14141e;font-size:11px;line-height:1.7">';
+      words.forEach(w => {
+        html += `<span style="color:#c0a060">${escHtml(w.word)}</span> <span style="color:#8a8aaa">(${escHtml(w.reading)})</span> <span style="color:#6a8a6a">${escHtml(w.meaning)}</span><br>`;
+      });
+      html += '</div>';
+      bdEl.innerHTML = html;
+      bdEl.style.display = 'block';
+    }
+  };
+
+  // ── Leave chat / close splitscreen ──
+  window.rpgLeaveChat = function() {
+    closeDialogue();
+  };
+
+  // ── Close dialogue ──
+  function closeDialogue() {
+    rpg.inDialogue = false;
+    rpg.dialogueState = null;
+    document.getElementById('rpgSceneView').classList.remove('active');
+    document.getElementById('rpgLocationLabel').style.display = '';
+    document.getElementById('rpgStatusMsg').textContent = 'Use arrow keys to walk. Approach characters to talk.';
+  }
+
+  // ── Keyboard handling ──
+  function onKeyDown(e) {
+    if (!rpg.active) return;
+
+    // Don't capture keys when typing in chat input
+    if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+      if (e.code === 'Escape') {
+        e.target.blur();
+        e.preventDefault();
+      }
+      return;
+    }
+
+    rpg.keys[e.code] = true;
+
+    if (e.code === 'Escape') {
+      if (rpg.showingDesc) {
+        hideDescription();
+      } else if (rpg.inDialogue) {
+        closeDialogue();
+      } else {
+        rpgExit();
+      }
+      e.preventDefault();
+      return;
+    }
+
+    // Space: show character description
+    if (e.code === 'Space') {
+      if (rpg.showingDesc) {
+        hideDescription();
+      } else if (rpg.nearNpc && !rpg.inDialogue) {
+        showDescription(rpg.nearNpc);
+      }
+      e.preventDefault();
+      return;
+    }
+
+    // Enter: start conversation (from description or proximity)
+    if (e.code === 'Enter' && !e.shiftKey) {
+      if (rpg.showingDesc && rpg.nearNpc) {
+        hideDescription();
+        startNpcDialogue(rpg.nearNpc);
+      } else if (rpg.nearNpc && !rpg.inDialogue) {
+        startNpcDialogue(rpg.nearNpc);
+      }
+      e.preventDefault();
+      return;
+    }
+
+    // Prevent page scroll
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) {
+      e.preventDefault();
+    }
+  }
+
+  function onKeyUp(e) {
+    rpg.keys[e.code] = false;
+  }
+
+  // ── Conversation persistence ──
+  // Store only role+content, cap at 50 messages per scenario to manage size
+  const CONVO_KEY = 'renshuu_rpg_convos';
+  const MAX_MSGS_PER_CONVO = 50;
+
+  function loadAllConvos() {
+    try { return JSON.parse(localStorage.getItem(CONVO_KEY)) || {}; }
+    catch { return {}; }
+  }
+
+  function saveConvo(scenarioId, convo) {
+    const all = loadAllConvos();
+    // Store only role + content (strip display, correction, etc to save space)
+    all[scenarioId] = convo.slice(-MAX_MSGS_PER_CONVO).map(m => ({
+      role: m.role,
+      content: m.content,
+    }));
+    localStorage.setItem(CONVO_KEY, JSON.stringify(all));
+    rpg._convoCache = all; // refresh cache for speech bubble indicators
+  }
+
+  function loadConvo(scenarioId) {
+    const all = loadAllConvos();
+    return all[scenarioId] || null;
+  }
+
+  function clearAllConvos() {
+    localStorage.removeItem(CONVO_KEY);
+    rpg._convoCache = {};
+  }
+
+  // ── Reset: wipe conversations, regenerate scenarios & zones ──
+  window.rpgReset = function() {
+    if (!confirm('Reset all conversations and regenerate the town?')) return;
+    clearAllConvos();
+    // Clear session scenarios so they regenerate
+    sessionStorage.removeItem('renshuu_scenarios');
+    sessionStorage.removeItem('renshuu_eng_scenarios');
+    // Reset zone cache and NPC sprite cache
+    rpg.zones = {};
+    rpg.zoneIdx = 0;
+    rpg.npcSprites = {};
+    rpg.nearNpc = null;
+    _txtCache && Object.keys(_txtCache).forEach(k => delete _txtCache[k]);
+    // Reset player
+    rpg.player.x = 160;
+    rpg.player.y = 126;
+    rpg.player.dir = 'down';
+    if (rpg.inDialogue) closeDialogue();
+    updateLocationLabel();
+  };
+
+  // ── Launch RPG world ──
+  window.rpgLaunch = function() {
+    const world = document.getElementById('rpgWorld');
+    world.classList.add('active');
+    rpg.active = true;
+
+    // Setup canvas
+    rpg.canvas = document.getElementById('rpgCanvas');
+    rpg.ctx = rpg.canvas.getContext('2d');
+    rpg.canvas.width = VIRT_W;
+    rpg.canvas.height = VIRT_H;
+
+    // Reset player position and zone state
+    rpg.player.x = 160;
+    rpg.player.y = 126;
+    rpg.player.dir = 'down';
+    rpg.player.walking = false;
+    rpg.score = 0;
+    rpg.npcSprites = {};
+    rpg.zones = {};
+    rpg.zoneIdx = 0;
+    updateLocationLabel();
+
+    document.getElementById('rpgScore').textContent = 'Score: 0 of 100';
+    document.getElementById('rpgStatusMsg').textContent = 'Use arrow keys to walk. Approach characters to talk.';
+
+    // Keyboard listeners
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keyup', onKeyUp);
+
+    // Start game loop
+    gameLoop();
+  };
+
+  // ── Exit RPG world ──
+  window.rpgExit = function() {
+    rpg.active = false;
+    rpg.keys = {};
+    const world = document.getElementById('rpgWorld');
+    world.classList.remove('active');
+    document.removeEventListener('keydown', onKeyDown);
+    document.removeEventListener('keyup', onKeyUp);
+    if (rpg.inDialogue) closeDialogue();
+  };
+
+  // ── Toggle speed ──
+  window.rpgToggleSpeed = function() {
+    rpg.speedMultiplier = rpg.speedMultiplier === 1 ? 2.5 : 1;
+    document.getElementById('rpgStatusMsg').textContent =
+      rpg.speedMultiplier > 1 ? 'Speed: FAST' : 'Speed: Normal';
+  };
+
+})();
 </script>
 </body>
 </html>
