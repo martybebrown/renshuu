@@ -6375,17 +6375,33 @@ function renderStoryCard() {
   function saveConvo(scenarioId, convo) {
     const all = loadAllConvos();
     // Store only role + content (strip display, correction, etc to save space)
-    all[scenarioId] = convo.slice(-MAX_MSGS_PER_CONVO).map(m => ({
+    const trimmed = convo.slice(-MAX_MSGS_PER_CONVO).map(m => ({
       role: m.role,
       content: m.content,
     }));
+    all[scenarioId] = trimmed;
     localStorage.setItem(CONVO_KEY, JSON.stringify(all));
     rpg._convoCache = all; // refresh cache for speech bubble indicators
+    // Sync back to favorite if one exists (keeps regular mode in sync)
+    const fav = S.favorites && S.favorites.find(f => f.id === scenarioId);
+    if (fav) {
+      fav.convo = trimmed;
+      saveFavorites();
+    }
   }
 
   function loadConvo(scenarioId) {
     const all = loadAllConvos();
-    return all[scenarioId] || null;
+    if (all[scenarioId]) return all[scenarioId];
+    // Fall back to favorite conversation from regular roleplay mode
+    const fav = S.favorites && S.favorites.find(f => f.id === scenarioId);
+    if (fav && fav.convo && fav.convo.length > 0) {
+      // Import into RPG storage and return
+      const imported = fav.convo.map(m => ({ role: m.role, content: m.content }));
+      saveConvo(scenarioId, imported);
+      return imported;
+    }
+    return null;
   }
 
   function clearAllConvos() {
