@@ -6391,17 +6391,19 @@ function renderStoryCard() {
   }
 
   function loadConvo(scenarioId) {
-    const all = loadAllConvos();
-    if (all[scenarioId]) return all[scenarioId];
-    // Fall back to favorite conversation from regular roleplay mode
+    // Favorite conversations from regular mode always take priority
     const fav = S.favorites && S.favorites.find(f => f.id === scenarioId);
     if (fav && fav.convo && fav.convo.length > 0) {
-      // Import into RPG storage and return
       const imported = fav.convo.map(m => ({ role: m.role, content: m.content }));
-      saveConvo(scenarioId, imported);
+      // Sync into RPG storage so it stays current
+      const all = loadAllConvos();
+      all[scenarioId] = imported.slice(-MAX_MSGS_PER_CONVO);
+      localStorage.setItem(CONVO_KEY, JSON.stringify(all));
+      rpg._convoCache = all;
       return imported;
     }
-    return null;
+    const all = loadAllConvos();
+    return all[scenarioId] || null;
   }
 
   function clearAllConvos() {
