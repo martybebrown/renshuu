@@ -2211,6 +2211,16 @@ ${plain}` }
   }
 }
 
+// Rebuild word map on zoom/resize so highlighting stays in sync
+window.addEventListener('resize', () => {
+  if (_currentMsgId == null || !_currentAudio || !_wordBounds?.length) return;
+  const msgBody = document.getElementById('ap-' + _currentMsgId)?.closest('.msg')?.querySelector('.msg-body');
+  if (msgBody) {
+    _wordMap = buildWordMap(msgBody);
+    updatePlayer(_currentMsgId);
+  }
+});
+
 // After any re-render, restore audio player visibility and word map if audio is active
 function restoreAudioPlayer() {
   if (_currentMsgId == null || !_currentAudio) return;
@@ -4070,7 +4080,7 @@ VOCABULARY TO USE NATURALLY: ${allList}
 PRIORITY — embed these NEW words whenever natural: ${newList || '(none this session)'}
 ${knownList ? `\nSTUDENT'S KNOWN VOCABULARY (their full Anki deck): ${knownList}\nIMPORTANT: Strongly prefer words from this known vocabulary list. Minimise using words the student hasn't studied yet — keep unknown words to only essential particles, greetings, and words required by the scenario context. If you must use an unknown word, keep it simple and high-frequency.\n` : ''}
 Rules:
-1. Respond in Japanese only. IMPORTANT: Vary your reply length naturally like a real conversation — sometimes just a short reaction or one sentence (え？本当？ / そうだね。), sometimes 2–3 sentences, occasionally longer when the story demands it. Do NOT always write the same length. Short replies are good and natural.
+1. Respond in Japanese only. Keep responses to 3 sentences MAX — usually 1–2 sentences is best. Only exceed 3 sentences in truly exceptional circumstances (e.g. telling a critical story detail that can't be split). Short, natural replies like a real conversation (え？本当？ / そうだね。/ いいね！) are encouraged.
 2. Weave in vocab from the list, especially the priority new words.
 3. Stay in character. Ask a natural follow-up question each turn (but not every single turn — sometimes just react).
 4. After your Japanese, if the student made errors in their MOST RECENT message ONLY (grammar, vocab, particle, conjugation, word choice, unnatural phrasing), add: [Correction: explain what was wrong, what it should be, and briefly why. Cover every mistake in that message — don't skip any. Be specific: show the wrong text → correct text. Use numbered points (1. 2. 3.) for multiple errors so each is clear. Do NOT correct errors from earlier messages — only the latest one. Example: "1. だれごらい → どのくらい (dono kurai) — だれごらい isn't a word; どのくらい means 'about how much/long'"]
