@@ -1427,7 +1427,10 @@ document.addEventListener('click', e => {
       const msg = S.engConvo[mi];
       if (msg) speakEnglish(msg.content, speakBtn, mi);
     } else {
-      const msg = S.convo[mi];
+      // Check RPG dialogue convo first, then regular convo
+      const rpgDs = window._rpg?.inDialogue && window._rpg?.dialogueState;
+      const convo = rpgDs ? rpgDs.convo : S.convo;
+      const msg = convo[mi];
       if (msg) speakJapanese(msg.content, speakBtn, mi);
     }
     return;
@@ -1486,7 +1489,10 @@ document.addEventListener('click', e => {
       const msg = S.engConvo[mi];
       if (msg) breakdownEngMessage(msg, bdBtn, mi);
     } else {
-      const msg = S.convo[mi];
+      // Check RPG dialogue convo first, then regular convo
+      const rpgDs = window._rpg?.inDialogue && window._rpg?.dialogueState;
+      const convo = rpgDs ? rpgDs.convo : S.convo;
+      const msg = convo[mi];
       if (msg) breakdownMessage(msg, bdBtn, mi);
     }
     return;
@@ -2146,10 +2152,13 @@ function speakWebSpeech(text, btn) {
 }
 
 async function breakdownMessage(msg, btn, mi) {
+  const inRpg = window._rpg?.inDialogue && window._rpg?.dialogueState;
+
   // Toggle off if already shown
   if (msg.breakdown) {
     delete msg.breakdown;
-    updateChat();
+    if (inRpg) rpgRenderChatMessages();
+    else updateChat();
     return;
   }
 
@@ -2186,12 +2195,19 @@ ${plain}` }
   }
 
   // Re-render without auto-scrolling to bottom; scroll breakdown into view instead
-  const chatWin = document.getElementById('chatWin');
-  if (chatWin) {
-    chatWin.innerHTML = renderMessages();
-    restoreAudioPlayer();
-    const bdEl = chatWin.querySelector(`[data-mi="${mi}"]`)?.closest('.msg')?.querySelector('.msg-breakdown');
+  if (inRpg) {
+    rpgRenderChatMessages();
+    const container = document.getElementById('rpgChatMessages');
+    const bdEl = container?.querySelector(`[data-mi="${mi}"]`)?.closest('.msg')?.querySelector('.msg-breakdown');
     if (bdEl) bdEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } else {
+    const chatWin = document.getElementById('chatWin');
+    if (chatWin) {
+      chatWin.innerHTML = renderMessages();
+      restoreAudioPlayer();
+      const bdEl = chatWin.querySelector(`[data-mi="${mi}"]`)?.closest('.msg')?.querySelector('.msg-breakdown');
+      if (bdEl) bdEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
   }
 }
 
@@ -6141,52 +6157,30 @@ function renderStoryCard() {
   }
 
   // ── Render chat messages in splitscreen ──
-  function rpgRenderChatMessages() {
+  window.rpgRenderChatMessages = function rpgRenderChatMessages() {
     const ds = rpg.dialogueState;
     if (!ds) return;
     const chatMessages = document.getElementById('rpgChatMessages');
-    const sc = ds.scenario;
 
-    chatMessages.innerHTML = ds.convo.map((msg, i) => {
-      const isAssistant = msg.role === 'assistant';
-      const isReal = isAssistant && msg.content && msg.content !== '…';
-      const body = isAssistant
-        ? (msg.display || safeAnnotated(buildAnnotated(msg.content)))
-        : escHtml(msg.content);
-      const bodyFormatted = isAssistant ? formatActions(body) : body;
+    // Temporarily swap global state so renderMessages() renders RPG conversation
+    const savedConvo = S.convo;
+    const savedScenario = S.scenario;
+    const savedSierra = S.sierraMode;
+    S.convo = ds.convo;
+    S.scenario = ds.scenario;
+    S.sierraMode = true;
 
-      // Check if next message has a correction for this user message
-      const nextMsg = ds.convo[i + 1];
-      const correctionHtml = msg.role === 'user' && nextMsg?.correction
-        ? `<div class="rpg-msg .msg-correction" style="font-size:10px;color:#cc7744;padding:2px 0;font-family:Courier New,monospace">↳ ${escHtml(nextMsg.correction)}</div>` : '';
+    chatMessages.innerHTML = renderMessages();
+    restoreAudioPlayer();
 
-      const portraitHtml = isAssistant
-        ? `<div class="rpg-portrait-frame" style="width:44px;height:44px;border:2px solid #3a3a5a;background:#12121e;flex-shrink:0;padding:2px;image-rendering:pixelated">${renderPortrait(sc)}</div>` : '';
-      const charName = isAssistant
-        ? `<div style="font-family:Courier New,monospace;font-size:10px;font-weight:bold;color:#d0a850;margin-bottom:3px;text-transform:uppercase;letter-spacing:1px">${escHtml(sc.char.split(',')[0])}</div>`
-        : `<div style="font-family:Courier New,monospace;font-size:10px;font-weight:bold;color:#6090c0;margin-bottom:3px;text-align:right;letter-spacing:1px">YOU</div>`;
-      const footHtml = isReal ? `
-        <div style="display:flex;gap:6px;margin-top:4px">
-          <button onclick="rpgSpeakMsg(${i})" style="background:#1a1a2a;border:1px solid #3a3a5a;border-radius:3px;cursor:pointer;font-size:11px;color:#9090a8;padding:3px 8px;font-family:Courier New,monospace">🔊</button>
-          <button onclick="rpgBreakdownMsg(${i})" style="background:#1a1a2a;border:1px solid #3a3a5a;border-radius:3px;cursor:pointer;font-size:11px;color:#9090a8;padding:3px 8px;font-family:Courier New,monospace">📖</button>
-        </div>
-        <div id="rpgBd-${i}" style="display:none"></div>` : '';
-
-      return `
-        <div class="rpg-msg msg ${msg.role}" style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start;${isAssistant ? '' : 'flex-direction:row-reverse'}">
-          ${portraitHtml}
-          <div style="flex:1;min-width:0">
-            ${charName}
-            <div class="msg-body" style="padding:0;background:none;font-family:Shippori Mincho,serif;font-size:15px;line-height:1.7;color:${isAssistant ? '#e0d8c8' : '#a0b8d0'};${isAssistant ? '' : 'text-align:right;font-size:14px'}">${bodyFormatted}</div>
-            ${correctionHtml}
-            ${footHtml}
-          </div>
-        </div>`;
-    }).join('');
+    // Restore global state
+    S.convo = savedConvo;
+    S.scenario = savedScenario;
+    S.sierraMode = savedSierra;
 
     // Auto-scroll to bottom
     chatMessages.scrollTop = chatMessages.scrollHeight;
-  }
+  };
 
   // Helper: extract correction from Claude reply
   function extractCorrection(reply) {
@@ -6253,41 +6247,6 @@ function renderStoryCard() {
     });
   };
 
-  // ── Speak a specific message ──
-  window.rpgSpeakMsg = function(i) {
-    if (!rpg.dialogueState) return;
-    const msg = rpg.dialogueState.convo[i];
-    if (msg && msg.role === 'assistant') {
-      const btn = document.querySelector(`#rpgChatMessages .rpg-msg:nth-child(${i+1}) button`);
-      speakJapanese(msg.content, btn);
-    }
-  };
-
-  // ── Breakdown a specific message ──
-  window.rpgBreakdownMsg = function(i) {
-    if (!rpg.dialogueState) return;
-    const msg = rpg.dialogueState.convo[i];
-    if (!msg || msg.role !== 'assistant') return;
-    const bdEl = document.getElementById(`rpgBd-${i}`);
-    if (!bdEl) return;
-    if (bdEl.style.display !== 'none') { bdEl.style.display = 'none'; return; }
-    const words = [];
-    const regex = /\[\[([^|]*)\|([^|]*)\|([^\]]*)\]\]/g;
-    let m;
-    while ((m = regex.exec(msg.content)) !== null) {
-      words.push({ word: m[1], reading: m[2], meaning: m[3] });
-    }
-    if (words.length) {
-      let html = '<div style="margin-top:6px;padding:6px 8px;border:1px solid #2a2a3a;border-radius:3px;background:#14141e;font-size:11px;line-height:1.7">';
-      words.forEach(w => {
-        html += `<span style="color:#c0a060">${escHtml(w.word)}</span> <span style="color:#8a8aaa">(${escHtml(w.reading)})</span> <span style="color:#6a8a6a">${escHtml(w.meaning)}</span><br>`;
-      });
-      html += '</div>';
-      bdEl.innerHTML = html;
-      bdEl.style.display = 'block';
-    }
-  };
-
   // ── Leave chat / close splitscreen ──
   window.rpgLeaveChat = function() {
     closeDialogue();
@@ -6295,6 +6254,7 @@ function renderStoryCard() {
 
   // ── Close dialogue ──
   function closeDialogue() {
+    cancelSpeech();
     rpg.inDialogue = false;
     rpg.dialogueState = null;
     document.getElementById('rpgSceneView').classList.remove('active');
@@ -6437,6 +6397,7 @@ function renderStoryCard() {
     const world = document.getElementById('rpgWorld');
     world.classList.add('active');
     rpg.active = true;
+    window._rpg = rpg; // expose for global event handlers
 
     // Setup canvas
     rpg.canvas = document.getElementById('rpgCanvas');
