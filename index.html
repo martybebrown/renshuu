@@ -61,6 +61,7 @@ header {
   grid-template-columns: 240px 1fr;
   overflow: hidden;
   height: calc(100vh - 49px);
+  transition: grid-template-columns 0.25s ease;
 }
 aside {
   border-right: 1px solid var(--border);
@@ -69,8 +70,9 @@ aside {
   flex-direction: column;
   gap: 18px;
   overflow-y: auto;
+  overflow-x: hidden;
   position: relative;
-  transition: width 0.2s, padding 0.2s;
+  transition: padding 0.25s ease, border-color 0.25s ease;
 }
 .layout { position: relative; }
 .sidebar-toggle {
@@ -88,24 +90,26 @@ aside {
   font-size: 12px;
   line-height: 1;
   z-index: 10;
-  transition: all 0.15s;
+  transition: left 0.25s ease, border-color 0.15s, color 0.15s;
   padding: 0;
   align-items: center;
   justify-content: center;
 }
 .sidebar-toggle:hover { border-color: var(--muted); color: var(--text); }
 @media (min-width: 768px) {
-  .sidebar-toggle { display: flex; }
-  .layout.sidebar-collapsed { grid-template-columns: 0px 1fr; }
-  .layout.sidebar-collapsed aside {
-    width: 0;
-    padding: 0;
-    overflow: hidden;
-    border-right: none;
-  }
-  .layout.sidebar-collapsed .sidebar-toggle {
+  .sidebar-toggle {
+    display: flex;
     position: fixed;
     top: 60px;
+    left: 226px;
+  }
+  .layout.sidebar-collapsed { grid-template-columns: 0px 1fr; }
+  .layout.sidebar-collapsed aside {
+    padding: 0;
+    overflow: hidden;
+    border-right-color: transparent;
+  }
+  .layout.sidebar-collapsed .sidebar-toggle {
     left: 6px;
   }
 }
@@ -411,6 +415,12 @@ pre.code {
 .drill-card.correct-card { border-color: rgba(90,158,106,0.4); }
 .drill-card.wrong-card { border-color: rgba(201,79,60,0.4); }
 .drill-card.partial-card { border-color: rgba(168,110,26,0.4); }
+.drill-score-row { display: flex; align-items: center; gap: 8px; margin-top: 20px; padding: 12px 0 4px; border-top: 1px solid var(--border); }
+.score-chip { padding: 3px 10px; border-radius: 2px; font-size: 12px; font-weight: 600; }
+.score-correct { background: rgba(90,158,106,0.12); color: var(--green); border: 1px solid rgba(90,158,106,0.25); }
+.score-close { background: rgba(168,110,26,0.12); color: var(--amber,#a86e1a); border: 1px solid rgba(168,110,26,0.25); }
+.score-wrong { background: rgba(201,79,60,0.12); color: var(--red); border: 1px solid rgba(201,79,60,0.25); }
+.score-total { margin-left: auto; font-size: 11px; color: var(--muted); }
 .drill-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
 .tier-badge {
   display: inline-flex;
@@ -2482,7 +2492,26 @@ Rules:
 
 function paintDrills() {
   const zone = document.getElementById('drillZone');
-  zone.innerHTML = S.drills.map(d => drillHTML(d)).join('');
+  const answered = S.drills.filter(d => d.answered);
+  const correct  = answered.filter(d => d.correct && !d.partial).length;
+  const close    = answered.filter(d => d.partial).length;
+  const wrong    = answered.filter(d => !d.correct).length;
+  const total    = S.drills.length;
+
+  const scoreHTML = answered.length > 0 ? `
+    <div class="drill-score-row">
+      <span class="score-chip score-correct">✓ ${correct}</span>
+      <span class="score-chip score-close">△ ${close}</span>
+      <span class="score-chip score-wrong">✗ ${wrong}</span>
+      <span class="score-total">${answered.length} / ${total} answered</span>
+    </div>` : '';
+
+  const bottomBtn = `
+    <div style="text-align:center;margin-top:16px">
+      <button class="btn" onclick="genDrills()">New set →</button>
+    </div>`;
+
+  zone.innerHTML = S.drills.map(d => drillHTML(d)).join('') + scoreHTML + bottomBtn;
 }
 
 function drillHTML(d) {
@@ -2532,6 +2561,7 @@ function drillHTML(d) {
           data-di="${d.i}"
           placeholder="answer…"
           value="${d.input}"
+          autocomplete="off"
           ${d.answered ? 'disabled' : ''}
         />
         <button class="btn drill-submit" data-di="${d.i}" ${d.answered ? 'disabled' : ''}>→</button>
