@@ -499,8 +499,8 @@ pre.code {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 8px;
 }
-.fav-row { display: flex; gap: 14px; overflow-x: auto; padding: 2px 0 12px; margin-bottom: 4px; scrollbar-width: none; }
-.fav-row::-webkit-scrollbar { display: none; }
+.fav-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.fav-row { display: flex; gap: 14px; flex-wrap: wrap; padding: 2px 0 12px; margin-bottom: 4px; }
 .fav-avatar { display: flex; flex-direction: column; align-items: center; gap: 5px; cursor: pointer; flex-shrink: 0; position: relative; }
 .fav-face {
   width: 48px; height: 48px; border-radius: 50%;
@@ -512,7 +512,7 @@ pre.code {
 .fav-face-sprite svg { width: 38px; height: 38px; image-rendering: pixelated; }
 .fav-name { font-size: 9px; color: var(--muted); text-align: center; max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fav-tooltip {
-  display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  display: none; position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%);
   background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
   padding: 7px 10px; font-size: 10px; line-height: 1.5; white-space: normal;
   width: 200px; z-index: 50; pointer-events: none; color: var(--text);
@@ -4034,33 +4034,18 @@ function scCard(sc) {
     </div>`;
 }
 
+function backToScenarios() {
+  cancelSpeech();
+  S.scenario = null;
+  renderRoleplay();
+}
+
 function renderRoleplay() {
   const m = document.getElementById('mainContent');
-  const favScenarios = S.favorites;
 
-  m.innerHTML = `
-    <div>
-      <button class="rpg-explore-btn" onclick="rpgLaunch()">
-        <span style="font-size:18px">🗺</span> Explore Town — 町を探検する
-      </button>
-
-      ${favScenarios.length ? `
-        <div class="label" style="margin-bottom:6px">★ Favorites</div>
-        <div class="fav-row">${favScenarios.map(favAvatar).join('')}</div>
-      ` : ''}
-      <div class="sc-section-head">
-        <div class="label">Scenarios</div>
-        <button class="btn" style="font-size:10px;padding:4px 10px" onclick="refreshScenarios()">↻ Refresh</button>
-      </div>
-      <div style="color:var(--muted);font-size:11px;margin-bottom:10px">
-        Claude plays the scene using your vocab. Star a scenario to save it to favorites.
-      </div>
-      <div class="scenario-grid">
-        ${S.scenarios.map(scCard).join('')}
-      </div>
-    </div>
-
-    ${S.scenario ? (S.sierraMode ? `
+  // Active conversation — show full-screen, no picker
+  if (S.scenario) {
+    m.innerHTML = S.sierraMode ? `
       <div class="rpg-frame">
         <div class="rpg-scene">
           ${renderScene(S.scenario)}
@@ -4068,7 +4053,8 @@ function renderRoleplay() {
         </div>
         <div class="rpg-dialogue-wrap">
           <div class="rpg-head">
-            <div class="label">${escHtml(S.scenario.char)}</div>
+            <button class="btn" onclick="backToScenarios()">← Back</button>
+            <div class="label" style="flex:1;text-align:center">${escHtml(S.scenario.char)}</div>
             <button class="btn" onclick="resetChat()">Reset</button>
           </div>
           <div class="rpg-dialogue" id="chatWin">${renderMessages()}</div>
@@ -4085,8 +4071,9 @@ function renderRoleplay() {
     ` : `
       <div class="chat-wrap">
         <div class="chat-head">
+          <button class="btn" onclick="backToScenarios()">← Back</button>
           <div class="label">${S.scenario.jp} — ${S.scenario.en}</div>
-          <button class="btn" onclick="resetChat()">Reset chat</button>
+          <button class="btn" onclick="resetChat()">Reset</button>
         </div>
         <div class="chat-window" id="chatWin">${renderMessages()}</div>
         <div class="chat-foot">
@@ -4098,10 +4085,38 @@ function renderRoleplay() {
         </div>
         <div class="chat-tip">Enter to send · Shift+Enter for new line · romaji auto-converted</div>
       </div>
-    `) : ''}
-  `;
+    `;
+    scrollChat();
+    return;
+  }
 
-  scrollChat();
+  // No active conversation — show picker
+  const favScenarios = S.favorites;
+  m.innerHTML = `
+    <div>
+      ${favScenarios.length ? `
+        <div class="fav-header-row">
+          <div class="label">★ Favorites</div>
+          <button class="rpg-explore-btn" onclick="rpgLaunch()">🗺 Explore Town</button>
+        </div>
+        <div class="fav-row">${favScenarios.map(favAvatar).join('')}</div>
+      ` : `
+        <button class="rpg-explore-btn" style="margin-bottom:14px" onclick="rpgLaunch()">
+          <span style="font-size:18px">🗺</span> Explore Town — 町を探検する
+        </button>
+      `}
+      <div class="sc-section-head">
+        <div class="label">Scenarios</div>
+        <button class="btn" style="font-size:10px;padding:4px 10px" onclick="refreshScenarios()">↻ Refresh</button>
+      </div>
+      <div style="color:var(--muted);font-size:11px;margin-bottom:10px">
+        Claude plays the scene using your vocab. Star a scenario to save it to favorites.
+      </div>
+      <div class="scenario-grid">
+        ${S.scenarios.map(scCard).join('')}
+      </div>
+    </div>
+  `;
 }
 
 function renderMessages() {
