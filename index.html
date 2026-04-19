@@ -2178,7 +2178,7 @@ async function breakdownMessage(msg, btn, mi) {
   const plain = stripMarkers(msg.content);
   try {
     const reply = await claude([
-      { role: 'user', content: `Break down this Japanese message for an N4–N3 learner.
+      { role: 'user', content: `Break down this Japanese message for an N4–N3 learner. The student understands basic grammar but needs clear explanations of how sentences are assembled and why each element is used.
 
 Use EXACTLY this format (with these exact headers):
 
@@ -2191,11 +2191,12 @@ BREAKDOWN:
 SENTENCE: [Japanese sentence]
 MEANING: [English translation]
 VOCAB: [key word (reading) — meaning, one per line, use bullet ・]
-GRAMMAR: [grammar point explanations, one per line, use bullet ・]
+STRUCTURE: [Explain how the sentence is built — the overall pattern (topic-comment, subject-object-verb, etc.), what role each clause plays, and how the parts connect. Write this as a short paragraph, not a list.]
+GRAMMAR: [For each particle, verb conjugation, or grammatical construction worth noting: explain what it is, what base form it came from and how it was changed, what job it does in this specific sentence, and what it would mean or imply if it were different or absent. Be thorough — a student should understand not just the label but the actual mechanics. One element per bullet ・]
 
-Keep it concise. Message:
+Message:
 ${plain}` }
-    ], 'You are a Japanese language teacher. Give clear, structured breakdowns.', 1500);
+    ], 'You are a Japanese language teacher giving thorough, student-friendly grammar explanations. Never just label a grammar point — always explain how and why it works in the specific sentence.', 2500);
 
     // Parse structured reply into styled HTML
     const html = formatBreakdown(reply);
@@ -2274,6 +2275,10 @@ function formatBreakdown(text) {
     } else if (/^VOCAB:/i.test(stripped)) {
       const content = stripped.replace(/^VOCAB:\s*/i, '').trim();
       parts.push(`<div class="bd-label">Vocab</div>`);
+      if (content) parts.push(`<div class="bd-item">${escHtml(content)}</div>`);
+    } else if (/^STRUCTURE:/i.test(stripped)) {
+      const content = stripped.replace(/^STRUCTURE:\s*/i, '').trim();
+      parts.push(`<div class="bd-label">Structure</div>`);
       if (content) parts.push(`<div class="bd-item">${escHtml(content)}</div>`);
     } else if (/^GRAMMAR:/i.test(stripped)) {
       const content = stripped.replace(/^GRAMMAR:\s*/i, '').trim();
