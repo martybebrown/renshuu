@@ -509,6 +509,7 @@ pre.code {
   font-size: 22px; transition: border-color 0.15s, transform 0.15s;
 }
 .fav-avatar:hover .fav-face { border-color: var(--gold); transform: scale(1.08); }
+.fav-face-sprite svg { width: 38px; height: 38px; image-rendering: pixelated; }
 .fav-name { font-size: 9px; color: var(--muted); text-align: center; max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fav-tooltip {
   display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
@@ -628,7 +629,9 @@ pre.code {
 .msg-breakdown .bd-meaning { font-style: italic; color: var(--muted); margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dashed var(--border); }
 .msg-breakdown .bd-label { font-weight: 600; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 8px; margin-bottom: 2px; }
 .msg-breakdown .bd-list { color: var(--text); margin-left: 4px; }
-.bd-next-wrap { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); text-align: right; }
+.bd-card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; margin-bottom: 6px; }
+.bd-card-translation { border-color: var(--accent); }
+.bd-next-wrap { margin-top: 4px; text-align: right; }
 .bd-next-btn { font-size: 10px; padding: 4px 10px; }
 .bd-next-btn:disabled { opacity: 0.5; cursor: default; }
 .chat-foot { display: flex; gap: 8px; align-items: flex-end; }
@@ -2196,13 +2199,25 @@ function splitSentences(text) {
   return parts.length > 0 ? parts : [text.trim()];
 }
 
+function parseFirstBdReply(text) {
+  const m = text.search(/^SENTENCE:/im);
+  if (m === -1) return { translationPart: text, sentencePart: '' };
+  return { translationPart: text.slice(0, m), sentencePart: text.slice(m) };
+}
+
 function renderBdState(state, mi) {
   let html = '';
+  // Translation card (always first)
+  if (state.translationHtml) {
+    html += `<div class="bd-card bd-card-translation">${state.translationHtml}</div>`;
+  } else {
+    html += `<div class="bd-card bd-card-translation"><span class="spin"></span></div>`;
+  }
+  // Sentence cards
   for (let i = 0; i <= state.idx; i++) {
-    if (i > 0) html += '<hr class="bd-divider">';
     html += state.sentenceHtml[i] != null
-      ? state.sentenceHtml[i]
-      : '<div style="padding:8px 0"><span class="spin"></span></div>';
+      ? `<div class="bd-card">${state.sentenceHtml[i]}</div>`
+      : `<div class="bd-card"><span class="spin"></span></div>`;
   }
   const hasMore = state.idx < state.sentences.length - 1;
   if (hasMore) {
@@ -2247,7 +2262,7 @@ async function breakdownMessage(msg, btn, mi) {
 
   const plain = stripMarkers(msg.content);
   const sentences = splitSentences(plain);
-  msg.bdState = { sentences, idx: 0, sentenceHtml: new Array(sentences.length).fill(null) };
+  msg.bdState = { sentences, idx: 0, translationHtml: null, sentenceHtml: new Array(sentences.length).fill(null) };
 
   try {
     const reply = await claude([{ role: 'user', content:
@@ -2264,9 +2279,11 @@ VOCAB: [key words (reading) — meaning, one per bullet ・]
 STRUCTURE: [How this sentence is built — its overall pattern and how the parts connect. Short paragraph.]
 GRAMMAR: [Each particle, verb form, or grammatical construction: what it is, its base form and how it was changed, its role here, and what would differ without it. One element per bullet ・]`
     }], BD_SYS, 800, 'claude-haiku-4-5-20251001');
-    msg.bdState.sentenceHtml[0] = formatBreakdown(reply);
+    const { translationPart, sentencePart } = parseFirstBdReply(reply);
+    msg.bdState.translationHtml = formatBreakdown(translationPart);
+    msg.bdState.sentenceHtml[0] = formatBreakdown(sentencePart);
   } catch (err) {
-    msg.bdState.sentenceHtml[0] = `<span style="color:var(--red)">Failed: ${escHtml(err.message)}</span>`;
+    msg.bdState.translationHtml = `<span style="color:var(--red)">Failed: ${escHtml(err.message)}</span>`;
   }
 
   msg.breakdown = renderBdState(msg.bdState, mi);
@@ -3990,9 +4007,12 @@ function getScenarioSprite(sc, px) {
 
 function favAvatar(sc) {
   const name = sc.char.split(',')[0].trim();
+  const face = sc.voice
+    ? `<div class="fav-face fav-face-sprite">${renderPortrait(sc)}</div>`
+    : `<div class="fav-face">${sc.icon || '👤'}</div>`;
   return `
     <div class="fav-avatar" onclick="pickScenario('${sc.id}')">
-      <div class="fav-face">${sc.icon || '👤'}</div>
+      ${face}
       <div class="fav-name">${escHtml(name)}</div>
       <div class="fav-tooltip"><strong>${escHtml(sc.jp)} — ${escHtml(sc.en)}</strong><br>${escHtml(sc.char)}<br><span style="color:var(--muted)">${escHtml(sc.ctx)}</span></div>
     </div>`;
