@@ -499,6 +499,24 @@ pre.code {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 8px;
 }
+.fav-row { display: flex; gap: 14px; overflow-x: auto; padding: 2px 0 12px; margin-bottom: 4px; scrollbar-width: none; }
+.fav-row::-webkit-scrollbar { display: none; }
+.fav-avatar { display: flex; flex-direction: column; align-items: center; gap: 5px; cursor: pointer; flex-shrink: 0; position: relative; }
+.fav-face {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: var(--surface); border: 2px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; transition: border-color 0.15s, transform 0.15s;
+}
+.fav-avatar:hover .fav-face { border-color: var(--gold); transform: scale(1.08); }
+.fav-name { font-size: 9px; color: var(--muted); text-align: center; max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fav-tooltip {
+  display: none; position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+  padding: 7px 10px; font-size: 10px; line-height: 1.5; white-space: normal;
+  width: 200px; z-index: 50; pointer-events: none; color: var(--text);
+}
+.fav-avatar:hover .fav-tooltip { display: block; }
 
 .chat-wrap { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; }
 .chat-head { display: flex; justify-content: space-between; align-items: center; }
@@ -610,6 +628,9 @@ pre.code {
 .msg-breakdown .bd-meaning { font-style: italic; color: var(--muted); margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dashed var(--border); }
 .msg-breakdown .bd-label { font-weight: 600; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 8px; margin-bottom: 2px; }
 .msg-breakdown .bd-list { color: var(--text); margin-left: 4px; }
+.bd-next-wrap { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); text-align: right; }
+.bd-next-btn { font-size: 10px; padding: 4px 10px; }
+.bd-next-btn:disabled { opacity: 0.5; cursor: default; }
 .chat-foot { display: flex; gap: 8px; align-items: flex-end; }
 .chat-input {
   flex: 1;
@@ -1493,6 +1514,13 @@ document.addEventListener('click', e => {
     }
   }
 
+  // Next sentence in breakdown
+  const nextBtn = e.target.closest('.bd-next-btn[data-mi]');
+  if (nextBtn && !nextBtn.disabled) {
+    breakdownNext(parseInt(nextBtn.dataset.mi, 10));
+    return;
+  }
+
   // Break down message
   const bdBtn = e.target.closest('.breakdown-btn[data-mi]');
   if (bdBtn) {
@@ -2163,11 +2191,51 @@ function speakWebSpeech(text, btn) {
   else { speechSynthesis.onvoiceschanged = () => { speechSynthesis.onvoiceschanged = null; trySpeak(); }; }
 }
 
+function splitSentences(text) {
+  const parts = text.split(/(?<=[。！？])/g).map(s => s.trim()).filter(s => s);
+  return parts.length > 0 ? parts : [text.trim()];
+}
+
+function renderBdState(state, mi) {
+  let html = '';
+  for (let i = 0; i <= state.idx; i++) {
+    if (i > 0) html += '<hr class="bd-divider">';
+    html += state.sentenceHtml[i] != null
+      ? state.sentenceHtml[i]
+      : '<div style="padding:8px 0"><span class="spin"></span></div>';
+  }
+  const hasMore = state.idx < state.sentences.length - 1;
+  if (hasMore) {
+    const ready = state.sentenceHtml[state.idx] != null;
+    html += `<div class="bd-next-wrap"><button class="bd-next-btn btn" data-mi="${mi}" ${ready ? '' : 'disabled'}>${ready ? 'Next sentence →' : '<span class="spin"></span>'}</button></div>`;
+  }
+  return html;
+}
+
+function repaintBreakdown(inRpg, mi) {
+  if (inRpg) {
+    rpgRenderChatMessages();
+    const bdEl = document.getElementById('rpgChatMessages')
+      ?.querySelector(`[data-mi="${mi}"]`)?.closest('.msg')?.querySelector('.msg-breakdown');
+    if (bdEl) bdEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } else {
+    const chatWin = document.getElementById('chatWin');
+    if (chatWin) {
+      chatWin.innerHTML = renderMessages();
+      restoreAudioPlayer();
+      const bdEl = chatWin.querySelector(`[data-mi="${mi}"]`)?.closest('.msg')?.querySelector('.msg-breakdown');
+      if (bdEl) bdEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+}
+
+const BD_SYS = 'You are a Japanese language teacher giving thorough, student-friendly grammar explanations. Never just label a grammar point — always explain how and why it works in the specific sentence.';
+
 async function breakdownMessage(msg, btn, mi) {
   const inRpg = window._rpg?.inDialogue && window._rpg?.dialogueState;
 
-  // Toggle off if already shown
-  if (msg.breakdown) {
+  if (msg.bdState) {
+    delete msg.bdState;
     delete msg.breakdown;
     if (inRpg) rpgRenderChatMessages();
     else updateChat();
@@ -2178,49 +2246,67 @@ async function breakdownMessage(msg, btn, mi) {
   btn.textContent = '⏳';
 
   const plain = stripMarkers(msg.content);
-  try {
-    const reply = await claude([
-      { role: 'user', content: `Break down this Japanese message for an N4–N3 learner. The student understands basic grammar but needs clear explanations of how sentences are assembled and why each element is used.
+  const sentences = splitSentences(plain);
+  msg.bdState = { sentences, idx: 0, sentenceHtml: new Array(sentences.length).fill(null) };
 
-Use EXACTLY this format (with these exact headers):
+  try {
+    const reply = await claude([{ role: 'user', content:
+`Message: ${plain}
+
+Give the full translation, then break down only the first sentence for an N4–N3 learner.
 
 TRANSLATION:
-[Full natural English translation]
+[Natural English translation of the complete message]
 
-BREAKDOWN:
-[For each sentence, use this format:]
-
-SENTENCE: [Japanese sentence]
-MEANING: [English translation]
-VOCAB: [key word (reading) — meaning, one per line, use bullet ・]
-STRUCTURE: [Explain how the sentence is built — the overall pattern (topic-comment, subject-object-verb, etc.), what role each clause plays, and how the parts connect. Write this as a short paragraph, not a list.]
-GRAMMAR: [For each particle, verb conjugation, or grammatical construction worth noting: explain what it is, what base form it came from and how it was changed, what job it does in this specific sentence, and what it would mean or imply if it were different or absent. Be thorough — a student should understand not just the label but the actual mechanics. One element per bullet ・]
-
-Message:
-${plain}` }
-    ], 'You are a Japanese language teacher giving thorough, student-friendly grammar explanations. Never just label a grammar point — always explain how and why it works in the specific sentence.', 1500, 'claude-haiku-4-5-20251001');
-
-    // Parse structured reply into styled HTML
-    const html = formatBreakdown(reply);
-    msg.breakdown = html;
+SENTENCE: ${sentences[0]}
+MEANING: [English translation of this sentence]
+VOCAB: [key words (reading) — meaning, one per bullet ・]
+STRUCTURE: [How this sentence is built — its overall pattern and how the parts connect. Short paragraph.]
+GRAMMAR: [Each particle, verb form, or grammatical construction: what it is, its base form and how it was changed, its role here, and what would differ without it. One element per bullet ・]`
+    }], BD_SYS, 800, 'claude-haiku-4-5-20251001');
+    msg.bdState.sentenceHtml[0] = formatBreakdown(reply);
   } catch (err) {
-    msg.breakdown = `<span style="color:var(--red)">Failed: ${escHtml(err.message)}</span>`;
+    msg.bdState.sentenceHtml[0] = `<span style="color:var(--red)">Failed: ${escHtml(err.message)}</span>`;
   }
 
-  // Re-render without auto-scrolling to bottom; scroll breakdown into view instead
-  if (inRpg) {
-    rpgRenderChatMessages();
-    const container = document.getElementById('rpgChatMessages');
-    const bdEl = container?.querySelector(`[data-mi="${mi}"]`)?.closest('.msg')?.querySelector('.msg-breakdown');
-    if (bdEl) bdEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  } else {
-    const chatWin = document.getElementById('chatWin');
-    if (chatWin) {
-      chatWin.innerHTML = renderMessages();
-      restoreAudioPlayer();
-      const bdEl = chatWin.querySelector(`[data-mi="${mi}"]`)?.closest('.msg')?.querySelector('.msg-breakdown');
-      if (bdEl) bdEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  msg.breakdown = renderBdState(msg.bdState, mi);
+  repaintBreakdown(inRpg, mi);
+}
+
+async function breakdownNext(mi) {
+  const inRpg = window._rpg?.inDialogue && window._rpg?.dialogueState;
+  const convo = inRpg ? window._rpg.dialogueState.convo : S.convo;
+  const msg = convo[mi];
+  if (!msg?.bdState) return;
+
+  const state = msg.bdState;
+  if (state.idx >= state.sentences.length - 1) return;
+  state.idx++;
+
+  msg.breakdown = renderBdState(state, mi);
+  repaintBreakdown(inRpg, mi);
+
+  if (state.sentenceHtml[state.idx] === null) {
+    try {
+      const plain = stripMarkers(msg.content);
+      const sentence = state.sentences[state.idx];
+      const reply = await claude([{ role: 'user', content:
+`Full message context: ${plain}
+
+Break down only this sentence for an N4–N3 learner:
+
+SENTENCE: ${sentence}
+MEANING: [English translation]
+VOCAB: [key words (reading) — meaning, one per bullet ・]
+STRUCTURE: [How this sentence is built — short paragraph]
+GRAMMAR: [Each particle, verb form, or grammatical construction explained mechanically. One element per bullet ・]`
+      }], BD_SYS, 800, 'claude-haiku-4-5-20251001');
+      state.sentenceHtml[state.idx] = formatBreakdown(reply);
+    } catch (err) {
+      state.sentenceHtml[state.idx] = `<span style="color:var(--red)">Failed: ${escHtml(err.message)}</span>`;
     }
+    msg.breakdown = renderBdState(state, mi);
+    repaintBreakdown(inRpg, mi);
   }
 }
 
@@ -3902,6 +3988,16 @@ function getScenarioSprite(sc, px) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges">${rects}</svg>`;
 }
 
+function favAvatar(sc) {
+  const name = sc.char.split(',')[0].trim();
+  return `
+    <div class="fav-avatar" onclick="pickScenario('${sc.id}')">
+      <div class="fav-face">${sc.icon || '👤'}</div>
+      <div class="fav-name">${escHtml(name)}</div>
+      <div class="fav-tooltip"><strong>${escHtml(sc.jp)} — ${escHtml(sc.en)}</strong><br>${escHtml(sc.char)}<br><span style="color:var(--muted)">${escHtml(sc.ctx)}</span></div>
+    </div>`;
+}
+
 function scCard(sc) {
   const isFav = S.favorites.some(f => f.id === sc.id);
   const isSel = S.scenario?.id === sc.id;
@@ -3929,12 +4025,8 @@ function renderRoleplay() {
       </button>
 
       ${favScenarios.length ? `
-        <div class="sc-section-head">
-          <div class="label">★ Favorites</div>
-        </div>
-        <div class="scenario-grid" style="margin-bottom:18px">
-          ${favScenarios.map(scCard).join('')}
-        </div>
+        <div class="label" style="margin-bottom:6px">★ Favorites</div>
+        <div class="fav-row">${favScenarios.map(favAvatar).join('')}</div>
       ` : ''}
       <div class="sc-section-head">
         <div class="label">Scenarios</div>
@@ -4079,13 +4171,25 @@ function formatCorrection(s) {
 
 function pickScenario(id) {
   cancelSpeech();
+  // On desktop, always use sierra split view and collapse sidebar
+  if (window.innerWidth >= 768) {
+    S.sierraMode = true;
+    const tog = document.getElementById('sierraToggle');
+    if (tog) tog.checked = true;
+    localStorage.setItem('renshuu_sierra_mode', 'true');
+    const layout = document.getElementById('layout');
+    if (!layout.classList.contains('sidebar-collapsed')) {
+      layout.classList.add('sidebar-collapsed');
+      const tb = document.getElementById('sidebarToggle');
+      if (tb) tb.textContent = '»';
+    }
+  }
   // Check for saved conversation in favorites
   const fav = S.favorites.find(f => f.id === id);
   if (fav && fav.convo && fav.convo.length) {
     S.scenario = fav;
     S.convo = fav.convo;
     renderRoleplay();
-    // Rebuild system prompt for continued conversation
     buildSysPrompt(S.scenario);
     scrollChat();
     return;
