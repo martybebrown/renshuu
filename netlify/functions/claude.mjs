@@ -4,9 +4,9 @@ export default async (req) => {
   const json = (body, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-  let messages, system, max_tokens;
+  let messages, system, max_tokens, model;
   try {
-    ({ messages, system, max_tokens } = await req.json());
+    ({ messages, system, max_tokens, model } = await req.json());
   } catch {
     return json({ error: { message: 'Invalid request body' } }, 400);
   }
@@ -21,7 +21,7 @@ export default async (req) => {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        model: model || 'claude-sonnet-4-5',
         max_tokens: max_tokens || 1000,
         system: system || '',
         messages,

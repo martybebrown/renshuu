@@ -2196,7 +2196,7 @@ GRAMMAR: [For each particle, verb conjugation, or grammatical construction worth
 
 Message:
 ${plain}` }
-    ], 'You are a Japanese language teacher giving thorough, student-friendly grammar explanations. Never just label a grammar point — always explain how and why it works in the specific sentence.', 1500);
+    ], 'You are a Japanese language teacher giving thorough, student-friendly grammar explanations. Never just label a grammar point — always explain how and why it works in the specific sentence.', 1500, 'claude-haiku-4-5-20251001');
 
     // Parse structured reply into styled HTML
     const html = formatBreakdown(reply);
@@ -2403,15 +2403,13 @@ function renderMode() {
 }
 
 // ── Claude ────────────────────────────────────────────────────────────────────
-async function claude(messages, system = '', maxTokens = 1000) {
+async function claude(messages, system = '', maxTokens = 1000, model = null) {
+  const body = { messages, system, max_tokens: maxTokens };
+  if (model) body.model = model;
   const r = await fetch('/.netlify/functions/claude', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      messages,
-      system,
-      max_tokens: maxTokens,
-    }),
+    body: JSON.stringify(body),
   });
   if (!r.ok) {
     const text = await r.text().catch(() => '');
