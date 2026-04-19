@@ -2413,8 +2413,12 @@ async function claude(messages, system = '', maxTokens = 1000) {
       max_tokens: maxTokens,
     }),
   });
+  if (!r.ok) {
+    const text = await r.text().catch(() => '');
+    throw new Error(`API error ${r.status}${text && !text.startsWith('<') ? ': ' + text : ''}`);
+  }
   const d = await r.json();
-  if (d.error) throw new Error(d.error.message);
+  if (d.error) throw new Error(d.error.message || JSON.stringify(d.error));
   return d.content[0].text;
 }
 
