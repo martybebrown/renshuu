@@ -606,30 +606,58 @@ pre.code {
 }
 .breakdown-btn.active { color: var(--blue); border-color: var(--blue); }
 .msg-breakdown {
-  font-size: 10px;
-  line-height: 1.5;
+  font-size: 12px;
+  line-height: 1.6;
   color: var(--text);
   background: var(--cream);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 8px 10px;
-  margin-top: 6px;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 8px;
 }
 @media (min-width: 800px) {
   .msg.assistant.has-breakdown { max-width: 95%; }
-  .msg.assistant.has-breakdown .msg-main { flex-direction: row; align-items: flex-start; gap: 10px; }
+  .msg.assistant.has-breakdown .msg-main { flex-direction: row; align-items: flex-start; gap: 12px; }
   .msg.assistant.has-breakdown .msg-inner { flex: 1; min-width: 0; }
-  .msg.assistant.has-breakdown .msg-breakdown { margin-top: 0; flex: 0 0 280px; max-height: 400px; overflow-y: auto; }
+  .msg.assistant.has-breakdown .msg-breakdown { margin-top: 0; flex: 0 0 310px; max-height: 480px; overflow-y: auto; }
 }
-.msg-breakdown .bd-section { margin-bottom: 8px; }
-.msg-breakdown .bd-heading { font-weight: 700; color: var(--accent); font-size: 9px; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; }
-.msg-breakdown .bd-translation { font-size: 12px; font-style: italic; line-height: 1.6; padding-bottom: 8px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
-.msg-breakdown .bd-divider { border: none; border-top: 1px solid var(--border); margin: 10px 0 8px; }
-.msg-breakdown .bd-sentence { font-size: 12px; font-weight: 600; margin: 0 0 2px; }
-.msg-breakdown .bd-meaning { font-style: italic; color: var(--muted); margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dashed var(--border); }
-.msg-breakdown .bd-label { font-weight: 600; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 8px; margin-bottom: 2px; }
+.msg-breakdown .bd-section { margin-bottom: 10px; }
+.msg-breakdown .bd-heading {
+  font-weight: 700; color: var(--accent); font-size: 9px;
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;
+  padding-bottom: 4px; border-bottom: 1px solid var(--border);
+}
+.msg-breakdown .bd-translation {
+  font-size: 13px; font-style: italic; line-height: 1.7;
+  color: var(--text); padding-bottom: 0; border-bottom: none; margin-bottom: 0;
+}
+.msg-breakdown .bd-divider { border: none; border-top: 1px solid var(--border); margin: 12px 0 10px; }
+.msg-breakdown .bd-sentence {
+  font-family: 'Shippori Mincho', serif; font-size: 20px;
+  font-weight: 600; line-height: 1.4; margin: 0 0 4px; color: var(--text);
+}
+.msg-breakdown .bd-meaning {
+  font-style: italic; font-size: 12px; color: var(--muted);
+  margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed var(--border);
+}
+.msg-breakdown .bd-label {
+  display: inline-block; font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.8px;
+  background: var(--border); color: var(--muted);
+  border-radius: 3px; padding: 1px 6px; margin: 10px 0 6px;
+}
+.msg-breakdown .bd-item {
+  font-size: 12px; line-height: 1.7; color: var(--text);
+}
+.msg-breakdown .bd-bullets { display: flex; flex-direction: column; gap: 4px; }
+.msg-breakdown .bd-bullet {
+  font-size: 11px; line-height: 1.6; color: var(--text);
+  padding: 4px 8px; background: var(--surface);
+  border-left: 2px solid var(--border); border-radius: 0 3px 3px 0;
+}
 .msg-breakdown .bd-list { color: var(--text); margin-left: 4px; }
-.bd-card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; margin-bottom: 6px; }
+.bd-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; }
+.bd-card-translation .bd-translation { font-size: 13px; }
 .bd-card-translation { border-color: var(--accent); }
 .bd-next-wrap { margin-top: 4px; text-align: right; }
 .bd-next-btn { font-size: 10px; padding: 4px 10px; }
@@ -757,12 +785,18 @@ pre.code {
 .rpg-msg .msg-foot button.speaking { color: #6aa0d0; border-color: #4a7aaa; background: rgba(74,122,170,0.15); }
 .rpg-msg .msg-foot button.active { color: #6aa0d0; border-color: #4a7aaa; background: rgba(74,122,170,0.15); }
 .rpg-msg .msg-breakdown {
-  font-size: 10px; line-height: 1.5; color: #b0a888; background: #14141e;
-  border: 1px solid #2a2a3a; border-radius: 3px; padding: 8px 10px; margin-top: 6px;
+  font-size: 12px; line-height: 1.6; color: #b0a888; background: #12121e;
+  border: 1px solid #2a2a3a; border-radius: 6px; padding: 12px 14px; margin-top: 8px;
 }
 .rpg-msg .msg-breakdown .bd-heading { color: #d0a850; border-bottom-color: #2a2a3a; }
-.rpg-msg .msg-breakdown .bd-meaning { color: #8a8a9a; }
-.rpg-msg .msg-breakdown .bd-label { color: #8a8a9a; }
+.rpg-msg .msg-breakdown .bd-translation { color: #c0b898; }
+.rpg-msg .msg-breakdown .bd-sentence { color: #e8dfc8; }
+.rpg-msg .msg-breakdown .bd-meaning { color: #8a8a9a; border-bottom-color: #2a2a3a; }
+.rpg-msg .msg-breakdown .bd-label { background: #1e1e2e; color: #7a7a9a; border-color: #2a2a3a; }
+.rpg-msg .msg-breakdown .bd-bullet { background: #1a1a2a; border-left-color: #3a3a5a; color: #b0a888; }
+.rpg-msg .msg-breakdown .bd-item { color: #b0a888; }
+.rpg-msg .msg-breakdown .bd-divider { border-top-color: #2a2a3a; }
+.rpg-msg .bd-card { background: #1a1a2e; border-color: #2a2a3a; }
 .rpg-msg .audio-player { margin-top: 4px; }
 .rpg-msg .audio-player .ap-btn { color: #5a5a7a; border-color: #2a2a3a; }
 .rpg-msg .audio-player .ap-btn:hover { color: #c0b080; border-color: #3a3a5a; }
@@ -2362,44 +2396,70 @@ function formatBreakdown(text) {
   const lines = clean.split('\n');
   const parts = [];
   let sentenceCount = 0;
+  // Track whether we're currently inside a bullet list section
+  let inBulletSection = false;
+
+  function closeBullets() {
+    if (inBulletSection) { parts.push(`</div>`); inBulletSection = false; }
+  }
+
   for (const raw of lines) {
     const line = raw.trim();
-    if (!line || line === '---') continue;
+    if (!line || line === '---') { closeBullets(); continue; }
     const stripped = line.replace(/^#{1,3}\s*/, '');
+
     if (/^TRANSLATION:/i.test(stripped)) {
+      closeBullets();
       const content = stripped.replace(/^TRANSLATION:\s*/i, '').trim();
       parts.push(`<div class="bd-heading">Translation</div>`);
-      parts.push(`<div class="bd-item bd-translation">${content ? escHtml(content) : ''}</div>`);
+      parts.push(`<div class="bd-translation">${content ? escHtml(content) : ''}</div>`);
     } else if (/^BREAKDOWN:/i.test(stripped)) {
-      parts.push(`<div class="bd-heading" style="margin-top:8px">Breakdown</div>`);
+      closeBullets();
+      // No visible header for "Breakdown" — it's just the section start
     } else if (/^SENTENCE:/i.test(stripped)) {
+      closeBullets();
       if (sentenceCount > 0) parts.push(`<hr class="bd-divider">`);
       sentenceCount++;
       parts.push(`<div class="bd-sentence">${escHtml(stripped.replace(/^SENTENCE:\s*/i, ''))}</div>`);
     } else if (/^MEANING:/i.test(stripped)) {
+      closeBullets();
       parts.push(`<div class="bd-meaning">${escHtml(stripped.replace(/^MEANING:\s*/i, ''))}</div>`);
     } else if (/^VOCAB:/i.test(stripped)) {
+      closeBullets();
       const content = stripped.replace(/^VOCAB:\s*/i, '').trim();
       parts.push(`<div class="bd-label">Vocab</div>`);
-      if (content) parts.push(`<div class="bd-item">${escHtml(content)}</div>`);
+      parts.push(`<div class="bd-bullets">`); inBulletSection = true;
+      if (content) parts.push(`<div class="bd-bullet">${escHtml(content)}</div>`);
     } else if (/^STRUCTURE:/i.test(stripped)) {
+      closeBullets();
       const content = stripped.replace(/^STRUCTURE:\s*/i, '').trim();
       parts.push(`<div class="bd-label">Structure</div>`);
       if (content) parts.push(`<div class="bd-item">${escHtml(content)}</div>`);
     } else if (/^GRAMMAR:/i.test(stripped)) {
+      closeBullets();
       const content = stripped.replace(/^GRAMMAR:\s*/i, '').trim();
       parts.push(`<div class="bd-label">Grammar</div>`);
-      if (content) parts.push(`<div class="bd-item">${escHtml(content)}</div>`);
+      parts.push(`<div class="bd-bullets">`); inBulletSection = true;
+      if (content) parts.push(`<div class="bd-bullet">${escHtml(content)}</div>`);
     } else {
+      // Continuation line — bullet item or prose continuation
+      const isBullet = /^[・•\-\*]\s*/.test(line);
       const bulletText = line.replace(/^[・•\-\*]\s*/, '');
-      const last = parts.length - 1;
-      if (last >= 0 && parts[last].includes('bd-item')) {
-        parts[last] = parts[last].replace(/<\/div>$/, `<br>${escHtml(bulletText)}</div>`);
+      if (inBulletSection) {
+        // Each bullet gets its own pill
+        parts.push(`<div class="bd-bullet">${escHtml(bulletText)}</div>`);
       } else {
-        parts.push(`<div class="bd-item">${escHtml(bulletText)}</div>`);
+        // Prose continuation — append to last bd-item or start new one
+        const last = parts.length - 1;
+        if (last >= 0 && parts[last].startsWith('<div class="bd-item">')) {
+          parts[last] = parts[last].replace(/<\/div>$/, ` ${escHtml(bulletText)}</div>`);
+        } else {
+          parts.push(`<div class="bd-item">${escHtml(bulletText)}</div>`);
+        }
       }
     }
   }
+  closeBullets();
   return parts.join('');
 }
 
