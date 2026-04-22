@@ -2284,10 +2284,11 @@ function renderBdState(state, mi) {
   let sentenceCards = '';
   for (let i = 0; i <= cur; i++) {
     const visible = i === cur;
-    const content = state.sentenceHtml[i] != null
+    const jpHeader = `<div class="bd-sentence">${escHtml(state.sentences[i])}</div>`;
+    const body = state.sentenceHtml[i] != null
       ? state.sentenceHtml[i]
       : `<div style="padding:12px 0;text-align:center"><span class="spin"></span></div>`;
-    sentenceCards += `<div class="bd-slide${visible ? ' bd-slide-active' : ''}">${content}</div>`;
+    sentenceCards += `<div class="bd-slide${visible ? ' bd-slide-active' : ''}">${jpHeader}${body}</div>`;
   }
 
   // Dots
@@ -2461,13 +2462,12 @@ function restoreAudioPlayer() {
 // Split a vocab/grammar string into individual "word (reading) — meaning" items
 function splitVocabItems(text) {
   if (!text.trim()) return [];
-  // Primary: split on ・ or • bullet markers (prompt enforces this format)
+  // Split on ・ or • bullet markers only — regex fallback was over-splitting
+  // parenthetical content like "(temporal and locational adverbials)"
   if (/[・•]/.test(text)) {
     return text.split(/\s*[・•]\s*/).map(s => s.trim()).filter(Boolean);
   }
-  // Fallback: split before entries starting with non-paren/non-dash char followed by —
-  const items = text.split(/\s+(?=[^(（\s—―].*?(?:\s*[(（][^)）]*[)）])?\s*[—―])/);
-  return items.length > 1 ? items.map(s => s.trim()).filter(Boolean) : [text.trim()];
+  return [text.trim()];
 }
 
 function formatBreakdown(text) {
@@ -2499,19 +2499,12 @@ function formatBreakdown(text) {
     } else if (/^BREAKDOWN\b/i.test(stripped)) {
       closeBullets(); awaitingSentenceContent = false;
     } else if (/^SENTENCE\b/i.test(stripped)) {
+      // Skip — the Japanese sentence is injected directly from state.sentences[i] in renderBdState
       closeBullets();
-      if (sentenceCount > 0) parts.push(`<hr class="bd-divider">`);
-      sentenceCount++;
       lastSection = 'sentence';
       const content = stripped.replace(/^SENTENCE:?\s*/i, '').trim();
-      if (content) {
-        parts.push(`<div class="bd-sentence">${escHtml(content)}</div>`);
-        awaitingSentenceContent = false;
-      } else {
-        // Japanese will be on the next line
-        parts.push(`<div class="bd-sentence"></div>`);
-        awaitingSentenceContent = true;
-      }
+      // If content follows on the next line, skip that too
+      awaitingSentenceContent = !!content ? false : true;
     } else if (/^MEANING\b/i.test(stripped)) {
       closeBullets(); awaitingSentenceContent = false; lastSection = 'meaning';
       parts.push(`<div class="bd-meaning">${escHtml(stripped.replace(/^MEANING:?\s*/i, ''))}</div>`);
@@ -2536,9 +2529,7 @@ function formatBreakdown(text) {
       // Continuation content — use stripped (# already removed)
       const bulletText = stripped.replace(/^[・•\-\*]\s*/, '');
       if (awaitingSentenceContent) {
-        // Fill the empty bd-sentence div we reserved
-        const last = parts.length - 1;
-        parts[last] = `<div class="bd-sentence">${escHtml(bulletText)}</div>`;
+        // Skip — sentence text comes from state.sentences[i], not Claude's response
         awaitingSentenceContent = false;
       } else if (inBulletSection) {
         splitVocabItems(bulletText).forEach(item => parts.push(`<div class="bd-bullet">${escHtml(item)}</div>`));
