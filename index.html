@@ -632,10 +632,20 @@ pre.code {
   color: var(--text); padding-bottom: 0; border-bottom: none; margin-bottom: 0;
 }
 .msg-breakdown .bd-divider { border: none; border-top: 1px solid var(--border); margin: 12px 0 10px; }
+.msg-breakdown .bd-sentence-row {
+  display: flex; align-items: flex-start; gap: 8px; margin-bottom: 4px;
+}
 .msg-breakdown .bd-sentence {
   font-family: 'Shippori Mincho', serif; font-size: 20px;
-  font-weight: 600; line-height: 1.4; margin: 0 0 4px; color: var(--text);
+  font-weight: 600; line-height: 1.4; flex: 1; color: var(--text);
 }
+.msg-breakdown .bd-speak-btn {
+  flex-shrink: 0; background: none; border: 1px solid var(--border);
+  border-radius: 4px; cursor: pointer; font-size: 13px; padding: 3px 7px;
+  color: var(--muted); margin-top: 2px; transition: color 0.15s, border-color 0.15s;
+}
+.msg-breakdown .bd-speak-btn:hover { color: var(--text); border-color: var(--text); }
+.msg-breakdown .bd-speak-btn.speaking { color: var(--accent); border-color: var(--accent); }
 .msg-breakdown .bd-meaning {
   font-style: italic; font-size: 12px; color: var(--muted);
   margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed var(--border);
@@ -815,6 +825,9 @@ pre.code {
 .rpg-msg .msg-breakdown .bd-item { color: #b0a888; }
 .rpg-msg .msg-breakdown .bd-divider { border-top-color: #2a2a3a; }
 .rpg-msg .bd-card { background: #1a1a2e; border-color: #2a2a3a; }
+.rpg-msg .msg-breakdown .bd-speak-btn { border-color: #2a2a3a; color: #5a5a7a; }
+.rpg-msg .msg-breakdown .bd-speak-btn:hover { color: #c0b080; border-color: #3a3a5a; }
+.rpg-msg .msg-breakdown .bd-speak-btn.speaking { color: #d0a850; border-color: #d0a850; }
 .rpg-msg .bd-carousel-nav { border-top-color: #2a2a3a; }
 .rpg-msg .bd-nav-btn { border-color: #2a2a3a; color: #5a5a7a; }
 .rpg-msg .bd-nav-btn:hover:not(:disabled) { color: #c0b080; border-color: #3a3a5a; }
@@ -2262,6 +2275,16 @@ function splitSentences(text) {
   return parts.length > 0 ? parts : [text.trim()];
 }
 
+// Speak a single sentence from the breakdown carousel
+window.bdSpeak = function(mi, si) {
+  const inRpg = window._rpg?.inDialogue && window._rpg?.dialogueState;
+  const convo = inRpg ? window._rpg.dialogueState.convo : S.convo;
+  const msg = convo[mi];
+  if (!msg?.bdState?.sentences?.[si]) return;
+  const btn = document.querySelector(`.bd-speak-btn[data-mi="${mi}"][data-si="${si}"]`);
+  speakJapanese(msg.bdState.sentences[si], btn, null);
+};
+
 function parseFirstBdReply(text) {
   const m = text.search(/^(?:#{1,3}\s*)?SENTENCE\b/im);
   if (m === -1) return { translationPart: text, sentencePart: '' };
@@ -2284,7 +2307,10 @@ function renderBdState(state, mi) {
   let sentenceCards = '';
   for (let i = 0; i <= cur; i++) {
     const visible = i === cur;
-    const jpHeader = `<div class="bd-sentence">${escHtml(state.sentences[i])}</div>`;
+    const jpHeader = `<div class="bd-sentence-row">
+        <div class="bd-sentence">${escHtml(state.sentences[i])}</div>
+        <button class="bd-speak-btn speak-btn" data-mi="${mi}" data-si="${i}" onclick="bdSpeak(${mi},${i})" title="Listen to this sentence">🔊</button>
+      </div>`;
     const body = state.sentenceHtml[i] != null
       ? state.sentenceHtml[i]
       : `<div style="padding:12px 0;text-align:center"><span class="spin"></span></div>`;
