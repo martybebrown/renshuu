@@ -659,9 +659,27 @@ pre.code {
 .bd-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; }
 .bd-card-translation .bd-translation { font-size: 13px; }
 .bd-card-translation { border-color: var(--accent); }
-.bd-next-wrap { margin-top: 4px; text-align: right; }
-.bd-next-btn { font-size: 10px; padding: 4px 10px; }
-.bd-next-btn:disabled { opacity: 0.5; cursor: default; }
+.bd-carousel { margin-top: 0; }
+.bd-slides { position: relative; }
+.bd-slide { display: none; }
+.bd-slide.bd-slide-active { display: block; }
+.bd-carousel-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);
+}
+.bd-nav-btn {
+  background: none; border: 1px solid var(--border); border-radius: 4px;
+  cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 10px;
+  color: var(--muted); transition: color 0.15s, border-color 0.15s;
+}
+.bd-nav-btn:hover:not(:disabled) { color: var(--text); border-color: var(--text); }
+.bd-nav-btn:disabled { opacity: 0.3; cursor: default; }
+.bd-dots { display: flex; gap: 5px; align-items: center; }
+.bd-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--border); transition: background 0.15s;
+}
+.bd-dot.bd-dot-active { background: var(--accent); }
 .chat-foot { display: flex; gap: 8px; align-items: flex-end; }
 .chat-input {
   flex: 1;
@@ -797,6 +815,11 @@ pre.code {
 .rpg-msg .msg-breakdown .bd-item { color: #b0a888; }
 .rpg-msg .msg-breakdown .bd-divider { border-top-color: #2a2a3a; }
 .rpg-msg .bd-card { background: #1a1a2e; border-color: #2a2a3a; }
+.rpg-msg .bd-carousel-nav { border-top-color: #2a2a3a; }
+.rpg-msg .bd-nav-btn { border-color: #2a2a3a; color: #5a5a7a; }
+.rpg-msg .bd-nav-btn:hover:not(:disabled) { color: #c0b080; border-color: #3a3a5a; }
+.rpg-msg .bd-dot { background: #2a2a3a; }
+.rpg-msg .bd-dot.bd-dot-active { background: #d0a850; }
 .rpg-msg .audio-player { margin-top: 4px; }
 .rpg-msg .audio-player .ap-btn { color: #5a5a7a; border-color: #2a2a3a; }
 .rpg-msg .audio-player .ap-btn:hover { color: #c0b080; border-color: #3a3a5a; }
@@ -1552,6 +1575,12 @@ document.addEventListener('click', e => {
   }
 
   // Next sentence in breakdown
+  const prevBtn = e.target.closest('.bd-prev-btn[data-mi]');
+  if (prevBtn && !prevBtn.disabled) {
+    breakdownPrev(parseInt(prevBtn.dataset.mi, 10));
+    return;
+  }
+
   const nextBtn = e.target.closest('.bd-next-btn[data-mi]');
   if (nextBtn && !nextBtn.disabled) {
     breakdownNext(parseInt(nextBtn.dataset.mi, 10));
@@ -2240,25 +2269,45 @@ function parseFirstBdReply(text) {
 }
 
 function renderBdState(state, mi) {
-  let html = '';
-  // Translation card (always first)
-  if (state.translationHtml) {
-    html += `<div class="bd-card bd-card-translation">${state.translationHtml}</div>`;
-  } else {
-    html += `<div class="bd-card bd-card-translation"><span class="spin"></span></div>`;
+  // Translation card
+  const translationCard = state.translationHtml
+    ? `<div class="bd-card bd-card-translation">${state.translationHtml}</div>`
+    : `<div class="bd-card bd-card-translation"><span class="spin"></span></div>`;
+
+  // Carousel: all loaded sentence cards, showing only current
+  const total = state.sentences.length;
+  const cur = state.idx;
+  const prevDisabled = cur === 0 ? 'disabled' : '';
+  const nextLoading = state.sentenceHtml[cur] === null;
+  const nextDisabled = (cur >= total - 1 && !nextLoading) ? 'disabled' : '';
+
+  let sentenceCards = '';
+  for (let i = 0; i <= cur; i++) {
+    const visible = i === cur;
+    const content = state.sentenceHtml[i] != null
+      ? state.sentenceHtml[i]
+      : `<div style="padding:12px 0;text-align:center"><span class="spin"></span></div>`;
+    sentenceCards += `<div class="bd-slide${visible ? ' bd-slide-active' : ''}">${content}</div>`;
   }
-  // Sentence cards
-  for (let i = 0; i <= state.idx; i++) {
-    html += state.sentenceHtml[i] != null
-      ? `<div class="bd-card">${state.sentenceHtml[i]}</div>`
-      : `<div class="bd-card"><span class="spin"></span></div>`;
+
+  // Dots
+  let dots = '';
+  for (let i = 0; i < total; i++) {
+    dots += `<span class="bd-dot${i === cur ? ' bd-dot-active' : ''}"></span>`;
   }
-  const hasMore = state.idx < state.sentences.length - 1;
-  if (hasMore) {
-    const ready = state.sentenceHtml[state.idx] != null;
-    html += `<div class="bd-next-wrap"><button class="bd-next-btn btn" data-mi="${mi}" ${ready ? '' : 'disabled'}>${ready ? 'Next sentence →' : '<span class="spin"></span>'}</button></div>`;
-  }
-  return html;
+
+  const carousel = total > 0 ? `
+    <div class="bd-carousel">
+      <div class="bd-slides">${sentenceCards}</div>
+      ${total > 1 ? `
+      <div class="bd-carousel-nav">
+        <button class="bd-prev-btn bd-nav-btn" data-mi="${mi}" ${prevDisabled} title="Previous sentence">‹</button>
+        <span class="bd-dots">${dots}</span>
+        <button class="bd-next-btn bd-nav-btn" data-mi="${mi}" ${nextDisabled} title="Next sentence">${nextLoading ? '<span class="spin"></span>' : '›'}</button>
+      </div>` : ''}
+    </div>` : '';
+
+  return translationCard + carousel;
 }
 
 function repaintBreakdown(inRpg, mi) {
@@ -2320,6 +2369,16 @@ GRAMMAR: [Each particle, verb form, or grammatical construction: what it is, its
     msg.bdState.translationHtml = `<span style="color:var(--red)">Failed: ${escHtml(err.message)}</span>`;
   }
 
+  msg.breakdown = renderBdState(msg.bdState, mi);
+  repaintBreakdown(inRpg, mi);
+}
+
+function breakdownPrev(mi) {
+  const inRpg = window._rpg?.inDialogue && window._rpg?.dialogueState;
+  const convo = inRpg ? window._rpg.dialogueState.convo : S.convo;
+  const msg = convo[mi];
+  if (!msg?.bdState || msg.bdState.idx <= 0) return;
+  msg.bdState.idx--;
   msg.breakdown = renderBdState(msg.bdState, mi);
   repaintBreakdown(inRpg, mi);
 }
@@ -2396,8 +2455,11 @@ function formatBreakdown(text) {
   const lines = clean.split('\n');
   const parts = [];
   let sentenceCount = 0;
-  // Track whether we're currently inside a bullet list section
   let inBulletSection = false;
+  // When SENTENCE: header has no inline content, the next line is the Japanese
+  let awaitingSentenceContent = false;
+  // Track current prose section so continuation lines know where to go
+  let lastSection = null;
 
   function closeBullets() {
     if (inBulletSection) { parts.push(`</div>`); inBulletSection = false; }
@@ -2405,48 +2467,60 @@ function formatBreakdown(text) {
 
   for (const raw of lines) {
     const line = raw.trim();
-    if (!line || line === '---') { closeBullets(); continue; }
+    if (!line || line === '---') { closeBullets(); awaitingSentenceContent = false; continue; }
+    // Strip leading markdown heading markers
     const stripped = line.replace(/^#{1,3}\s*/, '');
 
     if (/^TRANSLATION\b/i.test(stripped)) {
-      closeBullets();
+      closeBullets(); awaitingSentenceContent = false; lastSection = 'translation';
       const content = stripped.replace(/^TRANSLATION:?\s*/i, '').trim();
       parts.push(`<div class="bd-heading">Translation</div>`);
       parts.push(`<div class="bd-translation">${content ? escHtml(content) : ''}</div>`);
     } else if (/^BREAKDOWN\b/i.test(stripped)) {
-      closeBullets();
-      // No visible header for "Breakdown" — it's just the section start
+      closeBullets(); awaitingSentenceContent = false;
     } else if (/^SENTENCE\b/i.test(stripped)) {
       closeBullets();
       if (sentenceCount > 0) parts.push(`<hr class="bd-divider">`);
       sentenceCount++;
-      parts.push(`<div class="bd-sentence">${escHtml(stripped.replace(/^SENTENCE:?\s*/i, ''))}</div>`);
+      lastSection = 'sentence';
+      const content = stripped.replace(/^SENTENCE:?\s*/i, '').trim();
+      if (content) {
+        parts.push(`<div class="bd-sentence">${escHtml(content)}</div>`);
+        awaitingSentenceContent = false;
+      } else {
+        // Japanese will be on the next line
+        parts.push(`<div class="bd-sentence"></div>`);
+        awaitingSentenceContent = true;
+      }
     } else if (/^MEANING\b/i.test(stripped)) {
-      closeBullets();
+      closeBullets(); awaitingSentenceContent = false; lastSection = 'meaning';
       parts.push(`<div class="bd-meaning">${escHtml(stripped.replace(/^MEANING:?\s*/i, ''))}</div>`);
     } else if (/^VOCAB\b/i.test(stripped)) {
-      closeBullets();
+      closeBullets(); awaitingSentenceContent = false; lastSection = 'vocab';
       const content = stripped.replace(/^VOCAB:?\s*/i, '').trim();
       parts.push(`<div class="bd-label">Vocab</div>`);
       parts.push(`<div class="bd-bullets">`); inBulletSection = true;
       if (content) parts.push(`<div class="bd-bullet">${escHtml(content)}</div>`);
     } else if (/^STRUCTURE\b/i.test(stripped)) {
-      closeBullets();
+      closeBullets(); awaitingSentenceContent = false; lastSection = 'structure';
       const content = stripped.replace(/^STRUCTURE:?\s*/i, '').trim();
       parts.push(`<div class="bd-label">Structure</div>`);
       if (content) parts.push(`<div class="bd-item">${escHtml(content)}</div>`);
     } else if (/^GRAMMAR\b/i.test(stripped)) {
-      closeBullets();
+      closeBullets(); awaitingSentenceContent = false; lastSection = 'grammar';
       const content = stripped.replace(/^GRAMMAR:?\s*/i, '').trim();
       parts.push(`<div class="bd-label">Grammar</div>`);
       parts.push(`<div class="bd-bullets">`); inBulletSection = true;
       if (content) parts.push(`<div class="bd-bullet">${escHtml(content)}</div>`);
     } else {
-      // Continuation line — bullet item or prose continuation
-      const isBullet = /^[・•\-\*]\s*/.test(line);
-      const bulletText = line.replace(/^[・•\-\*]\s*/, '');
-      if (inBulletSection) {
-        // Each bullet gets its own pill
+      // Continuation content — use stripped (# already removed)
+      const bulletText = stripped.replace(/^[・•\-\*]\s*/, '');
+      if (awaitingSentenceContent) {
+        // Fill the empty bd-sentence div we reserved
+        const last = parts.length - 1;
+        parts[last] = `<div class="bd-sentence">${escHtml(bulletText)}</div>`;
+        awaitingSentenceContent = false;
+      } else if (inBulletSection) {
         parts.push(`<div class="bd-bullet">${escHtml(bulletText)}</div>`);
       } else {
         // Prose continuation — append to last bd-item or start new one
