@@ -2286,8 +2286,32 @@ window.bdSpeak = function(mi, si) {
   const convo = inRpg ? window._rpg.dialogueState.convo : S.convo;
   const msg = convo[mi];
   if (!msg?.bdState?.sentences?.[si]) return;
+  const sentence = msg.bdState.sentences[si];
   const btn = document.querySelector(`.bd-speak-btn[data-mi="${mi}"][data-si="${si}"]`);
-  speakJapanese(msg.bdState.sentences[si], btn, null);
+
+  // If the full message audio is already loaded, scrub to the start of this sentence
+  if (_currentMsgId === mi && _currentAudio && _wordBounds?.length) {
+    const plain = stripMarkers(msg.content);
+    const sentenceOffset = plain.indexOf(sentence);
+    if (sentenceOffset !== -1) {
+      // Find the first word boundary at or after this character offset
+      const wb = _wordBounds.find(b => b.plainOffset >= sentenceOffset) || _wordBounds[0];
+      if (wb) {
+        _currentAudio.currentTime = wb.ms / 1000;
+        if (_currentAudio.paused) {
+          _currentAudio.play();
+          const apBtn = document.querySelector(`.ap-btn[data-ap="${mi}"]`);
+          if (apBtn) { apBtn.textContent = '⏸'; apBtn.classList.add('playing'); }
+          btn?.classList.add('speaking');
+        }
+        updatePlayer(mi);
+        return;
+      }
+    }
+  }
+
+  // Fallback: synthesise just this sentence
+  speakJapanese(sentence, btn, null);
 };
 
 function parseFirstBdReply(text) {
