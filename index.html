@@ -1114,6 +1114,8 @@ pre.code {
   font-family: 'Courier New', monospace;
 }
 .rpg-scene-view .rpg-chat-head .btn:hover { background: #2a2a3a; color: #c0b080; }
+.rpg-scene-view .rpg-chat-head .rpg-fav-btn { font-size: 14px; padding: 2px 8px; }
+.rpg-scene-view .rpg-chat-head .rpg-fav-btn.active { color: #d0a850; border-color: #d0a850; background: #1e1a0a; }
 .rpg-scene-view .rpg-chat-messages {
   flex: 1; overflow-y: auto; padding: 12px 14px; scroll-behavior: smooth;
 }
@@ -1353,7 +1355,10 @@ pre.code {
       <div class="rpg-chat-half">
         <div class="rpg-chat-head">
           <div class="label" id="rpgChatCharName"></div>
-          <button class="btn" onclick="rpgLeaveChat()">← Back to town</button>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn rpg-fav-btn" id="rpgFavBtn" onclick="rpgToggleFavorite()" title="Add to favourites">☆</button>
+            <button class="btn" onclick="rpgLeaveChat()">← Back</button>
+          </div>
         </div>
         <div class="rpg-chat-messages" id="rpgChatMessages"></div>
         <div class="rpg-chat-input-area">
@@ -6478,6 +6483,7 @@ function renderStoryCard() {
     chatInput.value = '';
 
     sceneView.classList.add('active');
+    updateFavBtn();
 
     // Build system prompt — buildSysPrompt sets S.sysPrompt (no return value)
     buildSysPrompt(sc);
@@ -6607,6 +6613,33 @@ function renderStoryCard() {
   };
 
   // ── Leave chat / close splitscreen ──
+  // Update the ☆/★ favourite button to reflect current state
+  function updateFavBtn() {
+    const btn = document.getElementById('rpgFavBtn');
+    if (!btn || !rpg.dialogueState) return;
+    const isFav = S.favorites.some(f => f.id === rpg.dialogueState.scenarioId);
+    btn.textContent = isFav ? '★' : '☆';
+    btn.classList.toggle('active', isFav);
+    btn.title = isFav ? 'Remove from favourites' : 'Add to favourites';
+  }
+
+  window.rpgToggleFavorite = function() {
+    if (!rpg.dialogueState) return;
+    const sc = rpg.dialogueState.scenario;
+    const id = rpg.dialogueState.scenarioId;
+    // Temporarily set S.scenario so toggleFavorite can capture convo
+    const prevScenario = S.scenario;
+    const prevConvo = S.convo;
+    S.scenario = sc;
+    S.convo = rpg.dialogueState.convo;
+    toggleFavorite(id);
+    S.scenario = prevScenario;
+    S.convo = prevConvo;
+    updateFavBtn();
+    // Regenerate zone 0 so the favourite star appears in town
+    if (rpg.zones) delete rpg.zones[0];
+  };
+
   window.rpgLeaveChat = function() {
     closeDialogue();
   };
