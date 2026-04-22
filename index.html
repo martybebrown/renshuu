@@ -2358,9 +2358,13 @@ TRANSLATION:
 
 SENTENCE: ${sentences[0]}
 MEANING: [English translation of this sentence]
-VOCAB: [key words (reading) — meaning, one per bullet ・]
+VOCAB:
+・[word] ([reading]) — [meaning]
+・[word] ([reading]) — [meaning]
 STRUCTURE: [How this sentence is built — its overall pattern and how the parts connect. Short paragraph.]
-GRAMMAR: [Each particle, verb form, or grammatical construction: what it is, its base form and how it was changed, its role here, and what would differ without it. One element per bullet ・]`
+GRAMMAR:
+・[element] — [explanation]
+・[element] — [explanation]`
     }], BD_SYS, 800, 'claude-haiku-4-5-20251001');
     const { translationPart, sentencePart } = parseFirstBdReply(reply);
     msg.bdState.translationHtml = formatBreakdown(translationPart);
@@ -2407,9 +2411,13 @@ Break down only this sentence for an N4–N3 learner:
 
 SENTENCE: ${sentence}
 MEANING: [English translation]
-VOCAB: [key words (reading) — meaning, one per bullet ・]
+VOCAB:
+・[word] ([reading]) — [meaning]
+・[word] ([reading]) — [meaning]
 STRUCTURE: [How this sentence is built — short paragraph]
-GRAMMAR: [Each particle, verb form, or grammatical construction explained mechanically. One element per bullet ・]`
+GRAMMAR:
+・[element] — [explanation]
+・[element] — [explanation]`
       }], BD_SYS, 800, 'claude-haiku-4-5-20251001');
       state.sentenceHtml[state.idx] = formatBreakdown(reply);
     } catch (err) {
@@ -2450,15 +2458,15 @@ function restoreAudioPlayer() {
   if (!_currentAudio.paused) updatePlayer(_currentMsgId);
 }
 
-// Split a vocab line into individual "word (reading) — meaning" items
+// Split a vocab/grammar string into individual "word (reading) — meaning" items
 function splitVocabItems(text) {
   if (!text.trim()) return [];
-  // Try splitting on ・ or • bullet markers first
+  // Primary: split on ・ or • bullet markers (prompt enforces this format)
   if (/[・•]/.test(text)) {
     return text.split(/\s*[・•]\s*/).map(s => s.trim()).filter(Boolean);
   }
-  // Split on whitespace before entries that match: chars + optional (reading) + ' —'
-  const items = text.split(/\s+(?=\S.*?(?:\([^)]*\)\s*)?—)/);
+  // Fallback: split before entries starting with non-paren/non-dash char followed by —
+  const items = text.split(/\s+(?=[^(（\s—―].*?(?:\s*[(（][^)）]*[)）])?\s*[—―])/);
   return items.length > 1 ? items.map(s => s.trim()).filter(Boolean) : [text.trim()];
 }
 
