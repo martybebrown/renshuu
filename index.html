@@ -2487,7 +2487,7 @@ function formatBreakdown(text) {
 
   for (const raw of lines) {
     const line = raw.trim();
-    if (!line || line === '---') { closeBullets(); awaitingSentenceContent = false; continue; }
+    if (!line || line === '---') { awaitingSentenceContent = false; continue; }
     // Strip leading markdown heading markers
     const stripped = line.replace(/^#{1,3}\s*/, '');
 
