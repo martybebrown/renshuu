@@ -2234,7 +2234,7 @@ function splitSentences(text) {
 }
 
 function parseFirstBdReply(text) {
-  const m = text.search(/^SENTENCE:/im);
+  const m = text.search(/^(?:#{1,3}\s*)?SENTENCE\b/im);
   if (m === -1) return { translationPart: text, sentencePart: '' };
   return { translationPart: text.slice(0, m), sentencePart: text.slice(m) };
 }
@@ -2408,36 +2408,36 @@ function formatBreakdown(text) {
     if (!line || line === '---') { closeBullets(); continue; }
     const stripped = line.replace(/^#{1,3}\s*/, '');
 
-    if (/^TRANSLATION:/i.test(stripped)) {
+    if (/^TRANSLATION\b/i.test(stripped)) {
       closeBullets();
-      const content = stripped.replace(/^TRANSLATION:\s*/i, '').trim();
+      const content = stripped.replace(/^TRANSLATION:?\s*/i, '').trim();
       parts.push(`<div class="bd-heading">Translation</div>`);
       parts.push(`<div class="bd-translation">${content ? escHtml(content) : ''}</div>`);
-    } else if (/^BREAKDOWN:/i.test(stripped)) {
+    } else if (/^BREAKDOWN\b/i.test(stripped)) {
       closeBullets();
       // No visible header for "Breakdown" — it's just the section start
-    } else if (/^SENTENCE:/i.test(stripped)) {
+    } else if (/^SENTENCE\b/i.test(stripped)) {
       closeBullets();
       if (sentenceCount > 0) parts.push(`<hr class="bd-divider">`);
       sentenceCount++;
-      parts.push(`<div class="bd-sentence">${escHtml(stripped.replace(/^SENTENCE:\s*/i, ''))}</div>`);
-    } else if (/^MEANING:/i.test(stripped)) {
+      parts.push(`<div class="bd-sentence">${escHtml(stripped.replace(/^SENTENCE:?\s*/i, ''))}</div>`);
+    } else if (/^MEANING\b/i.test(stripped)) {
       closeBullets();
-      parts.push(`<div class="bd-meaning">${escHtml(stripped.replace(/^MEANING:\s*/i, ''))}</div>`);
-    } else if (/^VOCAB:/i.test(stripped)) {
+      parts.push(`<div class="bd-meaning">${escHtml(stripped.replace(/^MEANING:?\s*/i, ''))}</div>`);
+    } else if (/^VOCAB\b/i.test(stripped)) {
       closeBullets();
-      const content = stripped.replace(/^VOCAB:\s*/i, '').trim();
+      const content = stripped.replace(/^VOCAB:?\s*/i, '').trim();
       parts.push(`<div class="bd-label">Vocab</div>`);
       parts.push(`<div class="bd-bullets">`); inBulletSection = true;
       if (content) parts.push(`<div class="bd-bullet">${escHtml(content)}</div>`);
-    } else if (/^STRUCTURE:/i.test(stripped)) {
+    } else if (/^STRUCTURE\b/i.test(stripped)) {
       closeBullets();
-      const content = stripped.replace(/^STRUCTURE:\s*/i, '').trim();
+      const content = stripped.replace(/^STRUCTURE:?\s*/i, '').trim();
       parts.push(`<div class="bd-label">Structure</div>`);
       if (content) parts.push(`<div class="bd-item">${escHtml(content)}</div>`);
-    } else if (/^GRAMMAR:/i.test(stripped)) {
+    } else if (/^GRAMMAR\b/i.test(stripped)) {
       closeBullets();
-      const content = stripped.replace(/^GRAMMAR:\s*/i, '').trim();
+      const content = stripped.replace(/^GRAMMAR:?\s*/i, '').trim();
       parts.push(`<div class="bd-label">Grammar</div>`);
       parts.push(`<div class="bd-bullets">`); inBulletSection = true;
       if (content) parts.push(`<div class="bd-bullet">${escHtml(content)}</div>`);
