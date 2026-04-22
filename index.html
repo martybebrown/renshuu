@@ -2450,6 +2450,18 @@ function restoreAudioPlayer() {
   if (!_currentAudio.paused) updatePlayer(_currentMsgId);
 }
 
+// Split a vocab line into individual "word (reading) — meaning" items
+function splitVocabItems(text) {
+  if (!text.trim()) return [];
+  // Try splitting on ・ or • bullet markers first
+  if (/[・•]/.test(text)) {
+    return text.split(/\s*[・•]\s*/).map(s => s.trim()).filter(Boolean);
+  }
+  // Split on whitespace before entries that match: chars + optional (reading) + ' —'
+  const items = text.split(/\s+(?=\S.*?(?:\([^)]*\)\s*)?—)/);
+  return items.length > 1 ? items.map(s => s.trim()).filter(Boolean) : [text.trim()];
+}
+
 function formatBreakdown(text) {
   const clean = text.replace(/\*\*/g, '');
   const lines = clean.split('\n');
@@ -2500,7 +2512,7 @@ function formatBreakdown(text) {
       const content = stripped.replace(/^VOCAB:?\s*/i, '').trim();
       parts.push(`<div class="bd-label">Vocab</div>`);
       parts.push(`<div class="bd-bullets">`); inBulletSection = true;
-      if (content) parts.push(`<div class="bd-bullet">${escHtml(content)}</div>`);
+      if (content) splitVocabItems(content).forEach(item => parts.push(`<div class="bd-bullet">${escHtml(item)}</div>`));
     } else if (/^STRUCTURE\b/i.test(stripped)) {
       closeBullets(); awaitingSentenceContent = false; lastSection = 'structure';
       const content = stripped.replace(/^STRUCTURE:?\s*/i, '').trim();
@@ -2511,7 +2523,7 @@ function formatBreakdown(text) {
       const content = stripped.replace(/^GRAMMAR:?\s*/i, '').trim();
       parts.push(`<div class="bd-label">Grammar</div>`);
       parts.push(`<div class="bd-bullets">`); inBulletSection = true;
-      if (content) parts.push(`<div class="bd-bullet">${escHtml(content)}</div>`);
+      if (content) splitVocabItems(content).forEach(item => parts.push(`<div class="bd-bullet">${escHtml(item)}</div>`));
     } else {
       // Continuation content — use stripped (# already removed)
       const bulletText = stripped.replace(/^[・•\-\*]\s*/, '');
@@ -2521,7 +2533,7 @@ function formatBreakdown(text) {
         parts[last] = `<div class="bd-sentence">${escHtml(bulletText)}</div>`;
         awaitingSentenceContent = false;
       } else if (inBulletSection) {
-        parts.push(`<div class="bd-bullet">${escHtml(bulletText)}</div>`);
+        splitVocabItems(bulletText).forEach(item => parts.push(`<div class="bd-bullet">${escHtml(item)}</div>`));
       } else {
         // Prose continuation — append to last bd-item or start new one
         const last = parts.length - 1;
