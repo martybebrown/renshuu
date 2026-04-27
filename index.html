@@ -6573,10 +6573,11 @@ function renderStoryCard() {
 
   // Helper: extract correction from Claude reply
   function extractCorrection(reply) {
-    const match = reply.match(/\[Correction:\s*(.*?)\]/s);
+    const corrRx = /\[Correction:\s*([\s\S]*)\]\s*$/i;
+    const match = reply.match(corrRx);
     return {
-      correction: match ? match[1].trim() : null,
-      clean: reply.replace(/\[Correction:.*?\]/s, '').trim(),
+      correction: match ? match[1].replace(/\[\[([^\[\]|]+)\|[^\[\]]+\]\]/g, '$1').trim() : null,
+      clean: reply.replace(corrRx, '').trim(),
     };
   }
 
