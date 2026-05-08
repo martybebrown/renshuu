@@ -1294,6 +1294,9 @@ pre.code {
 
 /* ── Mobile (< 768px) ──────────────────────────────────────────────────────── */
 @media (max-width: 767px) {
+  /* Hide character portrait/avatar in chat to give messages more width */
+  .rpg-portrait-frame, .msg-avatar { display: none; }
+
   /* Show hamburger */
   .menu-btn { display: inline-flex; }
 
