@@ -693,6 +693,19 @@ pre.code {
 .msg-breakdown .bd-list { color: var(--text); margin-left: 4px; }
 .bd-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; }
 .bd-card-translation .bd-translation { font-size: 13px; }
+.bd-tr-sentence {
+  cursor: pointer; padding: 1px 3px; margin: 0 -1px; border-radius: 3px;
+  transition: background 0.12s, color 0.12s;
+}
+.bd-tr-sentence:hover { background: rgba(150,120,80,0.12); }
+.bd-tr-sentence.bd-tr-sentence-active {
+  background: rgba(150,120,80,0.22); color: var(--accent);
+  box-shadow: inset 0 -1px 0 var(--accent);
+}
+.rpg-msg .msg-breakdown .bd-tr-sentence:hover { background: rgba(208,168,80,0.15); }
+.rpg-msg .msg-breakdown .bd-tr-sentence.bd-tr-sentence-active {
+  background: rgba(208,168,80,0.22); color: #d0a850; box-shadow: inset 0 -1px 0 #d0a850;
+}
 .bd-card-translation { border-color: var(--accent); }
 .bd-carousel { margin-top: 0; }
 .bd-slides { position: relative; }
@@ -2348,6 +2361,22 @@ function splitSentences(text) {
   return parts.length > 0 ? parts : [text.trim()];
 }
 
+function splitEngSentences(text) {
+  // Split on sentence-ending punctuation (.!?) keeping the punctuation,
+  // but be tolerant of trailing quotes/parens.
+  const matches = text.match(/[^.!?]+[.!?]+["')\]”’]*\s*/g);
+  if (!matches) return [text.trim()].filter(Boolean);
+  return matches.map(s => s.trim()).filter(Boolean);
+}
+
+function extractTranslationText(translationPart) {
+  return (translationPart || '')
+    .replace(/\*\*/g, '')
+    .replace(/^#{1,3}\s*/gm, '')
+    .replace(/^TRANSLATION:?\s*/im, '')
+    .trim();
+}
+
 // Speak a single sentence from the breakdown carousel
 window.bdSpeak = function(mi, si) {
   const inRpg = window._rpg?.inDialogue && window._rpg?.dialogueState;
@@ -2389,14 +2418,29 @@ function parseFirstBdReply(text) {
 }
 
 function renderBdState(state, mi) {
-  // Translation card
-  const translationCard = state.translationHtml
-    ? `<div class="bd-card bd-card-translation">${state.translationHtml}</div>`
-    : `<div class="bd-card bd-card-translation"><span class="spin"></span></div>`;
-
-  // Carousel: all loaded sentence cards, showing only current
   const total = state.sentences.length;
   const cur = state.idx;
+
+  // Translation card — try to make sentences clickable when EN count matches JP count
+  let translationInner;
+  if (!state.translationHtml) {
+    translationInner = '<span class="spin"></span>';
+  } else if (state.translationText) {
+    const engSentences = splitEngSentences(state.translationText);
+    if (engSentences.length === total && total > 1) {
+      const items = engSentences.map((s, i) =>
+        `<span class="bd-tr-sentence${i === cur ? ' bd-tr-sentence-active' : ''}" onclick="bdJumpTo(${mi}, ${i})" title="Jump to this sentence">${escHtml(s)}</span>`
+      ).join(' ');
+      translationInner = `<div class="bd-heading">Translation</div><div class="bd-translation">${items}</div>`;
+    } else {
+      translationInner = state.translationHtml;
+    }
+  } else {
+    translationInner = state.translationHtml;
+  }
+  const translationCard = `<div class="bd-card bd-card-translation">${translationInner}</div>`;
+
+  // Carousel: all loaded sentence cards, showing only current
   const prevDisabled = cur === 0 ? 'disabled' : '';
   const nextLoading = state.sentenceHtml[cur] === null;
   const nextDisabled = (cur >= total - 1 && !nextLoading) ? 'disabled' : '';
@@ -2482,7 +2526,7 @@ async function breakdownMessage(msg, btn, mi) {
 
   const plain = stripMarkers(msg.content);
   const sentences = splitSentences(plain);
-  msg.bdState = { sentences, idx: 0, translationHtml: null, sentenceHtml: new Array(sentences.length).fill(null) };
+  msg.bdState = { sentences, idx: 0, translationHtml: null, translationText: null, sentenceHtml: new Array(sentences.length).fill(null) };
 
   try {
     const reply = await claude([{ role: 'user', content:
@@ -2505,6 +2549,7 @@ GRAMMAR:
     }], BD_SYS, 800, 'claude-haiku-4-5-20251001');
     const { translationPart, sentencePart } = parseFirstBdReply(reply);
     msg.bdState.translationHtml = formatBreakdown(translationPart);
+    msg.bdState.translationText = extractTranslationText(translationPart);
     msg.bdState.sentenceHtml[0] = formatBreakdown(sentencePart);
   } catch (err) {
     msg.bdState.translationHtml = `<span style="color:var(--red)">Failed: ${escHtml(err.message)}</span>`;
@@ -2524,6 +2569,50 @@ function breakdownPrev(mi) {
   repaintBreakdown(inRpg, mi);
 }
 
+async function loadSentenceBreakdown(msg, si, mi, inRpg) {
+  const state = msg.bdState;
+  if (state.sentenceHtml[si] !== null) return;
+  try {
+    const plain = stripMarkers(msg.content);
+    const sentence = state.sentences[si];
+    const reply = await claude([{ role: 'user', content:
+`Full message context: ${plain}
+
+Break down only this sentence for an N4–N3 learner:
+
+SENTENCE: ${sentence}
+MEANING: [English translation]
+VOCAB:
+・[word] ([reading]) — [meaning]
+・[word] ([reading]) — [meaning]
+STRUCTURE: [How this sentence is built — short paragraph]
+GRAMMAR:
+・[element] — [explanation]
+・[element] — [explanation]`
+    }], BD_SYS, 800, 'claude-haiku-4-5-20251001');
+    state.sentenceHtml[si] = formatBreakdown(reply);
+  } catch (err) {
+    state.sentenceHtml[si] = `<span style="color:var(--red)">Failed: ${escHtml(err.message)}</span>`;
+  }
+  msg.breakdown = renderBdState(state, mi);
+  repaintBreakdown(inRpg, mi);
+}
+
+window.bdJumpTo = async function(mi, si) {
+  const inRpg = window._rpg?.inDialogue && window._rpg?.dialogueState;
+  const convo = inRpg ? window._rpg.dialogueState.convo : S.convo;
+  const msg = convo[mi];
+  if (!msg?.bdState) return;
+  const state = msg.bdState;
+  if (si < 0 || si >= state.sentences.length || si === state.idx) return;
+  state.idx = si;
+  msg.breakdown = renderBdState(state, mi);
+  repaintBreakdown(inRpg, mi);
+  if (state.sentenceHtml[si] === null) {
+    await loadSentenceBreakdown(msg, si, mi, inRpg);
+  }
+};
+
 async function breakdownNext(mi) {
   const inRpg = window._rpg?.inDialogue && window._rpg?.dialogueState;
   const convo = inRpg ? window._rpg.dialogueState.convo : S.convo;
@@ -2538,30 +2627,7 @@ async function breakdownNext(mi) {
   repaintBreakdown(inRpg, mi);
 
   if (state.sentenceHtml[state.idx] === null) {
-    try {
-      const plain = stripMarkers(msg.content);
-      const sentence = state.sentences[state.idx];
-      const reply = await claude([{ role: 'user', content:
-`Full message context: ${plain}
-
-Break down only this sentence for an N4–N3 learner:
-
-SENTENCE: ${sentence}
-MEANING: [English translation]
-VOCAB:
-・[word] ([reading]) — [meaning]
-・[word] ([reading]) — [meaning]
-STRUCTURE: [How this sentence is built — short paragraph]
-GRAMMAR:
-・[element] — [explanation]
-・[element] — [explanation]`
-      }], BD_SYS, 800, 'claude-haiku-4-5-20251001');
-      state.sentenceHtml[state.idx] = formatBreakdown(reply);
-    } catch (err) {
-      state.sentenceHtml[state.idx] = `<span style="color:var(--red)">Failed: ${escHtml(err.message)}</span>`;
-    }
-    msg.breakdown = renderBdState(state, mi);
-    repaintBreakdown(inRpg, mi);
+    await loadSentenceBreakdown(msg, state.idx, mi, inRpg);
   }
 }
 
