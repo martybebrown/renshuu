@@ -715,6 +715,36 @@ pre.code {
   background: var(--border); transition: background 0.15s;
 }
 .bd-dot.bd-dot-active { background: var(--accent); }
+.bd-qa-thread { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.bd-qa { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
+.bd-q { font-size: 11px; color: var(--muted); margin-bottom: 4px; font-style: italic; }
+.bd-q::before { content: '? '; color: var(--accent); font-weight: bold; font-style: normal; }
+.bd-a { font-size: 12px; line-height: 1.6; color: var(--text); }
+.bd-ask-form {
+  display: flex; gap: 6px; margin-top: 10px; padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+.bd-ask-input {
+  flex: 1; background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); padding: 6px 10px; border-radius: 4px;
+  font-family: 'Shippori Mincho', serif; font-size: 12px; outline: none;
+}
+.bd-ask-input:focus { border-color: var(--accent); }
+.bd-ask-input::placeholder { color: var(--muted); font-style: italic; }
+.bd-ask-btn {
+  background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+  padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
+}
+.bd-ask-btn:hover:not(:disabled) { color: var(--text); border-color: var(--text); }
+.bd-ask-btn:disabled { opacity: 0.4; cursor: default; }
+.rpg-msg .msg-breakdown .bd-qa { background: #1a1a2a; border-color: #2a2a3a; }
+.rpg-msg .msg-breakdown .bd-q { color: #7a7a9a; }
+.rpg-msg .msg-breakdown .bd-q::before { color: #d0a850; }
+.rpg-msg .msg-breakdown .bd-a { color: #b0a888; }
+.rpg-msg .msg-breakdown .bd-ask-input { background: #12121e; border-color: #2a2a3a; color: #e0d8c8; }
+.rpg-msg .msg-breakdown .bd-ask-input:focus { border-color: #4a4a6a; }
+.rpg-msg .msg-breakdown .bd-ask-btn { background: #1a1a2a; border-color: #2a2a3a; color: #7a7a9a; }
+.rpg-msg .msg-breakdown .bd-ask-btn:hover:not(:disabled) { color: #c0b080; border-color: #3a3a5a; }
 .chat-foot { display: flex; gap: 8px; align-items: flex-end; }
 .chat-input {
   flex: 1;
@@ -2381,7 +2411,20 @@ function renderBdState(state, mi) {
     const body = state.sentenceHtml[i] != null
       ? state.sentenceHtml[i]
       : `<div style="padding:12px 0;text-align:center"><span class="spin"></span></div>`;
-    sentenceCards += `<div class="bd-slide${visible ? ' bd-slide-active' : ''}">${jpHeader}${body}</div>`;
+
+    const qa = (state.questions?.[i] || []).map(qa => `
+      <div class="bd-qa">
+        <div class="bd-q">${escHtml(qa.q)}</div>
+        <div class="bd-a">${qa.a == null ? '<span class="spin"></span>' : qa.a}</div>
+      </div>`).join('');
+    const askForm = state.sentenceHtml[i] != null ? `
+      <form class="bd-ask-form" onsubmit="event.preventDefault(); bdAsk(this, ${mi}, ${i})">
+        <input class="bd-ask-input" placeholder="Ask about this sentence…" autocomplete="off" />
+        <button class="bd-ask-btn" type="submit">Ask</button>
+      </form>` : '';
+    const qaBlock = qa || askForm ? `<div class="bd-qa-thread">${qa}</div>${askForm}` : '';
+
+    sentenceCards += `<div class="bd-slide${visible ? ' bd-slide-active' : ''}">${jpHeader}${body}${qaBlock}</div>`;
   }
 
   // Dots
@@ -2521,6 +2564,49 @@ GRAMMAR:
     repaintBreakdown(inRpg, mi);
   }
 }
+
+window.bdAsk = async function(form, mi, si) {
+  const inRpg = window._rpg?.inDialogue && window._rpg?.dialogueState;
+  const convo = inRpg ? window._rpg.dialogueState.convo : S.convo;
+  const msg = convo[mi];
+  if (!msg?.bdState) return;
+
+  const input = form.querySelector('.bd-ask-input');
+  const question = input.value.trim();
+  if (!question) return;
+
+  const state = msg.bdState;
+  if (!state.questions) state.questions = [];
+  if (!state.questions[si]) state.questions[si] = [];
+
+  const entry = { q: question, a: null };
+  state.questions[si].push(entry);
+  input.value = '';
+  msg.breakdown = renderBdState(state, mi);
+  repaintBreakdown(inRpg, mi);
+
+  try {
+    const fullMsg = stripMarkers(msg.content);
+    const sentence = state.sentences[si];
+    const history = state.questions[si].slice(0, -1)
+      .map(p => `Q: ${p.q}\nA: ${typeof p.a === 'string' ? p.a.replace(/<[^>]+>/g, '') : ''}`).join('\n\n');
+    const reply = await claude([{ role: 'user', content:
+`Full message: ${fullMsg}
+Specific sentence: ${sentence}
+${history ? `\nPrevious Q&A on this sentence:\n${history}\n` : ''}
+Student's question: ${question}
+
+Answer the student's question directly, focusing on this specific sentence and what they don't understand. Be concise and clear — usually 2-4 sentences. If you cite Japanese words, you may use [[word|reading|english]] markers, but only for the specific words you're explaining (don't mark up everything).`
+    }], BD_SYS, 600, 'claude-haiku-4-5-20251001');
+
+    entry.a = safeAnnotated(buildAnnotated(reply.trim()));
+  } catch (err) {
+    entry.a = `<span style="color:var(--red)">Failed: ${escHtml(err.message)}</span>`;
+  }
+
+  msg.breakdown = renderBdState(state, mi);
+  repaintBreakdown(inRpg, mi);
+};
 
 // Rebuild word map on zoom/resize so highlighting stays in sync
 window.addEventListener('resize', () => {
