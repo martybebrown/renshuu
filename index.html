@@ -1393,7 +1393,7 @@ pre.code {
         <div class="rpg-chat-head">
           <div class="label" id="rpgChatCharName"></div>
           <div style="display:flex;gap:6px;align-items:center">
-            <button class="btn rpg-ff-btn" id="rpgFfBtn" onclick="rpgFastForward()" title="Fast forward to next meeting">⏩ Skip</button>
+            <button class="btn rpg-ff-btn" id="rpgFfBtn" onclick="rpgFastForward()" title="Skip ahead in time">⏩</button>
             <button class="btn rpg-fav-btn" id="rpgFavBtn" onclick="rpgToggleFavorite()" title="Add to favourites">☆</button>
             <button class="btn" onclick="rpgLeaveChat()">← Back</button>
           </div>
@@ -4819,8 +4819,8 @@ function renderRoleplay() {
           <div class="rpg-head">
             <button class="btn" onclick="backToScenarios()">← Back</button>
             <div class="label" style="flex:1;text-align:center">${escHtml(S.scenario.char)}</div>
-            <button class="btn rpg-ff-btn" id="roleplFfBtn" onclick="roleplFastForward()" title="Fast forward to next meeting">⏩ Skip</button>
-            <button class="btn" onclick="resetChat()">Reset</button>
+            <button class="btn rpg-ff-btn" id="roleplFfBtn" onclick="roleplFastForward()" title="Skip ahead in time">⏩</button>
+            <button class="btn" onclick="resetChat()" title="Reset conversation">↺</button>
           </div>
           <div class="rpg-dialogue" id="chatWin">${renderMessages()}</div>
           <div class="rpg-input-area">
@@ -4838,8 +4838,8 @@ function renderRoleplay() {
         <div class="chat-head">
           <button class="btn" onclick="backToScenarios()">← Back</button>
           <div class="label">${S.scenario.jp} — ${S.scenario.en}</div>
-          <button class="btn" id="roleplFfBtn" onclick="roleplFastForward()" title="Fast forward to next meeting">⏩ Skip</button>
-          <button class="btn" onclick="resetChat()">Reset</button>
+          <button class="btn" id="roleplFfBtn" onclick="roleplFastForward()" title="Skip ahead in time">⏩</button>
+          <button class="btn" onclick="resetChat()" title="Reset conversation">↺</button>
         </div>
         <div class="chat-window" id="chatWin">${renderMessages()}</div>
         <div class="chat-foot">
@@ -5047,14 +5047,14 @@ function saveConvoToFavorite() {
   }
 }
 
-async function roleplFastForward() {
-  if (!S.scenario || S.convo.length < 2) return;
+async function fastForward({ sc, getConvo, pushMsg, updateView, btnId }) {
+  const convo = getConvo();
+  if (!sc || convo.length < 2) return;
 
-  const btn = document.getElementById('roleplFfBtn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏩ …'; }
+  const btn = document.getElementById(btnId);
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
 
-  const sc = S.scenario;
-  const recentMsgs = S.convo.filter(m => !m.divider && m.content !== '…').slice(-20).map(m => ({ role: m.role, content: m.content }));
+  const recentMsgs = convo.filter(m => !m.divider && m.content !== '…').slice(-20).map(m => ({ role: m.role, content: m.content }));
 
   const summaryPrompt = `You are a narrator summarising an ongoing conversation for context.
 The student has been talking with ${sc.char} at ${sc.en}. ${sc.ctx}
@@ -5066,10 +5066,10 @@ Write a brief 2-3 sentence summary in ENGLISH of what happened, the relationship
       summaryPrompt, 300, 'claude-haiku-4-5-20251001'
     );
 
-    S.convo.push({ role: 'system', content: '', divider: true, _id: msgId() });
+    pushMsg({ role: 'system', content: '', divider: true });
 
     buildSysPrompt(sc);
-    S.sysPrompt += `\n\nEPISODE CONTINUITY — This is NOT the first meeting. The student and your character have an ongoing relationship.\nPrevious episode summary: ${summary}\nTIME SKIP: Some time has passed since you last met. Start a new scene — you might be in a different place, time of day, or situation, but still consistent with the scenario (${sc.en}). Reference something from the previous conversation naturally. Show that the relationship has progressed. Do NOT repeat the same opening greeting — vary your mood, setting, and conversation starter.`;
+    S.sysPrompt += `\n\nEPISODE CONTINUITY — This is NOT the first meeting. The student and your character have an ongoing relationship.\nPrevious episode summary: ${summary}\nTIME SKIP: Some time has passed since you last met. Start a new scene — different place, time of day, or situation, but consistent with ${sc.en}. Reference something from the previous conversation naturally. Show that the relationship has progressed. Do NOT repeat the same opening greeting.`;
 
     const reply = await claude(
       [{ role: 'user', content: 'Continue the story. We meet again after some time has passed. Greet me in character, referencing our previous encounter.' }],
@@ -5078,15 +5078,24 @@ Write a brief 2-3 sentence summary in ENGLISH of what happened, the relationship
 
     const corrRx = /\[Correction:\s*([\s\S]*)\]\s*$/i;
     const clean = reply.replace(corrRx, '').trim();
-    S.convo.push({ role: 'assistant', content: clean, _id: msgId() });
-    updateChat();
-    saveConvoToFavorite();
+    pushMsg({ role: 'assistant', content: clean });
+    updateView();
   } catch (e) {
-    S.convo.push({ role: 'assistant', content: 'エラーが発生しました。もう一度お願いします。', _id: msgId() });
-    updateChat();
+    pushMsg({ role: 'assistant', content: 'エラーが発生しました。もう一度お願いします。' });
+    updateView();
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '⏩ Skip'; }
+    if (btn) { btn.disabled = false; btn.textContent = '⏩'; }
   }
+}
+
+function roleplFastForward() {
+  fastForward({
+    sc: S.scenario,
+    btnId: 'roleplFfBtn',
+    getConvo: () => S.convo,
+    pushMsg: msg => { S.convo.push({ ...msg, _id: msgId() }); },
+    updateView: () => { updateChat(); saveConvoToFavorite(); },
+  });
 }
 
 async function startChat() {
@@ -7261,52 +7270,25 @@ function renderStoryCard() {
   // ── Fast forward — skip to next meeting/episode ──
   window.rpgFastForward = function() {
     const ds = rpg.dialogueState;
-    if (!ds || ds.phase !== 'chat' || ds.convo.length < 2) return;
-
-    const ffBtn = document.getElementById('rpgFfBtn');
-    if (ffBtn) { ffBtn.disabled = true; ffBtn.textContent = '⏩ …'; }
-
-    const sc = ds.scenario;
-    const recentMsgs = ds.convo.slice(-20).map(m => ({ role: m.role, content: m.content }));
-
-    const summaryPrompt = `You are a narrator summarising an ongoing conversation for context.
-The student has been talking with ${sc.char} at ${sc.en}. ${sc.ctx}
-Here is their recent conversation. Write a brief 2-3 sentence summary in ENGLISH of what happened, the relationship dynamic, any plans made, and the emotional tone. Focus on details that would matter when they meet again.`;
-
-    claude(
-      [...recentMsgs, { role: 'user', content: 'Summarise this conversation so far for continuity.' }],
-      summaryPrompt, 300, 'claude-haiku-4-5-20251001'
-    ).then(summary => {
-      ds.convo.push({ role: 'system', content: '', divider: true });
-
-      buildSysPrompt(sc);
-      const episodePrompt = S.sysPrompt + `
-
-EPISODE CONTINUITY — This is NOT the first meeting. The student and your character have an ongoing relationship.
-Previous episode summary: ${summary}
-TIME SKIP: Some time has passed since you last met. Start a new scene — you might be in a different place, time of day, or situation, but still consistent with the scenario (${sc.en}). Reference something from the previous conversation naturally (a plan you made, something you discussed, an inside joke). Show that the relationship has progressed. Do NOT repeat the same opening greeting — vary your mood, setting, and conversation starter.`;
-
-      ds.sysPrompt = episodePrompt;
-
-      return claude(
-        [{ role: 'user', content: 'Continue the story. We meet again after some time has passed. Greet me in character, referencing our previous encounter.' }],
-        episodePrompt, 800
-      );
-    }).then(reply => {
-      const { correction: corr, clean } = extractCorrection(reply);
-      const msg = { role: 'assistant', content: clean, correction: corr, display: safeAnnotated(buildAnnotated(clean)) };
-      ds.convo.push(msg);
-      if (ds.convo.length > MAX_MSGS_PER_CONVO) {
-        ds.convo = ds.convo.slice(-MAX_MSGS_PER_CONVO);
-      }
-      rpgRenderChatMessages();
-      saveConvo(ds.scenarioId, ds.convo);
-      if (ffBtn) { ffBtn.disabled = false; ffBtn.textContent = '⏩ Skip'; }
-      setTimeout(() => document.getElementById('rpgChatInput').focus(), 100);
-    }).catch(err => {
-      ds.convo.push({ role: 'assistant', content: 'すみません、エラーが発生しました。', display: '<span style="color:#cc4444">Error — try again</span>' });
-      rpgRenderChatMessages();
-      if (ffBtn) { ffBtn.disabled = false; ffBtn.textContent = '⏩ Skip'; }
+    if (!ds || ds.phase !== 'chat') return;
+    fastForward({
+      sc: ds.scenario,
+      btnId: 'rpgFfBtn',
+      getConvo: () => ds.convo,
+      pushMsg: msg => {
+        const full = { ...msg };
+        if (msg.role === 'assistant' && msg.content) {
+          full.display = safeAnnotated(buildAnnotated(msg.content));
+        }
+        ds.convo.push(full);
+        if (ds.convo.length > MAX_MSGS_PER_CONVO) ds.convo = ds.convo.slice(-MAX_MSGS_PER_CONVO);
+        if (!msg.divider) ds.sysPrompt = S.sysPrompt;
+      },
+      updateView: () => {
+        rpgRenderChatMessages();
+        saveConvo(ds.scenarioId, ds.convo);
+        setTimeout(() => document.getElementById('rpgChatInput')?.focus(), 100);
+      },
     });
   };
 
