@@ -4819,6 +4819,7 @@ function renderRoleplay() {
           <div class="rpg-head">
             <button class="btn" onclick="backToScenarios()">← Back</button>
             <div class="label" style="flex:1;text-align:center">${escHtml(S.scenario.char)}</div>
+            <button class="btn rpg-ff-btn" id="roleplFfBtn" onclick="roleplFastForward()" title="Fast forward to next meeting">⏩ Skip</button>
             <button class="btn" onclick="resetChat()">Reset</button>
           </div>
           <div class="rpg-dialogue" id="chatWin">${renderMessages()}</div>
@@ -4837,6 +4838,7 @@ function renderRoleplay() {
         <div class="chat-head">
           <button class="btn" onclick="backToScenarios()">← Back</button>
           <div class="label">${S.scenario.jp} — ${S.scenario.en}</div>
+          <button class="btn" id="roleplFfBtn" onclick="roleplFastForward()" title="Fast forward to next meeting">⏩ Skip</button>
           <button class="btn" onclick="resetChat()">Reset</button>
         </div>
         <div class="chat-window" id="chatWin">${renderMessages()}</div>
@@ -5040,8 +5042,50 @@ function saveConvoToFavorite() {
   if (fav) {
     fav.convo = S.convo
       .filter(m => m.content !== '…')
-      .map(m => ({ role: m.role, content: m.content, _id: m._id, correction: m.correction || undefined }));
+      .map(m => { const o = { role: m.role, content: m.content, _id: m._id, correction: m.correction || undefined }; if (m.divider) o.divider = true; return o; });
     saveFavorites();
+  }
+}
+
+async function roleplFastForward() {
+  if (!S.scenario || S.convo.length < 2) return;
+
+  const btn = document.getElementById('roleplFfBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏩ …'; }
+
+  const sc = S.scenario;
+  const recentMsgs = S.convo.filter(m => !m.divider && m.content !== '…').slice(-20).map(m => ({ role: m.role, content: m.content }));
+
+  const summaryPrompt = `You are a narrator summarising an ongoing conversation for context.
+The student has been talking with ${sc.char} at ${sc.en}. ${sc.ctx}
+Write a brief 2-3 sentence summary in ENGLISH of what happened, the relationship dynamic, any plans made, and the emotional tone. Focus on details that would matter when they meet again.`;
+
+  try {
+    const summary = await claude(
+      [...recentMsgs, { role: 'user', content: 'Summarise this conversation so far for continuity.' }],
+      summaryPrompt, 300, 'claude-haiku-4-5-20251001'
+    );
+
+    S.convo.push({ role: 'system', content: '', divider: true, _id: msgId() });
+
+    buildSysPrompt(sc);
+    S.sysPrompt += `\n\nEPISODE CONTINUITY — This is NOT the first meeting. The student and your character have an ongoing relationship.\nPrevious episode summary: ${summary}\nTIME SKIP: Some time has passed since you last met. Start a new scene — you might be in a different place, time of day, or situation, but still consistent with the scenario (${sc.en}). Reference something from the previous conversation naturally. Show that the relationship has progressed. Do NOT repeat the same opening greeting — vary your mood, setting, and conversation starter.`;
+
+    const reply = await claude(
+      [{ role: 'user', content: 'Continue the story. We meet again after some time has passed. Greet me in character, referencing our previous encounter.' }],
+      S.sysPrompt, 800
+    );
+
+    const corrRx = /\[Correction:\s*([\s\S]*)\]\s*$/i;
+    const clean = reply.replace(corrRx, '').trim();
+    S.convo.push({ role: 'assistant', content: clean, _id: msgId() });
+    updateChat();
+    saveConvoToFavorite();
+  } catch (e) {
+    S.convo.push({ role: 'assistant', content: 'エラーが発生しました。もう一度お願いします。', _id: msgId() });
+    updateChat();
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⏩ Skip'; }
   }
 }
 
@@ -5095,7 +5139,7 @@ async function sendMsg() {
 
   try {
     const msgs = S.convo
-      .filter(m => m.content !== '…')
+      .filter(m => m.content !== '…' && !m.divider)
       .map(m => ({ role: m.role, content: m.content }));
 
     // Vocab reinforcement: track used words and remind about unused ones
