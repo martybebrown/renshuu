@@ -128,11 +128,18 @@ aside {
   padding: 8px 10px;
   background: var(--surface);
   border-radius: 3px;
+  border: 1px solid var(--border);
   border-left: 2px solid transparent;
+  cursor: pointer;
+  transition: opacity 0.15s;
 }
-.count-row.n { border-color: var(--red); }
-.count-row.y { border-color: var(--blue); }
-.count-row.m { border-color: var(--green); }
+.count-row:not(.active) {
+  opacity: 0.35;
+}
+.count-row:hover { filter: brightness(0.96); }
+.count-row.n { border-left-color: var(--red); }
+.count-row.y { border-left-color: var(--blue); }
+.count-row.m { border-left-color: var(--green); }
 .count-label { display: flex; align-items: center; gap: 7px; }
 .kanji { font-family: 'Shippori Mincho', serif; font-size: 15px; }
 .count-num { font-size: 17px; font-weight: 500; }
@@ -466,6 +473,7 @@ pre.code {
 .feedback.ok { border-color: var(--green); }
 .feedback.no { border-color: var(--red); }
 .feedback.partial { border-color: var(--gold); }
+.retry-btn { margin-top: 8px; font-size: 11px; padding: 4px 14px; }
 .tl { color: var(--muted); margin-top: 4px; font-size: 11px; }
 
 /* Roleplay */
@@ -1277,6 +1285,38 @@ pre.code {
   box-shadow: 0 4px 16px rgba(0,0,0,0.1);
 }
 
+/* Header mode toggle — shown on desktop only */
+.header-mode-toggle {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px;
+}
+@media (min-width: 768px) {
+  .header-mode-toggle { display: flex; }
+  .sidebar-mode { display: none; }
+}
+.header-mode {
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--muted);
+  font-family: 'Nunito Sans', sans-serif;
+  font-size: 12px;
+  padding: 5px 14px;
+  transition: all 0.15s;
+}
+.header-mode:hover { color: var(--text); }
+.header-mode.active {
+  background: var(--surface2);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
 /* Hamburger — hidden on desktop */
 .menu-btn {
   display: none;
@@ -1377,6 +1417,11 @@ pre.code {
     <button class="menu-btn" id="menuBtn" onclick="toggleMenu()" title="Menu">☰</button>
     <div class="logo">練<em>習</em> · Renshuu</div>
   </div>
+  <div class="header-mode-toggle" id="headerModeToggle">
+    <button class="header-mode active" id="hm-drill" onclick="switchMode('drill')">Drills</button>
+    <button class="header-mode" id="hm-roleplay" onclick="switchMode('roleplay')">Roleplay</button>
+    <button class="header-mode" id="hm-story" onclick="switchMode('story')">Story</button>
+  </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="status">
       <div class="dot" id="dot"></div>
@@ -1473,23 +1518,23 @@ pre.code {
       </select>
     </div>
 
-    <!-- Counts -->
+    <!-- Counts (clickable as focus toggles) -->
     <div>
-      <div class="label">Vocabulary</div>
+      <div class="label">Vocabulary · Focus</div>
       <div class="counts">
-        <div class="count-row n">
+        <div class="count-row n active" id="focus-n" onclick="toggleFocus('n')">
           <div class="count-label">
             <span class="kanji" style="color:var(--red)">新</span><span>New</span>
           </div>
           <span class="count-num" id="cntNew">—</span>
         </div>
-        <div class="count-row y">
+        <div class="count-row y active" id="focus-y" onclick="toggleFocus('y')">
           <div class="count-label">
             <span class="kanji" style="color:var(--blue)">若</span><span>Young</span>
           </div>
           <span class="count-num" id="cntYoung">—</span>
         </div>
-        <div class="count-row m">
+        <div class="count-row m active" id="focus-m" onclick="toggleFocus('m')">
           <div class="count-label">
             <span class="kanji" style="color:var(--green)">熟</span><span>Mature</span>
           </div>
@@ -1500,8 +1545,8 @@ pre.code {
 
     <button class="btn red w100" id="loadBtn" onclick="loadCards()">Load from Anki</button>
 
-    <!-- Mode -->
-    <div>
+    <!-- Mode (mobile only — desktop uses header toggle) -->
+    <div class="sidebar-mode">
       <div class="label">Mode</div>
       <div class="tabs">
         <button class="tab active" id="tab-drill" onclick="switchMode('drill')">Drills</button>
@@ -1510,15 +1555,6 @@ pre.code {
       </div>
     </div>
 
-    <!-- Focus -->
-    <div>
-      <div class="label">Focus</div>
-      <div class="tabs">
-        <button class="tab active" id="focus-n" onclick="toggleFocus('n')" title="New words">新</button>
-        <button class="tab active" id="focus-y" onclick="toggleFocus('y')" title="Young words">若</button>
-        <button class="tab active" id="focus-m" onclick="toggleFocus('m')" title="Mature words">熟</button>
-      </div>
-    </div>
 
   </aside>
 
@@ -2913,6 +2949,8 @@ function switchMode(m) {
   S.mode = m;
   document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.remove('active'));
   document.getElementById(`tab-${m}`)?.classList.add('active');
+  document.querySelectorAll('[id^="hm-"]').forEach(t => t.classList.remove('active'));
+  document.getElementById(`hm-${m}`)?.classList.add('active');
   if (m === 'eng_roleplay' || total() > 0) renderMode();
 }
 
@@ -3103,6 +3141,7 @@ function drillHTML(d) {
             : d.aiFeedback
               ? `✗ &nbsp;${d.aiFeedback}`
               : `<span class="spin"></span>`}
+          ${(!d.correct && d.aiFeedback) ? `<button class="btn retry-btn" onclick="retryDrill(${d.i})">Try again</button>` : ''}
           <div class="tl">${d.translation}</div>
         </div>` : ''}
     </div>
@@ -3168,14 +3207,30 @@ Student answered: "${d.input}"`;
   const fb = document.getElementById(`fb-${i}`);
   if (fb) {
     fb.className = `feedback ${d.partial ? 'partial' : d.correct ? 'ok' : 'no'}`;
+    const retryHtml = !d.correct ? `<button class="btn retry-btn" onclick="retryDrill(${i})">Try again</button>` : '';
     fb.innerHTML = (d.correct
       ? `△ &nbsp;${d.aiFeedback}`
-      : `✗ &nbsp;${d.aiFeedback}`) + `<div class="tl">${d.translation}</div>`;
+      : `✗ &nbsp;${d.aiFeedback}`) + retryHtml + `<div class="tl">${d.translation}</div>`;
     const card = document.getElementById(`dc-${i}`);
     if (card) {
       card.className = `drill-card ${d.partial ? 'partial-card' : d.correct ? 'correct-card' : 'wrong-card'}`;
     }
   }
+}
+
+function retryDrill(i) {
+  const d = S.drills[i];
+  if (!d) return;
+  d.answered = false;
+  d.correct = false;
+  d.partial = false;
+  d.aiFeedback = null;
+  d.input = '';
+  paintDrills();
+  setTimeout(() => {
+    const inp = document.getElementById(`ai-${i}`);
+    if (inp) inp.focus();
+  }, 50);
 }
 
 // ── ROLEPLAY MODE ─────────────────────────────────────────────────────────────
