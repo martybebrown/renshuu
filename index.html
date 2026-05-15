@@ -16,6 +16,7 @@
   --border: #d5cfc5;
   --text: #2a2318;
   --muted: #8a7d6e;
+  --radius: 6px;
   --red: #c94f3c;
   --blue: #2e72a0;
   --green: #3d8850;
@@ -42,7 +43,7 @@ header {
 .logo { font-family: 'Shippori Mincho', serif; font-size: 18px; letter-spacing: 0.08em; }
 .logo em { color: var(--red); font-style: normal; }
 .lang-toggle {
-  background: none; border: 1px solid var(--border); border-radius: 6px;
+  background: none; border: 1px solid var(--border); border-radius: var(--radius);
   font-size: 18px; cursor: pointer; padding: 2px 6px; line-height: 1;
   transition: border-color 0.15s, transform 0.15s;
 }
@@ -127,7 +128,7 @@ aside {
   align-items: center;
   padding: 8px 10px;
   background: var(--surface);
-  border-radius: 3px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   border-left: 2px solid transparent;
   cursor: pointer;
@@ -152,7 +153,7 @@ input.field {
   border: 1px solid var(--border);
   color: var(--text);
   padding: 7px 10px;
-  border-radius: 3px;
+  border-radius: var(--radius);
   font-family: 'Nunito Sans', sans-serif;
   font-size: 11px;
   width: 100%;
@@ -166,7 +167,7 @@ select.field {
   border: 1px solid var(--border);
   color: var(--text);
   padding: 7px 10px;
-  border-radius: 3px;
+  border-radius: var(--radius);
   font-family: 'Nunito Sans', sans-serif;
   font-size: 11px;
   width: 100%;
@@ -186,7 +187,7 @@ select.field:focus { border-color: var(--muted); }
   border: 1px solid var(--border);
   color: var(--text);
   padding: 8px 12px;
-  border-radius: 3px;
+  border-radius: var(--radius);
   cursor: pointer;
   font-family: 'Nunito Sans', sans-serif;
   font-size: 11px;
@@ -205,7 +206,7 @@ select.field:focus { border-color: var(--muted); }
   padding: 7px 4px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: var(--radius);
   cursor: pointer;
   color: var(--muted);
   font-family: 'Nunito Sans', sans-serif;
@@ -218,7 +219,7 @@ select.field:focus { border-color: var(--muted); }
 .words-preview { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .chip {
   padding: 2px 7px;
-  border-radius: 2px;
+  border-radius: var(--radius);
   font-size: 11px;
   font-family: 'Shippori Mincho', serif;
   background: var(--surface2);
@@ -237,7 +238,7 @@ select.field:focus { border-color: var(--muted); }
   background: var(--surface2);
   border: 1px solid var(--border);
   padding: 2px 7px;
-  border-radius: 2px;
+  border-radius: var(--radius);
   font-size: 0.62em;
   white-space: nowrap;
   color: var(--gold);
@@ -258,7 +259,7 @@ select.field:focus { border-color: var(--muted); }
   background: var(--surface2);
   border: 1px solid var(--muted);
   padding: 3px 9px;
-  border-radius: 2px;
+  border-radius: var(--radius);
   font-size: 0.6em;
   white-space: nowrap;
   color: var(--text);
@@ -285,7 +286,7 @@ select.field:focus { border-color: var(--muted); }
 .story-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   padding: 28px;
 }
 .story-topic {
@@ -339,7 +340,7 @@ select.field:focus { border-color: var(--muted); }
 .quiz-item {
   background: var(--surface2);
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: var(--radius);
   padding: 12px 14px;
   margin-bottom: 8px;
 }
@@ -349,7 +350,7 @@ select.field:focus { border-color: var(--muted); }
   padding: 4px 10px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 2px;
+  border-radius: var(--radius);
   cursor: pointer;
   color: var(--muted);
   font-family: 'Nunito Sans', sans-serif;
@@ -393,7 +394,7 @@ main {
 .notice {
   background: rgba(201,79,60,0.07);
   border: 1px solid rgba(201,79,60,0.2);
-  border-radius: 3px;
+  border-radius: var(--radius);
   padding: 12px 14px;
   font-size: 11px;
   line-height: 1.7;
@@ -403,7 +404,7 @@ main {
 pre.code {
   background: var(--surface2);
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: var(--radius);
   padding: 7px 10px;
   font-size: 10px;
   margin-top: 6px;
@@ -415,7 +416,7 @@ pre.code {
 .drill-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   padding: 20px;
   transition: border-color 0.2s;
 }
@@ -423,7 +424,7 @@ pre.code {
 .drill-card.wrong-card { border-color: rgba(201,79,60,0.4); }
 .drill-card.partial-card { border-color: rgba(168,110,26,0.4); }
 .drill-score-row { display: flex; align-items: center; gap: 8px; margin-top: 20px; padding: 12px 0 4px; border-top: 1px solid var(--border); }
-.score-chip { padding: 3px 10px; border-radius: 2px; font-size: 12px; font-weight: 600; }
+.score-chip { padding: 3px 10px; border-radius: var(--radius); font-size: 12px; font-weight: 600; }
 .score-correct { background: rgba(90,158,106,0.12); color: var(--green); border: 1px solid rgba(90,158,106,0.25); }
 .score-close { background: rgba(168,110,26,0.12); color: var(--amber,#a86e1a); border: 1px solid rgba(168,110,26,0.25); }
 .score-wrong { background: rgba(201,79,60,0.12); color: var(--red); border: 1px solid rgba(201,79,60,0.25); }
@@ -434,7 +435,7 @@ pre.code {
   align-items: center;
   gap: 4px;
   padding: 3px 8px;
-  border-radius: 2px;
+  border-radius: var(--radius);
   font-size: 10px;
   letter-spacing: 0.06em;
 }
@@ -453,7 +454,7 @@ pre.code {
   border: 1px solid var(--border);
   color: var(--text);
   padding: 9px 12px;
-  border-radius: 3px;
+  border-radius: var(--radius);
   font-family: 'Shippori Mincho', serif;
   font-size: 15px;
   outline: none;
@@ -464,7 +465,7 @@ pre.code {
 .feedback {
   margin-top: 10px;
   padding: 10px 12px;
-  border-radius: 3px;
+  border-radius: var(--radius);
   background: var(--surface2);
   font-size: 12px;
   line-height: 1.6;
@@ -473,7 +474,7 @@ pre.code {
 .feedback.ok { border-color: var(--green); }
 .feedback.no { border-color: var(--red); }
 .feedback.partial { border-color: var(--gold); }
-.retry-btn { margin-top: 8px; font-size: 11px; padding: 4px 14px; }
+.retry-btn { margin-top: 8px; font-size: 11px; padding: 4px 14px; float: right; }
 .tl { color: var(--muted); margin-top: 4px; font-size: 11px; }
 
 /* Roleplay */
@@ -481,7 +482,7 @@ pre.code {
 .scenario-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   padding: 14px 12px 12px;
   cursor: pointer;
   transition: all 0.15s;
@@ -521,7 +522,7 @@ pre.code {
 .fav-name { font-size: 9px; color: var(--muted); text-align: center; max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fav-tooltip {
   display: none; position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%);
-  background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 7px 10px; font-size: 10px; line-height: 1.5; white-space: normal;
   width: 200px; z-index: 50; pointer-events: none; color: var(--text);
 }
@@ -541,15 +542,15 @@ pre.code {
 }
 .fav-modal-backdrop.active { display: flex; }
 .fav-modal {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 24px 28px; max-width: 320px; width: 90%; text-align: center;
   box-shadow: 0 8px 24px rgba(0,0,0,0.15);
 }
 .fav-modal-title { font-weight: 700; font-size: 14px; margin-bottom: 8px; }
 .fav-modal-body { font-size: 12px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
 .fav-modal-btns { display: flex; gap: 10px; justify-content: center; }
-.fav-modal-btns .btn-cancel { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 6px 18px; cursor: pointer; font-size: 12px; }
-.fav-modal-btns .btn-remove { background: var(--red); color: #fff; border: none; border-radius: 4px; padding: 6px 18px; cursor: pointer; font-size: 12px; }
+.fav-modal-btns .btn-cancel { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 18px; cursor: pointer; font-size: 12px; }
+.fav-modal-btns .btn-remove { background: var(--red); color: #fff; border: none; border-radius: var(--radius); padding: 6px 18px; cursor: pointer; font-size: 12px; }
 .fav-modal-btns .btn-remove:hover { opacity: 0.85; }
 
 .chat-wrap { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; }
@@ -557,7 +558,7 @@ pre.code {
 .chat-window {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   flex: 1;
   min-height: 300px;
   max-height: 420px;
@@ -571,11 +572,11 @@ pre.code {
 .msg { max-width: 82%; display: flex; flex-direction: column; gap: 3px; }
 .msg.user { align-self: flex-end; text-align: right; }
 .msg.assistant { align-self: flex-start; flex-direction: row; align-items: flex-start; gap: 8px; }
-.msg-avatar { width: 32px; height: 32px; flex-shrink: 0; margin-top: 4px; image-rendering: pixelated; border-radius: 3px; }
+.msg-avatar { width: 32px; height: 32px; flex-shrink: 0; margin-top: 4px; image-rendering: pixelated; border-radius: var(--radius); }
 .msg-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .msg-body {
   padding: 10px 14px;
-  border-radius: 4px;
+  border-radius: var(--radius);
   font-size: 13px;
   line-height: 1.65;
 }
@@ -593,7 +594,7 @@ pre.code {
 .speak-btn {
   background: none;
   border: 1px solid transparent;
-  border-radius: 3px;
+  border-radius: var(--radius);
   cursor: pointer;
   font-size: 12px;
   color: var(--muted);
@@ -603,24 +604,24 @@ pre.code {
 }
 .speak-btn:hover, .breakdown-btn:hover { border-color: var(--border); color: var(--text); }
 .speak-btn.speaking { color: var(--blue); border-color: var(--blue); }
-.w-active { background: rgba(180, 140, 100, 0.2); border-radius: 2px; transition: background 0.1s; }
+.w-active { background: rgba(180, 140, 100, 0.2); border-radius: var(--radius); transition: background 0.1s; }
 .wt, [data-rt] { cursor: pointer; }
 .audio-player {
   display: flex; align-items: center; gap: 6px; padding: 4px 0; margin-top: 2px;
 }
 .audio-player .ap-btn {
-  background: none; border: 1px solid var(--border); border-radius: 3px;
+  background: none; border: 1px solid var(--border); border-radius: var(--radius);
   cursor: pointer; font-size: 12px; color: var(--muted); padding: 2px 6px;
   line-height: 1; transition: all 0.15s;
 }
 .audio-player .ap-btn:hover { color: var(--text); border-color: var(--text); }
 .audio-player .ap-btn.playing { color: var(--blue); border-color: var(--blue); }
 .audio-player .ap-track {
-  flex: 1; height: 6px; background: var(--border); border-radius: 3px;
+  flex: 1; height: 6px; background: var(--border); border-radius: var(--radius);
   cursor: pointer; position: relative; min-width: 80px;
 }
 .audio-player .ap-fill {
-  height: 100%; background: var(--blue); border-radius: 3px;
+  height: 100%; background: var(--blue); border-radius: var(--radius);
   pointer-events: none; width: 0%;
 }
 .audio-player .ap-time {
@@ -629,7 +630,7 @@ pre.code {
 .breakdown-btn {
   background: none;
   border: 1px solid transparent;
-  border-radius: 3px;
+  border-radius: var(--radius);
   cursor: pointer;
   font-size: 12px;
   color: var(--muted);
@@ -644,7 +645,7 @@ pre.code {
   color: var(--text);
   background: var(--cream);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 12px 14px;
   margin-top: 8px;
 }
@@ -674,7 +675,7 @@ pre.code {
 }
 .msg-breakdown .bd-speak-btn {
   flex-shrink: 0; background: none; border: 1px solid var(--border);
-  border-radius: 4px; cursor: pointer; font-size: 13px; padding: 3px 7px;
+  border-radius: var(--radius); cursor: pointer; font-size: 13px; padding: 3px 7px;
   color: var(--muted); margin-top: 2px; transition: color 0.15s, border-color 0.15s;
 }
 .msg-breakdown .bd-speak-btn:hover { color: var(--text); border-color: var(--text); }
@@ -687,7 +688,7 @@ pre.code {
   display: inline-block; font-size: 9px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.8px;
   background: var(--border); color: var(--muted);
-  border-radius: 3px; padding: 1px 6px; margin: 10px 0 6px;
+  border-radius: var(--radius); padding: 1px 6px; margin: 10px 0 6px;
 }
 .msg-breakdown .bd-item {
   font-size: 12px; line-height: 1.7; color: var(--text);
@@ -696,13 +697,13 @@ pre.code {
 .msg-breakdown .bd-bullet {
   font-size: 11px; line-height: 1.6; color: var(--text);
   padding: 4px 8px; background: var(--surface);
-  border-left: 2px solid var(--border); border-radius: 0 3px 3px 0;
+  border-left: 2px solid var(--border); border-radius: 0 var(--radius) var(--radius) 0;
 }
 .msg-breakdown .bd-list { color: var(--text); margin-left: 4px; }
-.bd-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; }
+.bd-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 8px; }
 .bd-card-translation .bd-translation { font-size: 13px; }
 .bd-tr-sentence {
-  cursor: pointer; padding: 1px 3px; margin: 0 -1px; border-radius: 3px;
+  cursor: pointer; padding: 1px 3px; margin: 0 -1px; border-radius: var(--radius);
   transition: background 0.12s, color 0.12s;
 }
 .bd-tr-sentence:hover { background: rgba(150,120,80,0.12); }
@@ -724,7 +725,7 @@ pre.code {
   margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);
 }
 .bd-nav-btn {
-  background: none; border: 1px solid var(--border); border-radius: 4px;
+  background: none; border: 1px solid var(--border); border-radius: var(--radius);
   cursor: pointer; font-size: 18px; line-height: 1; padding: 2px 10px;
   color: var(--muted); transition: color 0.15s, border-color 0.15s;
 }
@@ -737,7 +738,7 @@ pre.code {
 }
 .bd-dot.bd-dot-active { background: var(--accent); }
 .bd-qa-thread { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
-.bd-qa { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
+.bd-qa { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; }
 .bd-q { font-size: 11px; color: var(--muted); margin-bottom: 4px; font-style: italic; }
 .bd-q::before { content: '? '; color: var(--accent); font-weight: bold; font-style: normal; }
 .bd-a { font-size: 12px; line-height: 1.6; color: var(--text); }
@@ -747,14 +748,14 @@ pre.code {
 }
 .bd-ask-input {
   flex: 1; background: var(--surface); border: 1px solid var(--border);
-  color: var(--text); padding: 6px 10px; border-radius: 4px;
+  color: var(--text); padding: 6px 10px; border-radius: var(--radius);
   font-family: 'Shippori Mincho', serif; font-size: 12px; outline: none;
 }
 .bd-ask-input:focus { border-color: var(--accent); }
 .bd-ask-input::placeholder { color: var(--muted); font-style: italic; }
 .bd-ask-btn {
   background: var(--surface); border: 1px solid var(--border); color: var(--muted);
-  padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;
+  padding: 4px 12px; border-radius: var(--radius); cursor: pointer; font-size: 12px;
 }
 .bd-ask-btn:hover:not(:disabled) { color: var(--text); border-color: var(--text); }
 .bd-ask-btn:disabled { opacity: 0.4; cursor: default; }
@@ -773,7 +774,7 @@ pre.code {
   border: 1px solid var(--border);
   color: var(--text);
   padding: 9px 12px;
-  border-radius: 3px;
+  border-radius: var(--radius);
   font-family: 'Shippori Mincho', serif;
   font-size: 14px;
   outline: none;
@@ -788,7 +789,7 @@ pre.code {
   color: white;
   width: 40px;
   height: 40px;
-  border-radius: 3px;
+  border-radius: var(--radius);
   cursor: pointer;
   font-size: 16px;
   transition: opacity 0.15s;
@@ -802,7 +803,7 @@ pre.code {
 .rpg-frame {
   background: #08080f;
   border: 3px solid #3a3a5a;
-  border-radius: 3px;
+  border-radius: var(--radius);
   overflow: hidden;
   box-shadow: inset 0 0 0 1px #1a1a2a, 0 4px 24px rgba(0,0,0,0.5);
 }
@@ -845,7 +846,7 @@ pre.code {
 .rpg-head .label { color: #c0b080; font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.5px; }
 .rpg-head .btn {
   background: #1a1a2a; border: 1px solid #3a3a5a; color: #8a8a9a;
-  font-size: 10px; padding: 3px 10px; border-radius: 2px; cursor: pointer;
+  font-size: 10px; padding: 3px 10px; border-radius: var(--radius); cursor: pointer;
   font-family: 'Courier New', monospace;
 }
 .rpg-head .btn:hover { background: #2a2a3a; color: #c0b080; }
@@ -875,13 +876,13 @@ pre.code {
   border: none !important;
 }
 .rpg-msg .msg-body .wt, .rpg-msg .msg-body [data-rt] { cursor: pointer; }
-.rpg-msg .msg-body .w-active { background: rgba(180,160,100,0.25); border-radius: 2px; }
+.rpg-msg .msg-body .w-active { background: rgba(180,160,100,0.25); border-radius: var(--radius); }
 .rpg-msg.user .msg-body { color: #a0b8d0; text-align: right; font-size: 14px; }
 .rpg-msg .msg-correction { font-size: 10px; color: #cc7744; padding: 2px 0; font-family: 'Courier New', monospace; }
 .rpg-msg.user .msg-correction { text-align: right; }
 .rpg-msg .msg-foot { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
 .rpg-msg .msg-foot button {
-  background: #1a1a2a; border: 1px solid #3a3a5a; border-radius: 4px;
+  background: #1a1a2a; border: 1px solid #3a3a5a; border-radius: var(--radius);
   cursor: pointer; font-size: 11px; color: #9090a8; padding: 4px 10px; line-height: 1.2;
   display: inline-flex; align-items: center; gap: 4px;
 }
@@ -890,7 +891,7 @@ pre.code {
 .rpg-msg .msg-foot button.active { color: #6aa0d0; border-color: #4a7aaa; background: rgba(74,122,170,0.15); }
 .rpg-msg .msg-breakdown {
   font-size: 12px; line-height: 1.6; color: #b0a888; background: #12121e;
-  border: 1px solid #2a2a3a; border-radius: 6px; padding: 12px 14px; margin-top: 8px;
+  border: 1px solid #2a2a3a; border-radius: var(--radius); padding: 12px 14px; margin-top: 8px;
 }
 .rpg-msg .msg-breakdown .bd-heading { color: #d0a850; border-bottom-color: #2a2a3a; }
 .rpg-msg .msg-breakdown .bd-translation { color: #c0b898; }
@@ -926,7 +927,7 @@ pre.code {
 }
 .rpg-input {
   flex: 1; background: #12121e; border: 1px solid #2a2a3a; color: #e0d8c8;
-  padding: 8px 12px; border-radius: 2px;
+  padding: 8px 12px; border-radius: var(--radius);
   font-family: 'Shippori Mincho', serif; font-size: 14px;
   outline: none; resize: none; min-height: 36px;
 }
@@ -934,14 +935,14 @@ pre.code {
 .rpg-input::placeholder { color: #3a3a5a; }
 .rpg-send {
   background: #2a2a3a; border: 1px solid #3a3a5a; color: #c0b080;
-  width: 36px; height: 36px; border-radius: 2px; cursor: pointer;
+  width: 36px; height: 36px; border-radius: var(--radius); cursor: pointer;
   font-size: 14px; transition: all 0.15s; flex-shrink: 0;
 }
 .rpg-send:hover { background: #3a3a5a; }
 .rpg-send:disabled { opacity: 0.3; cursor: not-allowed; }
 .rpg-tip { font-size: 9px; color: #3a3a5a; padding: 4px 12px 8px; background: #0a0a16; font-family: 'Courier New', monospace; }
 .sc-scene-preview {
-  width: 100%; aspect-ratio: 8/5; overflow: hidden; border-radius: 3px;
+  width: 100%; aspect-ratio: 8/5; overflow: hidden; border-radius: var(--radius);
   margin-bottom: 6px; background: #08080f; image-rendering: pixelated;
   border: 1px solid var(--border);
 }
@@ -1060,7 +1061,7 @@ pre.code {
   color: #e0d8c8; min-height: 1.7em;
 }
 .rpg-dialogue-text .wt, .rpg-dialogue-text [data-rt] { cursor: pointer; }
-.rpg-dialogue-text .w-active { background: rgba(180,160,100,0.25); border-radius: 2px; }
+.rpg-dialogue-text .w-active { background: rgba(180,160,100,0.25); border-radius: var(--radius); }
 .rpg-dialogue-prompt {
   font-size: 10px; color: #6a6a8a; margin-top: 8px;
   text-align: right; letter-spacing: 1px;
@@ -1072,7 +1073,7 @@ pre.code {
 .rpg-dialogue-input-area.active { display: flex; }
 .rpg-dialogue-input {
   flex: 1; background: #12121e; border: 1px solid #3a3a5a; color: #e0d8c8;
-  padding: 8px 12px; border-radius: 2px;
+  padding: 8px 12px; border-radius: var(--radius);
   font-family: 'Shippori Mincho', serif; font-size: 14px;
   outline: none; resize: none; min-height: 36px;
 }
@@ -1080,7 +1081,7 @@ pre.code {
 .rpg-dialogue-input::placeholder { color: #3a3a5a; }
 .rpg-dialogue-send {
   background: #2a2a3a; border: 1px solid #c0a060; color: #c0a060;
-  width: 36px; height: 36px; border-radius: 2px; cursor: pointer;
+  width: 36px; height: 36px; border-radius: var(--radius); cursor: pointer;
   font-size: 14px; flex-shrink: 0;
 }
 .rpg-dialogue-send:hover { background: #3a3a5a; }
@@ -1093,7 +1094,7 @@ pre.code {
   display: flex; gap: 6px; margin-top: 6px;
 }
 .rpg-dialogue-foot button {
-  background: #1a1a2a; border: 1px solid #3a3a5a; border-radius: 3px;
+  background: #1a1a2a; border: 1px solid #3a3a5a; border-radius: var(--radius);
   cursor: pointer; font-size: 11px; color: #9090a8; padding: 4px 10px;
   font-family: 'Courier New', monospace;
 }
@@ -1111,7 +1112,7 @@ pre.code {
 .rpg-interact-prompt {
   position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
   font-size: 12px; color: #fff; background: rgba(0,0,0,0.85);
-  padding: 6px 18px; border: 1px solid #c0a060; border-radius: 2px;
+  padding: 6px 18px; border: 1px solid #c0a060; border-radius: var(--radius);
   font-family: 'Courier New', monospace; z-index: 5;
   display: none; letter-spacing: 1px; white-space: nowrap;
 }
@@ -1186,7 +1187,7 @@ pre.code {
 }
 .rpg-scene-view .rpg-chat-head .btn {
   background: #1a1a2a; border: 1px solid #3a3a5a; color: #8a8a9a;
-  font-size: 10px; padding: 3px 10px; border-radius: 2px; cursor: pointer;
+  font-size: 10px; padding: 3px 10px; border-radius: var(--radius); cursor: pointer;
   font-family: 'Courier New', monospace;
 }
 .rpg-scene-view .rpg-chat-head .btn:hover { background: #2a2a3a; color: #c0b080; }
@@ -1213,7 +1214,7 @@ pre.code {
 }
 .rpg-scene-view .rpg-chat-input {
   flex: 1; background: #12121e; border: 1px solid #2a2a3a; color: #e0d8c8;
-  padding: 8px 12px; border-radius: 2px;
+  padding: 8px 12px; border-radius: var(--radius);
   font-family: 'Shippori Mincho', serif; font-size: 14px;
   outline: none; resize: none; min-height: 36px;
 }
@@ -1221,7 +1222,7 @@ pre.code {
 .rpg-scene-view .rpg-chat-input::placeholder { color: #3a3a5a; }
 .rpg-scene-view .rpg-chat-send {
   background: #2a2a3a; border: 1px solid #3a3a5a; color: #c0b080;
-  width: 36px; height: 36px; border-radius: 2px; cursor: pointer;
+  width: 36px; height: 36px; border-radius: var(--radius); cursor: pointer;
   font-size: 14px; flex-shrink: 0;
 }
 .rpg-scene-view .rpg-chat-send:hover { background: #3a3a5a; }
@@ -1234,7 +1235,7 @@ pre.code {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   background: #08080f; border: 2px solid #3a3a5a; color: #c0a060;
   font-family: 'Courier New', monospace; font-size: 13px;
-  padding: 12px 24px; border-radius: 3px; cursor: pointer;
+  padding: 12px 24px; border-radius: var(--radius); cursor: pointer;
   letter-spacing: 1px; margin: 16px auto; width: fit-content;
   transition: all 0.2s;
   box-shadow: 0 2px 12px rgba(0,0,0,0.3);
@@ -1263,7 +1264,7 @@ pre.code {
 .settings-btn {
   background: none;
   border: 1px solid transparent;
-  border-radius: 3px;
+  border-radius: var(--radius);
   cursor: pointer;
   font-size: 14px;
   color: var(--muted);
@@ -1278,7 +1279,7 @@ pre.code {
   right: 12px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   padding: 14px;
   width: 230px;
   z-index: 200;
@@ -1292,7 +1293,7 @@ pre.code {
   gap: 2px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   padding: 3px;
 }
 @media (min-width: 768px) {
@@ -1302,7 +1303,7 @@ pre.code {
 .header-mode {
   background: none;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius);
   cursor: pointer;
   color: var(--muted);
   font-family: 'Nunito Sans', sans-serif;
@@ -1322,7 +1323,7 @@ pre.code {
   display: none;
   background: none;
   border: 1px solid transparent;
-  border-radius: 3px;
+  border-radius: var(--radius);
   cursor: pointer;
   font-size: 18px;
   color: var(--muted);
@@ -5096,17 +5097,15 @@ function renderRoleplay() {
       ${favScenarios.length ? `
         <div class="fav-header-row">
           <div class="label">★ Favorites</div>
-          <button class="rpg-explore-btn" onclick="rpgLaunch()">🗺 Explore Town</button>
         </div>
         <div class="fav-row">${favScenarios.map(favAvatar).join('')}</div>
-      ` : `
-        <button class="rpg-explore-btn" style="margin-bottom:14px" onclick="rpgLaunch()">
-          <span style="font-size:18px">🗺</span> Explore Town — 町を探検する
-        </button>
-      `}
+      ` : ''}
       <div class="sc-section-head">
         <div class="label">Scenarios</div>
-        <button class="btn" style="font-size:10px;padding:4px 10px" onclick="refreshScenarios()">↻ Refresh</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn" style="font-size:10px;padding:4px 10px" onclick="rpgLaunch()">🗺 Explore</button>
+          <button class="btn" style="font-size:10px;padding:4px 10px" onclick="refreshScenarios()">↻ Refresh</button>
+        </div>
       </div>
       <div style="color:var(--muted);font-size:11px;margin-bottom:10px">
         Claude plays the scene using your vocab. Star a scenario to save it to favorites.
@@ -7698,20 +7697,69 @@ function renderStoryCard() {
     updateLocationLabel();
   };
 
+  // ── Dithering dissolve transition ──
+  const BAYER8 = [
+     0,32, 8,40, 2,34,10,42,
+    48,16,56,24,50,18,58,26,
+    12,44, 4,36,14,46, 6,38,
+    60,28,52,20,62,30,54,22,
+     3,35,11,43, 1,33, 9,41,
+    51,19,59,27,49,17,57,25,
+    15,47, 7,39,13,45, 5,37,
+    63,31,55,23,61,29,53,21
+  ];
+
+  function ditherDissolve(onComplete) {
+    const cvs = document.createElement('canvas');
+    cvs.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:10000;image-rendering:pixelated;pointer-events:none';
+    const W = 160, H = 100;
+    cvs.width = W;
+    cvs.height = H;
+    document.body.appendChild(cvs);
+    const ctx = cvs.getContext('2d');
+
+    const totalSteps = 64;
+    let step = 0;
+    const img = ctx.createImageData(W, H);
+
+    function frame() {
+      const threshold = step;
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const bval = BAYER8[(y & 7) * 8 + (x & 7)];
+          if (bval < threshold) {
+            const idx = (y * W + x) * 4;
+            img.data[idx] = 0;
+            img.data[idx + 1] = 0;
+            img.data[idx + 2] = 0;
+            img.data[idx + 3] = 255;
+          }
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      step += 2;
+      if (step <= totalSteps) {
+        requestAnimationFrame(frame);
+      } else {
+        onComplete();
+        setTimeout(() => cvs.remove(), 400);
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
   // ── Launch RPG world ──
-  window.rpgLaunch = function() {
+  function rpgInit() {
     const world = document.getElementById('rpgWorld');
     world.classList.add('active');
     rpg.active = true;
-    window._rpg = rpg; // expose for global event handlers
+    window._rpg = rpg;
 
-    // Setup canvas
     rpg.canvas = document.getElementById('rpgCanvas');
     rpg.ctx = rpg.canvas.getContext('2d');
     rpg.canvas.width = VIRT_W;
     rpg.canvas.height = VIRT_H;
 
-    // Reset player position and zone state
     rpg.player.x = 160;
     rpg.player.y = 126;
     rpg.player.dir = 'down';
@@ -7725,12 +7773,14 @@ function renderStoryCard() {
     document.getElementById('rpgScore').textContent = 'Score: 0 of 100';
     document.getElementById('rpgStatusMsg').textContent = 'Use arrow keys to walk. Approach characters to talk.';
 
-    // Keyboard listeners
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('keyup', onKeyUp);
 
-    // Start game loop
     gameLoop();
+  }
+
+  window.rpgLaunch = function() {
+    ditherDissolve(rpgInit);
   };
 
   // ── Exit RPG world ──
