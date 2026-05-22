@@ -1230,6 +1230,43 @@ pre.code {
   font-size: 9px; color: #3a3a5a; padding: 4px 12px 8px;
   background: #0a0a16; font-family: 'Courier New', monospace; flex-shrink: 0;
 }
+/* Breakdown drawer (third panel) */
+.rpg-bd-drawer {
+  width: 0; height: 100%; overflow: hidden; background: #0a0a16;
+  border-left: 2px solid #3a3a5a; display: flex; flex-direction: column;
+  transition: width 0.3s ease;
+}
+.rpg-scene-view.bd-open .rpg-bd-drawer { width: 35%; }
+.rpg-scene-view.bd-open .rpg-scene-half { width: 25%; }
+.rpg-scene-view.bd-open .rpg-chat-half { width: 40%; }
+.rpg-scene-view .rpg-scene-half,
+.rpg-scene-view .rpg-chat-half { transition: width 0.3s ease; }
+.rpg-bd-drawer-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 14px; background: #0e0e1a; border-bottom: 1px solid #1a1a2a;
+  flex-shrink: 0;
+}
+.rpg-bd-drawer-head .label {
+  color: #c0b080; font-family: 'Courier New', monospace; font-size: 11px; letter-spacing: 0.5px;
+}
+.rpg-bd-drawer-head .btn {
+  background: #1a1a2a; border: 1px solid #3a3a5a; color: #8a8a9a;
+  font-size: 10px; padding: 3px 10px; border-radius: var(--radius); cursor: pointer;
+  font-family: 'Courier New', monospace;
+}
+.rpg-bd-drawer-head .btn:hover { background: #2a2a3a; color: #c0b080; }
+.rpg-bd-drawer-body {
+  flex: 1; overflow-y: auto; padding: 12px 14px;
+}
+.rpg-bd-drawer-body .msg-breakdown {
+  background: #12121e; border-color: #2a2a3a; margin-top: 0;
+}
+@media (max-width: 899px) {
+  .rpg-scene-view.bd-open .rpg-scene-half { display: none; }
+  .rpg-scene-view.bd-open .rpg-chat-half { width: 50%; }
+  .rpg-scene-view.bd-open .rpg-bd-drawer { width: 50%; }
+}
+
 /* Explore button on scenario grid */
 .rpg-explore-btn {
   display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -1499,6 +1536,13 @@ pre.code {
           <button class="rpg-chat-send" onclick="rpgSendChatMsg()">→</button>
         </div>
         <div class="rpg-chat-tip">Enter to send · Shift+Enter for new line · ESC to leave</div>
+      </div>
+      <div class="rpg-bd-drawer" id="rpgBdDrawer">
+        <div class="rpg-bd-drawer-head">
+          <div class="label">Breakdown</div>
+          <button class="btn" onclick="closeRpgBdDrawer()">✕</button>
+        </div>
+        <div class="rpg-bd-drawer-body" id="rpgBdDrawerBody"></div>
       </div>
     </div>
   </div>
@@ -2549,9 +2593,18 @@ function renderBdState(state, mi) {
 function repaintBreakdown(inRpg, mi) {
   if (inRpg) {
     rpgRenderChatMessages();
-    const bdEl = document.getElementById('rpgChatMessages')
-      ?.querySelector(`[data-mi="${mi}"]`)?.closest('.msg')?.querySelector('.msg-breakdown');
-    if (bdEl) bdEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const ds = window._rpg?.dialogueState;
+    const msg = ds?.convo[mi];
+    const drawer = document.getElementById('rpgBdDrawer');
+    const body = document.getElementById('rpgBdDrawerBody');
+    const sceneView = document.getElementById('rpgSceneView');
+    if (msg?.breakdown && drawer && body) {
+      body.innerHTML = `<div class="msg-breakdown">${msg.breakdown}</div>`;
+      sceneView.classList.add('bd-open');
+    } else if (drawer) {
+      sceneView.classList.remove('bd-open');
+      body.innerHTML = '';
+    }
   } else {
     const chatWin = document.getElementById('chatWin');
     if (chatWin) {
@@ -2563,6 +2616,13 @@ function repaintBreakdown(inRpg, mi) {
   }
 }
 
+function closeRpgBdDrawer() {
+  const sceneView = document.getElementById('rpgSceneView');
+  const body = document.getElementById('rpgBdDrawerBody');
+  if (sceneView) sceneView.classList.remove('bd-open');
+  if (body) body.innerHTML = '';
+}
+
 const BD_SYS = 'You are a Japanese language teacher giving thorough, student-friendly grammar explanations. Never just label a grammar point — always explain how and why it works in the specific sentence.';
 
 async function breakdownMessage(msg, btn, mi) {
@@ -2571,8 +2631,10 @@ async function breakdownMessage(msg, btn, mi) {
   if (msg.bdState) {
     delete msg.bdState;
     delete msg.breakdown;
-    if (inRpg) rpgRenderChatMessages();
-    else updateChat();
+    if (inRpg) {
+      rpgRenderChatMessages();
+      closeRpgBdDrawer();
+    } else updateChat();
     return;
   }
 
@@ -5162,7 +5224,7 @@ function renderMessages() {
               <div class="ap-track" data-ap-track="${i}"><div class="ap-fill"></div></div>
               <span class="ap-time">0:00</span>
             </div>` : ''}
-            ${hasBd ? `<div class="msg-breakdown">${msg.breakdown}</div>` : ''}
+            ${hasBd && !window._rpg?.inDialogue ? `<div class="msg-breakdown">${msg.breakdown}</div>` : ''}
           </div>
         </div>`;
     }
