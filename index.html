@@ -3179,7 +3179,8 @@ function checkDrill(i) {
   d.correct  = exact || almost;
   d.partial  = almost;
   d.answered = true;
-  paintDrills();   // repaint all cards so answered state is consistent
+  paintDrills();
+  speakJapanese(stripMarkers(d.sentence));
   if (!d.correct) getWrongFeedback(i);
 }
 
