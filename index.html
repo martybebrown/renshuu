@@ -5259,13 +5259,15 @@ VOCABULARY TO USE NATURALLY: ${allList}
 PRIORITY — embed these NEW words whenever natural: ${newList || '(none this session)'}
 ${knownList ? `\nSTUDENT'S KNOWN VOCABULARY (their full Anki deck): ${knownList}\nIMPORTANT: Strongly prefer words from this known vocabulary list. Minimise using words the student hasn't studied yet — keep unknown words to only essential particles, greetings, and words required by the scenario context. If you must use an unknown word, keep it simple and high-frequency.\n` : ''}
 Rules:
-1. Respond in Japanese only. Keep responses to 3 sentences MAX — usually 1–2 sentences is best. Only exceed 3 sentences in truly exceptional circumstances (e.g. telling a critical story detail that can't be split). Short, natural replies like a real conversation (え？本当？ / そうだね。/ いいね！) are encouraged.
+1. Respond in Japanese only. STRICT LIMIT: 1–3 sentences. Most replies should be 1–2 sentences — like a real conversation, not a monologue. One-word or one-phrase reactions (え？本当？ / そうだね / いいね！) are great. NEVER write 4+ sentences. This is a back-and-forth dialogue, not a speech.
 2. Weave in vocab from the list, especially the priority new words.
 3. Stay in character. Ask a natural follow-up question each turn (but not every single turn — sometimes just react).
 4. After your Japanese, if the student made errors in their MOST RECENT message ONLY (grammar, vocab, particle, conjugation, word choice, unnatural phrasing), add: [Correction: explain what was wrong, what it should be, and briefly why. Cover every mistake in that message — don't skip any. Be specific: show the wrong text → correct text. Use numbered points (1. 2. 3.) for multiple errors so each is clear. Do NOT correct errors from earlier messages — only the latest one. Example: "1. だれごらい → どのくらい (dono kurai) — だれごらい isn't a word; どのくらい means 'about how much/long'"]
 5. Aim for N4–N3 level.
 6. Mark EVERY Japanese word with [[word|reading|english]] pipe markers — this includes kanji compounds (with okurigana), katakana words, AND hiragana words/phrases (2+ chars). Use hiragana as the reading for both katakana and hiragana-only words. Do NOT leave any word unmarked — every content word needs a tooltip. Example: [[日本語|にほんご|Japanese]]は[[面白い|おもしろい|interesting]]し、[[コーヒー|こーひー|coffee]]も[[やっぱり|やっぱり|as expected]][[美味しい|おいしい|delicious]]。[[でも|でも|but]][[ちょっと|ちょっと|a little]][[むずかしい|むずかしい|difficult]][[ですね|ですね|isn't it]]。
-7. The student may write in rōmaji (e.g. "watashi wa gakusei desu") — understand it as Japanese and respond naturally. Only correct it if there is an actual grammar or vocab mistake, not just for using romaji.`;
+7. The student may write in rōmaji (e.g. "watashi wa gakusei desu") — understand it as Japanese and respond naturally. Only correct it if there is an actual grammar or vocab mistake, not just for using romaji.
+
+REMEMBER: 1–3 sentences MAX for your Japanese reply. This is the most important rule. Short and conversational.`;
 }
 
 function saveConvoToFavorite() {
@@ -5398,7 +5400,7 @@ async function sendMsg() {
       }
     }
 
-    const reply = await claude(msgs, S.sysPrompt);
+    const reply = await claude(msgs, S.sysPrompt, 500);
 
     // parse optional [Correction: ...] — greedy match to final ] since corrections may contain ]] annotation markers
     const corrRx = /\[Correction:\s*([\s\S]*)\]\s*$/i;
@@ -7483,7 +7485,7 @@ function renderStoryCard() {
       }
     }
 
-    claude(messages, ds.sysPrompt, 800).then(reply => {
+    claude(messages, ds.sysPrompt, 500).then(reply => {
       const { correction: corr, clean } = extractCorrection(reply);
       const msg = { role: 'assistant', content: clean, correction: corr, display: safeAnnotated(buildAnnotated(clean)) };
       ds.convo.push(msg);
