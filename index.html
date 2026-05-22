@@ -975,7 +975,12 @@ pre.code {
     border-top: none;
     border-left: 2px solid #3a3a5a;
     overflow: hidden;
+    transition: width 0.3s ease;
   }
+  .sidebar-collapsed .rpg-scene { transition: width 0.3s ease; }
+  .sidebar-collapsed .rpg-frame.bd-open .rpg-scene { width: 25%; }
+  .sidebar-collapsed .rpg-frame.bd-open .rpg-dialogue-wrap { width: 40%; }
+  .sidebar-collapsed .rpg-frame.bd-open .rpg-bd-drawer { width: 35%; }
   .sidebar-collapsed .rpg-dialogue {
     flex: 1;
     max-height: none;
@@ -2610,8 +2615,19 @@ function repaintBreakdown(inRpg, mi) {
     if (chatWin) {
       chatWin.innerHTML = renderMessages();
       restoreAudioPlayer();
-      const bdEl = chatWin.querySelector(`[data-mi="${mi}"]`)?.closest('.msg')?.querySelector('.msg-breakdown');
-      if (bdEl) bdEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    const stdDrawer = document.getElementById('rpBdDrawer');
+    const stdBody = document.getElementById('rpBdDrawerBody');
+    const rpgFrame = document.querySelector('.rpg-frame');
+    if (stdDrawer && stdBody && rpgFrame) {
+      const msg = S.convo[mi];
+      if (msg?.breakdown) {
+        stdBody.innerHTML = `<div class="msg-breakdown">${msg.breakdown}</div>`;
+        rpgFrame.classList.add('bd-open');
+      } else {
+        rpgFrame.classList.remove('bd-open');
+        stdBody.innerHTML = '';
+      }
     }
   }
 }
@@ -2620,6 +2636,13 @@ function closeRpgBdDrawer() {
   const sceneView = document.getElementById('rpgSceneView');
   const body = document.getElementById('rpgBdDrawerBody');
   if (sceneView) sceneView.classList.remove('bd-open');
+  if (body) body.innerHTML = '';
+}
+
+function closeStdBdDrawer() {
+  const frame = document.querySelector('.rpg-frame');
+  const body = document.getElementById('rpBdDrawerBody');
+  if (frame) frame.classList.remove('bd-open');
   if (body) body.innerHTML = '';
 }
 
@@ -2634,7 +2657,10 @@ async function breakdownMessage(msg, btn, mi) {
     if (inRpg) {
       rpgRenderChatMessages();
       closeRpgBdDrawer();
-    } else updateChat();
+    } else {
+      updateChat();
+      closeStdBdDrawer();
+    }
     return;
   }
 
@@ -5129,6 +5155,13 @@ function renderRoleplay() {
           </div>
           <div class="rpg-tip">Enter to send · Shift+Enter for new line · romaji auto-converted</div>
         </div>
+        <div class="rpg-bd-drawer" id="rpBdDrawer">
+          <div class="rpg-bd-drawer-head">
+            <div class="label">Breakdown</div>
+            <button class="btn" onclick="closeStdBdDrawer()">✕</button>
+          </div>
+          <div class="rpg-bd-drawer-body" id="rpBdDrawerBody"></div>
+        </div>
       </div>
     ` : `
       <div class="chat-wrap">
@@ -5224,7 +5257,6 @@ function renderMessages() {
               <div class="ap-track" data-ap-track="${i}"><div class="ap-fill"></div></div>
               <span class="ap-time">0:00</span>
             </div>` : ''}
-            ${hasBd && !window._rpg?.inDialogue ? `<div class="msg-breakdown">${msg.breakdown}</div>` : ''}
           </div>
         </div>`;
     }
