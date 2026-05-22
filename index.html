@@ -711,8 +711,10 @@ pre.code {
   background: rgba(150,120,80,0.22); color: var(--accent);
   box-shadow: inset 0 -1px 0 var(--accent);
 }
-.rpg-msg .msg-breakdown .bd-tr-sentence:hover { background: rgba(208,168,80,0.15); }
-.rpg-msg .msg-breakdown .bd-tr-sentence.bd-tr-sentence-active {
+.rpg-msg .msg-breakdown .bd-tr-sentence:hover,
+.rpg-bd-drawer-body .msg-breakdown .bd-tr-sentence:hover { background: rgba(208,168,80,0.15); }
+.rpg-msg .msg-breakdown .bd-tr-sentence.bd-tr-sentence-active,
+.rpg-bd-drawer-body .msg-breakdown .bd-tr-sentence.bd-tr-sentence-active {
   background: rgba(208,168,80,0.22); color: #d0a850; box-shadow: inset 0 -1px 0 #d0a850;
 }
 .bd-card-translation { border-color: var(--accent); }
@@ -759,14 +761,22 @@ pre.code {
 }
 .bd-ask-btn:hover:not(:disabled) { color: var(--text); border-color: var(--text); }
 .bd-ask-btn:disabled { opacity: 0.4; cursor: default; }
-.rpg-msg .msg-breakdown .bd-qa { background: #1a1a2a; border-color: #2a2a3a; }
-.rpg-msg .msg-breakdown .bd-q { color: #7a7a9a; }
-.rpg-msg .msg-breakdown .bd-q::before { color: #d0a850; }
-.rpg-msg .msg-breakdown .bd-a { color: #b0a888; }
-.rpg-msg .msg-breakdown .bd-ask-input { background: #12121e; border-color: #2a2a3a; color: #e0d8c8; }
-.rpg-msg .msg-breakdown .bd-ask-input:focus { border-color: #4a4a6a; }
-.rpg-msg .msg-breakdown .bd-ask-btn { background: #1a1a2a; border-color: #2a2a3a; color: #7a7a9a; }
-.rpg-msg .msg-breakdown .bd-ask-btn:hover:not(:disabled) { color: #c0b080; border-color: #3a3a5a; }
+.rpg-msg .msg-breakdown .bd-qa,
+.rpg-bd-drawer-body .msg-breakdown .bd-qa { background: #1a1a2a; border-color: #2a2a3a; }
+.rpg-msg .msg-breakdown .bd-q,
+.rpg-bd-drawer-body .msg-breakdown .bd-q { color: #7a7a9a; }
+.rpg-msg .msg-breakdown .bd-q::before,
+.rpg-bd-drawer-body .msg-breakdown .bd-q::before { color: #d0a850; }
+.rpg-msg .msg-breakdown .bd-a,
+.rpg-bd-drawer-body .msg-breakdown .bd-a { color: #b0a888; }
+.rpg-msg .msg-breakdown .bd-ask-input,
+.rpg-bd-drawer-body .msg-breakdown .bd-ask-input { background: #12121e; border-color: #2a2a3a; color: #e0d8c8; }
+.rpg-msg .msg-breakdown .bd-ask-input:focus,
+.rpg-bd-drawer-body .msg-breakdown .bd-ask-input:focus { border-color: #4a4a6a; }
+.rpg-msg .msg-breakdown .bd-ask-btn,
+.rpg-bd-drawer-body .msg-breakdown .bd-ask-btn { background: #1a1a2a; border-color: #2a2a3a; color: #7a7a9a; }
+.rpg-msg .msg-breakdown .bd-ask-btn:hover:not(:disabled),
+.rpg-bd-drawer-body .msg-breakdown .bd-ask-btn:hover:not(:disabled) { color: #c0b080; border-color: #3a3a5a; }
 .chat-foot { display: flex; gap: 8px; align-items: flex-end; }
 .chat-input {
   flex: 1;
@@ -889,27 +899,45 @@ pre.code {
 .rpg-msg .msg-foot button:hover { border-color: #5a5a7a; color: #d0c8a0; background: #22223a; }
 .rpg-msg .msg-foot button.speaking { color: #6aa0d0; border-color: #4a7aaa; background: rgba(74,122,170,0.15); }
 .rpg-msg .msg-foot button.active { color: #6aa0d0; border-color: #4a7aaa; background: rgba(74,122,170,0.15); }
-.rpg-msg .msg-breakdown {
+.rpg-msg .msg-breakdown,
+.rpg-bd-drawer-body .msg-breakdown {
   font-size: 12px; line-height: 1.6; color: #b0a888; background: #12121e;
   border: 1px solid #2a2a3a; border-radius: var(--radius); padding: 12px 14px; margin-top: 8px;
 }
-.rpg-msg .msg-breakdown .bd-heading { color: #d0a850; border-bottom-color: #2a2a3a; }
-.rpg-msg .msg-breakdown .bd-translation { color: #c0b898; }
-.rpg-msg .msg-breakdown .bd-sentence { color: #e8dfc8; }
-.rpg-msg .msg-breakdown .bd-meaning { color: #8a8a9a; border-bottom-color: #2a2a3a; }
-.rpg-msg .msg-breakdown .bd-label { background: #1e1e2e; color: #7a7a9a; border-color: #2a2a3a; }
-.rpg-msg .msg-breakdown .bd-bullet { background: #1a1a2a; border-left-color: #3a3a5a; color: #b0a888; }
-.rpg-msg .msg-breakdown .bd-item { color: #b0a888; }
-.rpg-msg .msg-breakdown .bd-divider { border-top-color: #2a2a3a; }
-.rpg-msg .bd-card { background: #1a1a2e; border-color: #2a2a3a; }
-.rpg-msg .msg-breakdown .bd-speak-btn { border-color: #2a2a3a; color: #5a5a7a; }
-.rpg-msg .msg-breakdown .bd-speak-btn:hover { color: #c0b080; border-color: #3a3a5a; }
-.rpg-msg .msg-breakdown .bd-speak-btn.speaking { color: #d0a850; border-color: #d0a850; }
-.rpg-msg .bd-carousel-nav { border-top-color: #2a2a3a; }
-.rpg-msg .bd-nav-btn { border-color: #2a2a3a; color: #5a5a7a; }
-.rpg-msg .bd-nav-btn:hover:not(:disabled) { color: #c0b080; border-color: #3a3a5a; }
-.rpg-msg .bd-dot { background: #2a2a3a; }
-.rpg-msg .bd-dot.bd-dot-active { background: #d0a850; }
+.rpg-msg .msg-breakdown .bd-heading,
+.rpg-bd-drawer-body .msg-breakdown .bd-heading { color: #d0a850; border-bottom-color: #2a2a3a; }
+.rpg-msg .msg-breakdown .bd-translation,
+.rpg-bd-drawer-body .msg-breakdown .bd-translation { color: #c0b898; }
+.rpg-msg .msg-breakdown .bd-sentence,
+.rpg-bd-drawer-body .msg-breakdown .bd-sentence { color: #e8dfc8; }
+.rpg-msg .msg-breakdown .bd-meaning,
+.rpg-bd-drawer-body .msg-breakdown .bd-meaning { color: #8a8a9a; border-bottom-color: #2a2a3a; }
+.rpg-msg .msg-breakdown .bd-label,
+.rpg-bd-drawer-body .msg-breakdown .bd-label { background: #1e1e2e; color: #7a7a9a; border-color: #2a2a3a; }
+.rpg-msg .msg-breakdown .bd-bullet,
+.rpg-bd-drawer-body .msg-breakdown .bd-bullet { background: #1a1a2a; border-left-color: #3a3a5a; color: #b0a888; }
+.rpg-msg .msg-breakdown .bd-item,
+.rpg-bd-drawer-body .msg-breakdown .bd-item { color: #b0a888; }
+.rpg-msg .msg-breakdown .bd-divider,
+.rpg-bd-drawer-body .msg-breakdown .bd-divider { border-top-color: #2a2a3a; }
+.rpg-msg .bd-card,
+.rpg-bd-drawer-body .bd-card { background: #1a1a2e; border-color: #2a2a3a; }
+.rpg-msg .msg-breakdown .bd-speak-btn,
+.rpg-bd-drawer-body .msg-breakdown .bd-speak-btn { border-color: #2a2a3a; color: #5a5a7a; }
+.rpg-msg .msg-breakdown .bd-speak-btn:hover,
+.rpg-bd-drawer-body .msg-breakdown .bd-speak-btn:hover { color: #c0b080; border-color: #3a3a5a; }
+.rpg-msg .msg-breakdown .bd-speak-btn.speaking,
+.rpg-bd-drawer-body .msg-breakdown .bd-speak-btn.speaking { color: #d0a850; border-color: #d0a850; }
+.rpg-msg .bd-carousel-nav,
+.rpg-bd-drawer-body .bd-carousel-nav { border-top-color: #2a2a3a; }
+.rpg-msg .bd-nav-btn,
+.rpg-bd-drawer-body .bd-nav-btn { border-color: #2a2a3a; color: #5a5a7a; }
+.rpg-msg .bd-nav-btn:hover:not(:disabled),
+.rpg-bd-drawer-body .bd-nav-btn:hover:not(:disabled) { color: #c0b080; border-color: #3a3a5a; }
+.rpg-msg .bd-dot,
+.rpg-bd-drawer-body .bd-dot { background: #2a2a3a; }
+.rpg-msg .bd-dot.bd-dot-active,
+.rpg-bd-drawer-body .bd-dot.bd-dot-active { background: #d0a850; }
 .rpg-msg .audio-player { margin-top: 4px; }
 .rpg-msg .audio-player .ap-btn { color: #5a5a7a; border-color: #2a2a3a; }
 .rpg-msg .audio-player .ap-btn:hover { color: #c0b080; border-color: #3a3a5a; }
@@ -1264,8 +1292,9 @@ pre.code {
   flex: 1; overflow-y: auto; padding: 12px 14px;
 }
 .rpg-bd-drawer-body .msg-breakdown {
-  background: #12121e; border-color: #2a2a3a; margin-top: 0;
+  background: transparent; border: none; margin-top: 0; padding: 0;
 }
+.rpg-bd-drawer-body .bd-ask-form { border-top-color: #2a2a3a; }
 @media (max-width: 899px) {
   .rpg-scene-view.bd-open .rpg-scene-half { display: none; }
   .rpg-scene-view.bd-open .rpg-chat-half { width: 50%; }
