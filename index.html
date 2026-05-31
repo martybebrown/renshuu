@@ -1295,10 +1295,22 @@ pre.code {
   background: transparent; border: none; margin-top: 0; padding: 0;
 }
 .rpg-bd-drawer-body .bd-ask-form { border-top-color: #2a2a3a; }
-@media (max-width: 899px) {
+@media (max-width: 899px) and (min-width: 768px) {
   .rpg-scene-view.bd-open .rpg-scene-half { display: none; }
   .rpg-scene-view.bd-open .rpg-chat-half { width: 50%; }
   .rpg-scene-view.bd-open .rpg-bd-drawer { width: 50%; }
+}
+@media (max-width: 767px) {
+  .rpg-bd-drawer {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    width: 100% !important; height: 0; max-height: 75vh;
+    border-left: none; border-top: 2px solid #3a3a5a;
+    border-radius: 12px 12px 0 0;
+    transition: height 0.3s ease;
+    z-index: 200;
+  }
+  .bd-open > .rpg-bd-drawer,
+  .rpg-frame.bd-open .rpg-bd-drawer { height: 65vh; }
 }
 
 /* Explore button on scenario grid */
