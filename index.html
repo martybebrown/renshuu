@@ -5453,7 +5453,7 @@ Write a brief 2-3 sentence summary in ENGLISH of what happened, the relationship
       S.sysPrompt, 800
     );
 
-    const corrRx = /\[Correction:\s*([\s\S]*)\]\s*$/i;
+    const corrRx = /\[Corrections?:\s*([\s\S]*)\]\s*$/i;
     const clean = reply.replace(corrRx, '').trim();
     pushMsg({ role: 'assistant', content: clean });
     updateView();
@@ -5546,7 +5546,7 @@ async function sendMsg() {
     const reply = await claude(msgs, S.sysPrompt, 500);
 
     // parse optional [Correction: ...] — greedy match to final ] since corrections may contain ]] annotation markers
-    const corrRx = /\[Correction:\s*([\s\S]*)\]\s*$/i;
+    const corrRx = /\[Corrections?:\s*([\s\S]*)\]\s*$/i;
     const corrMatch = reply.match(corrRx);
     const clean = reply.replace(corrRx, '').trim();
     const correction = corrMatch ? corrMatch[1].replace(/\[\[([^\[\]|]+)\|[^\[\]]+\]\]/g, '$1').trim() : null;
@@ -6063,7 +6063,7 @@ async function sendEngMsg() {
     const reply = await claude(msgs, S.engSysPrompt);
 
     // Parse optional [Correction: ...] — greedy match to final ]
-    const corrRx = /\[Correction:\s*([\s\S]*)\]\s*$/i;
+    const corrRx = /\[Corrections?:\s*([\s\S]*)\]\s*$/i;
     const corrMatch = reply.match(corrRx);
     const clean = reply.replace(corrRx, '').trim();
     const correction = corrMatch ? corrMatch[1].replace(/\[\[([^\[\]|]+)\|[^\[\]]+\]\]/g, '$1').trim() : null;
@@ -7580,7 +7580,7 @@ function renderStoryCard() {
 
   // Helper: extract correction from Claude reply
   function extractCorrection(reply) {
-    const corrRx = /\[Correction:\s*([\s\S]*)\]\s*$/i;
+    const corrRx = /\[Corrections?:\s*([\s\S]*)\]\s*$/i;
     const match = reply.match(corrRx);
     return {
       correction: match ? match[1].replace(/\[\[([^\[\]|]+)\|[^\[\]]+\]\]/g, '$1').trim() : null,
