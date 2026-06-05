@@ -199,6 +199,8 @@ select.field:focus { border-color: var(--muted); }
 .menu-btn svg, .settings-btn svg, .lang-toggle svg {
   vertical-align: middle; flex-shrink: 0;
 }
+.spin-icon { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .btn:hover { border-color: var(--muted); }
 .btn.red { background: var(--red); border-color: var(--red); color: #fff; }
 .btn.red:hover { opacity: 0.85; }
@@ -1584,7 +1586,7 @@ pre.code {
             placeholder="日本語か romaji で…"
             onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();rpgSendChatMsg()}"
           ></textarea>
-          <button class="rpg-chat-send" onclick="rpgSendChatMsg()">→</button>
+          <button class="rpg-chat-send" onclick="rpgSendChatMsg()"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></button>
         </div>
         <div class="rpg-chat-tip">Enter to send · Shift+Enter for new line · ESC to leave</div>
       </div>
@@ -1604,7 +1606,7 @@ pre.code {
 </div>
 
 <div class="layout" id="layout">
-  <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Collapse sidebar">«</button>
+  <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Collapse sidebar"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg></button>
   <aside>
     <!-- Deck filter -->
     <div>
@@ -1768,12 +1770,12 @@ document.addEventListener('click', e => {
   if (apBtn && _currentAudio && _currentMsgId === parseInt(apBtn.dataset.ap, 10)) {
     if (_currentAudio.paused) {
       _currentAudio.play();
-      apBtn.textContent = '⏸';
+      apBtn.innerHTML = IC.pause;
       apBtn.classList.add('playing');
       updatePlayer(_currentMsgId);
     } else {
       _currentAudio.pause();
-      apBtn.textContent = '▶';
+      apBtn.innerHTML = IC.play;
       apBtn.classList.remove('playing');
     }
     return;
@@ -1864,6 +1866,13 @@ const IC = {
   send:     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>',
   map:      '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/></svg>',
   x:        '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
+  play:     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>',
+  pause:    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg>',
+  loader:   '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin-icon"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>',
+  chevL:    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
+  chevLL:   '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>',
+  chevRR:   '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 17 5-5-5-5"/><path d="m13 17 5-5-5-5"/></svg>',
+  refresh:  '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>',
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -2189,14 +2198,14 @@ function toggleSidebar() {
   const btn = document.getElementById('sidebarToggle');
   layout.classList.toggle('sidebar-collapsed');
   const collapsed = layout.classList.contains('sidebar-collapsed');
-  btn.textContent = collapsed ? '»' : '«';
+  btn.innerHTML = collapsed ? IC.chevRR : IC.chevLL;
   localStorage.setItem('renshuu_sidebar', collapsed ? '0' : '1');
 }
 // Restore sidebar state on load
 if (localStorage.getItem('renshuu_sidebar') === '0') {
   document.getElementById('layout')?.classList.add('sidebar-collapsed');
   const tb = document.getElementById('sidebarToggle');
-  if (tb) tb.textContent = '»';
+  if (tb) tb.innerHTML = IC.chevRR;
 }
 
 // Strip all HTML except <span data-rt="...">, preserving data-en and data-new
@@ -2262,7 +2271,7 @@ function cancelSpeech() {
   document.querySelectorAll('.speak-btn.speaking').forEach(b => b.classList.remove('speaking'));
   // Hide all players and reset
   document.querySelectorAll('.audio-player').forEach(p => { p.style.display = 'none'; });
-  document.querySelectorAll('.ap-btn').forEach(b => { b.textContent = '▶'; b.classList.remove('playing'); });
+  document.querySelectorAll('.ap-btn').forEach(b => { b.innerHTML = IC.play; b.classList.remove('playing'); });
   document.querySelectorAll('.w-active').forEach(el => el.classList.remove('w-active'));
   _wordBounds = null;
   _wordMap = null;
@@ -2347,13 +2356,13 @@ async function speakJapanese(rawText, btn, msgIdx) {
     if (_currentAudio.paused) {
       _currentAudio.play();
       const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
-      if (apBtn) { apBtn.textContent = '⏸'; apBtn.classList.add('playing'); }
+      if (apBtn) { apBtn.innerHTML = IC.pause; apBtn.classList.add('playing'); }
       btn?.classList.add('speaking');
       updatePlayer(msgIdx);
     } else {
       _currentAudio.pause();
       const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
-      if (apBtn) { apBtn.textContent = '▶'; apBtn.classList.remove('playing'); }
+      if (apBtn) { apBtn.innerHTML = IC.play; apBtn.classList.remove('playing'); }
       btn?.classList.remove('speaking');
     }
     return;
@@ -2406,7 +2415,7 @@ async function speakJapanese(rawText, btn, msgIdx) {
               if (_wordMap) _wordMap.forEach(m => m.el.classList.remove('w-active'));
               if (msgIdx != null) {
                 const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
-                if (apBtn) { apBtn.textContent = '▶'; apBtn.classList.remove('playing'); }
+                if (apBtn) { apBtn.innerHTML = IC.play; apBtn.classList.remove('playing'); }
                 updatePlayer(msgIdx);
               } else {
                 _currentAudio = null;
@@ -2453,7 +2462,7 @@ async function speakJapanese(rawText, btn, msgIdx) {
               const player = document.getElementById('ap-' + msgIdx);
               if (player) player.style.display = 'flex';
               const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
-              if (apBtn) { apBtn.textContent = '⏸'; apBtn.classList.add('playing'); }
+              if (apBtn) { apBtn.innerHTML = IC.pause; apBtn.classList.add('playing'); }
             }
             audio.play();
             if (msgIdx != null) updatePlayer(msgIdx);
@@ -2559,7 +2568,7 @@ window.bdSpeak = function(mi, si) {
         if (_currentAudio.paused) {
           _currentAudio.play();
           const apBtn = document.querySelector(`.ap-btn[data-ap="${mi}"]`);
-          if (apBtn) { apBtn.textContent = '⏸'; apBtn.classList.add('playing'); }
+          if (apBtn) { apBtn.innerHTML = IC.pause; apBtn.classList.add('playing'); }
           btn?.classList.add('speaking');
         }
         updatePlayer(mi);
@@ -2724,7 +2733,7 @@ async function breakdownMessage(msg, btn, mi) {
   }
 
   btn.classList.add('active');
-  btn.textContent = '⏳';
+  btn.innerHTML = IC.loader;
 
   const plain = stripMarkers(msg.content);
   const sentences = splitSentences(plain);
@@ -2902,7 +2911,7 @@ function restoreAudioPlayer() {
     player.style.display = 'flex';
     const apBtn = player.querySelector('.ap-btn');
     if (apBtn) {
-      apBtn.textContent = _currentAudio.paused ? '▶' : '⏸';
+      apBtn.innerHTML = _currentAudio.paused ? IC.play : IC.pause;
       if (!_currentAudio.paused) apBtn.classList.add('playing');
     }
   }
@@ -3069,7 +3078,7 @@ function toggleLangMode() {
     if (localStorage.getItem('renshuu_sidebar') !== '0') {
       layout.classList.remove('sidebar-collapsed');
       const tb = document.getElementById('sidebarToggle');
-      if (tb) tb.textContent = '«';
+      if (tb) tb.innerHTML = IC.chevLL;
     }
     document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.remove('active'));
     document.getElementById('tab-drill').classList.add('active');
@@ -3085,7 +3094,7 @@ function toggleLangMode() {
     if (!layout.classList.contains('sidebar-collapsed')) {
       layout.classList.add('sidebar-collapsed');
       const tb = document.getElementById('sidebarToggle');
-      if (tb) tb.textContent = '»';
+      if (tb) tb.innerHTML = IC.chevRR;
     }
     document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.remove('active'));
     renderMode();
@@ -3285,7 +3294,7 @@ function drillHTML(d) {
           autocomplete="off"
           ${d.answered ? 'disabled' : ''}
         />
-        <button class="btn drill-submit" data-di="${d.i}" ${d.answered ? 'disabled' : ''}>→</button>
+        <button class="btn drill-submit" data-di="${d.i}" ${d.answered ? 'disabled' : ''}>${IC.send}</button>
       </div>
       ${d.answered ? `
         <div class="feedback ${d.partial ? 'partial' : d.correct ? 'ok' : 'no'}" id="fb-${d.i}">
@@ -5217,7 +5226,7 @@ function renderRoleplay() {
               placeholder="日本語か romaji で…"
               onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"
             ></textarea>
-            <button class="rpg-send" id="sendBtn" onclick="sendMsg()">→</button>
+            <button class="rpg-send" id="sendBtn" onclick="sendMsg()">${IC.send}</button>
           </div>
           <div class="rpg-tip">Enter to send · Shift+Enter for new line · romaji auto-converted</div>
         </div>
@@ -5243,7 +5252,7 @@ function renderRoleplay() {
             placeholder="日本語か romaji で…"
             onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"
           ></textarea>
-          <button class="send-btn" id="sendBtn" onclick="sendMsg()">→</button>
+          <button class="send-btn" id="sendBtn" onclick="sendMsg()">${IC.send}</button>
         </div>
         <div class="chat-tip">Enter to send · Shift+Enter for new line · romaji auto-converted</div>
       </div>
@@ -5266,7 +5275,7 @@ function renderRoleplay() {
         <div class="label">Scenarios</div>
         <div style="display:flex;gap:6px">
           <button class="btn" style="font-size:10px;padding:4px 10px" onclick="rpgLaunch()">${IC.map} Explore</button>
-          <button class="btn" style="font-size:10px;padding:4px 10px" onclick="refreshScenarios()">↻ Refresh</button>
+          <button class="btn" style="font-size:10px;padding:4px 10px" onclick="refreshScenarios()">${IC.refresh} Refresh</button>
         </div>
       </div>
       <div style="color:var(--muted);font-size:11px;margin-bottom:10px">
@@ -5319,7 +5328,7 @@ function renderMessages() {
               <button class="breakdown-btn" data-mi="${i}" title="Break down">${IC.book} Breakdown</button>
             </div>
             <div class="audio-player" id="ap-${i}" style="display:none">
-              <button class="ap-btn" data-ap="${i}" title="Play/Pause">▶</button>
+              <button class="ap-btn" data-ap="${i}" title="Play/Pause">${IC.play}</button>
               <div class="ap-track" data-ap-track="${i}"><div class="ap-fill"></div></div>
               <span class="ap-time">0:00</span>
             </div>` : ''}
@@ -5340,7 +5349,7 @@ function renderMessages() {
             <button class="breakdown-btn" data-mi="${i}" title="Break down this message">${IC.book}</button>
           </div>
           <div class="audio-player" id="ap-${i}" style="display:none">
-            <button class="ap-btn" data-ap="${i}" title="Play/Pause">▶</button>
+            <button class="ap-btn" data-ap="${i}" title="Play/Pause">${IC.play}</button>
             <div class="ap-track" data-ap-track="${i}"><div class="ap-fill"></div></div>
             <span class="ap-time">0:00</span>
           </div>` : ''}
@@ -5378,7 +5387,7 @@ function pickScenario(id) {
     if (!layout.classList.contains('sidebar-collapsed')) {
       layout.classList.add('sidebar-collapsed');
       const tb = document.getElementById('sidebarToggle');
-      if (tb) tb.textContent = '»';
+      if (tb) tb.innerHTML = IC.chevRR;
     }
   }
   // Check for saved conversation in favorites
@@ -5870,7 +5879,7 @@ function renderEngRoleplay() {
       ` : ''}
       <div class="sc-section-head">
         <div class="label">シナリオ</div>
-        <button class="btn" style="font-size:10px;padding:4px 10px" onclick="refreshEngScenarios()">↻ 更新</button>
+        <button class="btn" style="font-size:10px;padding:4px 10px" onclick="refreshEngScenarios()">${IC.refresh} 更新</button>
       </div>
       <div style="color:var(--muted);font-size:11px;margin-bottom:10px">
         英語で会話の練習をしましょう。AIが英語で返答し、間違いを直してくれます。
@@ -5897,7 +5906,7 @@ function renderEngRoleplay() {
               placeholder="英語で入力… (日本語でもOK)"
               onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendEngMsg()}"
             ></textarea>
-            <button class="rpg-send" id="sendBtn" onclick="sendEngMsg()">→</button>
+            <button class="rpg-send" id="sendBtn" onclick="sendEngMsg()">${IC.send}</button>
           </div>
           <div class="rpg-tip">Enterで送信 · Shift+Enterで改行</div>
         </div>
@@ -5914,7 +5923,7 @@ function renderEngRoleplay() {
             placeholder="英語で入力… (日本語でもOK)"
             onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendEngMsg()}"
           ></textarea>
-          <button class="send-btn" id="sendBtn" onclick="sendEngMsg()">→</button>
+          <button class="send-btn" id="sendBtn" onclick="sendEngMsg()">${IC.send}</button>
         </div>
         <div class="chat-tip">Enterで送信 · Shift+Enterで改行</div>
       </div>
@@ -5960,7 +5969,7 @@ function renderEngMessages() {
               <button class="breakdown-btn" data-mi="${i}" title="文法解説">${IC.book}</button>
             </div>
             <div class="audio-player" id="ap-${i}" style="display:none">
-              <button class="ap-btn" data-ap="${i}" title="再生/一時停止">▶</button>
+              <button class="ap-btn" data-ap="${i}" title="再生/一時停止">${IC.play}</button>
               <div class="ap-track" data-ap-track="${i}"><div class="ap-fill"></div></div>
               <span class="ap-time">0:00</span>
             </div>` : ''}
@@ -5982,7 +5991,7 @@ function renderEngMessages() {
             <button class="breakdown-btn" data-mi="${i}" title="文法解説">${IC.book}</button>
           </div>
           <div class="audio-player" id="ap-${i}" style="display:none">
-            <button class="ap-btn" data-ap="${i}" title="再生/一時停止">▶</button>
+            <button class="ap-btn" data-ap="${i}" title="再生/一時停止">${IC.play}</button>
             <div class="ap-track" data-ap-track="${i}"><div class="ap-fill"></div></div>
             <span class="ap-time">0:00</span>
           </div>` : ''}
@@ -6113,13 +6122,13 @@ async function speakEnglish(rawText, btn, msgIdx) {
     if (_currentAudio.paused) {
       _currentAudio.play();
       const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
-      if (apBtn) { apBtn.textContent = '⏸'; apBtn.classList.add('playing'); }
+      if (apBtn) { apBtn.innerHTML = IC.pause; apBtn.classList.add('playing'); }
       btn?.classList.add('speaking');
       updatePlayer(msgIdx);
     } else {
       _currentAudio.pause();
       const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
-      if (apBtn) { apBtn.textContent = '▶'; apBtn.classList.remove('playing'); }
+      if (apBtn) { apBtn.innerHTML = IC.play; apBtn.classList.remove('playing'); }
       btn?.classList.remove('speaking');
     }
     return;
@@ -6167,7 +6176,7 @@ async function speakEnglish(rawText, btn, msgIdx) {
               if (_wordMap) _wordMap.forEach(m => m.el.classList.remove('w-active'));
               if (msgIdx != null) {
                 const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
-                if (apBtn) { apBtn.textContent = '▶'; apBtn.classList.remove('playing'); }
+                if (apBtn) { apBtn.innerHTML = IC.play; apBtn.classList.remove('playing'); }
                 updatePlayer(msgIdx);
               } else { _currentAudio = null; }
             };
@@ -6192,7 +6201,7 @@ async function speakEnglish(rawText, btn, msgIdx) {
               const player = document.getElementById('ap-' + msgIdx);
               if (player) player.style.display = 'flex';
               const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
-              if (apBtn) { apBtn.textContent = '⏸'; apBtn.classList.add('playing'); }
+              if (apBtn) { apBtn.innerHTML = IC.pause; apBtn.classList.add('playing'); }
             }
             audio.play();
             if (msgIdx != null) updatePlayer(msgIdx);
@@ -6250,7 +6259,7 @@ async function breakdownEngMessage(msg, btn, mi) {
   }
 
   btn.classList.add('active');
-  btn.textContent = '⏳';
+  btn.innerHTML = IC.loader;
 
   const plain = stripMarkers(msg.content);
   try {
