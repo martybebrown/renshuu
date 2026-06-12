@@ -8,7 +8,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;700&family=Nunito+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/wanakana@5/umd/wanakana.min.js"></script>
 <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
-<script src="genkiGrammar.js"></script>
 <style>
 :root {
   --bg: #f6f2eb;
@@ -1585,41 +1584,6 @@ pre.code {
   .logo { font-size: 15px; }
 }
 
-/* ── Grammar Target ─────────────────────────────────────────────────────────── */
-.gt-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; max-width: 340px; }
-.gt-chip { font-size: 10px; padding: 3px 9px; border-radius: 10px; border: 1px solid var(--gold); color: var(--gold); cursor: pointer; user-select: none; background: rgba(168,110,26,0.06); }
-.gt-chip.off { border-color: var(--border); color: var(--muted); background: none; opacity: 0.65; }
-.gt-stepper { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 11px; color: var(--text); }
-.gt-step-btn { width: 22px; height: 22px; line-height: 1; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 4px; cursor: pointer; font-size: 13px; }
-.gt-warn { margin-top: 6px; font-size: 10px; color: var(--red); max-width: 340px; }
-.gt-note { margin-top: 6px; font-size: 9px; color: var(--muted); max-width: 340px; }
-.chat-wrap { position: relative; }
-.rpg-scene-half { position: relative; }
-.gt-hud { position: absolute; top: 8px; right: 8px; z-index: 40; background: rgba(255,255,255,0.94); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 9px; font-size: 10px; max-width: 190px; box-shadow: 0 2px 10px rgba(0,0,0,0.12); }
-.gt-hud-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 4px; }
-.gt-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 2px 0; cursor: pointer; }
-.gt-row-name { color: var(--text); white-space: nowrap; }
-.gt-dots { display: flex; gap: 3px; align-items: center; }
-.gt-dot { width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--gold); background: none; opacity: 0.4; }
-.gt-dot.hit { background: var(--gold); opacity: 1; }
-.gt-dot.assisted { background: none; border-width: 2px; opacity: 1; }
-.gt-hint { font-size: 9px; color: var(--muted); padding: 2px 0 4px; border-bottom: 1px dashed var(--border); }
-.gt-hud.rpg { background: rgba(8,8,15,0.88); border: 2px solid #3a3a5a; font-family: 'Courier New', monospace; }
-.gt-hud.rpg .gt-hud-title { color: #8a8aaa; }
-.gt-hud.rpg .gt-row-name { color: #e0e0f0; }
-.gt-hud.rpg .gt-dot { border-color: #d4a017; }
-.gt-hud.rpg .gt-dot.hit { background: #d4a017; }
-.gt-hud.rpg .gt-hint { color: #8a8aaa; border-bottom-color: #3a3a5a; }
-.gt-summary { background: var(--surface); border: 1px solid var(--gold); border-radius: var(--radius); padding: 12px 14px; margin: 8px 0; font-size: 12px; max-width: 560px; }
-.gt-sum-title { font-weight: 700; color: var(--gold); font-size: 12px; margin-bottom: 8px; }
-.gt-sum-point { margin-bottom: 8px; }
-.gt-sum-name { font-weight: 600; color: var(--text); font-size: 11px; }
-.gt-sum-sent { color: var(--text); font-size: 12px; padding: 2px 0 2px 12px; }
-.gt-sum-tag { font-size: 9px; color: var(--muted); }
-.gt-sum-recast { color: var(--muted); font-size: 11px; padding: 2px 0 2px 12px; }
-.rpg-dialogue .gt-summary, .rpg-chat-messages .gt-summary { background: rgba(8,8,15,0.7); border-color: #d4a017; color: #e0e0f0; }
-.rpg-dialogue .gt-summary .gt-sum-name, .rpg-dialogue .gt-summary .gt-sum-sent, .rpg-chat-messages .gt-summary .gt-sum-name, .rpg-chat-messages .gt-summary .gt-sum-sent { color: #e0e0f0; }
-@media (max-width: 640px) { .gt-hud { max-width: 150px; font-size: 9px; } }
 </style>
 </head>
 <body>
@@ -1665,9 +1629,6 @@ pre.code {
     <input type="checkbox" id="sierraToggle" onchange="S.sierraMode=this.checked;localStorage.setItem('renshuu_sierra_mode',this.checked);if(S.mode==='roleplay')renderRoleplay()" />
     Sierra RPG mode <span style="font-size:9px;color:var(--muted)">(pixel art scenes)</span>
   </label>
-  <div class="label" style="margin-top:12px">Grammar Target <span style="font-size:9px;color:var(--muted);text-transform:none;letter-spacing:0">(Genki · applies to new roleplay conversations)</span></div>
-  <select class="field" id="gtChapterSel" onchange="gtSetChapter(this.value)" style="margin-top:4px;font-size:11px"></select>
-  <div id="gtSetupBody"></div>
 </div>
 
 <!-- RPG World Overlay -->
@@ -1807,7 +1768,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const vocabConstrain = localStorage.getItem('renshuu_vocab_constrain');
   if (vocabConstrain === '0') document.getElementById('vocabConstrain').checked = false;
   document.getElementById('sierraToggle').checked = S.sierraMode;
-  gtInitSetup();
   // Migrate old favorites format (array of IDs → array of objects)
   if (S.favorites.length && typeof S.favorites[0] === 'string') {
     S.favorites = S.favorites.map(id => SCENARIO_POOL.find(s => s.id === id)).filter(Boolean);
@@ -2014,7 +1974,6 @@ const S = {
   convo: [],
   sysPrompt: '',
   sessionWords: [],
-  gt: null,  // Grammar Target session state (see initGrammarTarget)
   story: null,
   sierraMode: localStorage.getItem('renshuu_sierra_mode') !== 'false',
   // English roleplay (reverse mode)
