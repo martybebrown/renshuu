@@ -6797,7 +6797,7 @@ Return ONLY this JSON object:
   ],
   "nuance": "One sentence in English explaining why ${w.jp} is commonly confused or forgotten — collocations, similar kanji, near-synonyms. Name confusable words if relevant."
 }`;
-  const raw = await claude([{ role: 'user', content: user }], system, 1200, 'claude-sonnet-4-6');
+  const raw = await claude([{ role: 'user', content: user }], system, 1200);
   const clean = raw.replace(/```json|```/g, '').trim();
   // Defensive parse — fall back to first {…} block on the line if extra text
   let parsed;
@@ -6818,7 +6818,7 @@ async function checkLeechReply(prompt, reply, word) {
   const user = `Prompt: ${prompt}
 Target word that must be used: ${word.jp}${word.rd ? ` (${word.rd})` : ''} — ${word.en}
 Learner reply: ${reply}`;
-  const raw = await claude([{ role: 'user', content: user }], system, 200, 'claude-sonnet-4-6');
+  const raw = await claude([{ role: 'user', content: user }], system, 200);
   return raw.trim();
 }
 
