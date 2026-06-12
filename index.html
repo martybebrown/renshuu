@@ -6933,6 +6933,10 @@ function showToast(msg, kind) {
 
 // ── Leech rendering ─────────────────────────────────────────────────────────
 function renderLeechRehab() {
+  // Async callbacks (anki query, claude generation, triage) call this on
+  // completion. If the user has switched modes in the meantime, bail out so
+  // we don't clobber the other mode's rendered content.
+  if (S.mode !== 'leech') return;
   const m = document.getElementById('mainContent');
   // 1. Active session → show session UI
   if (S.leech.session) {
