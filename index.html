@@ -6776,36 +6776,45 @@ function getLeechKnownWords() {
 async function generateLeechContent(st) {
   const w = st.word;
   // Netlify free-tier functions cap at 10s. Use Haiku here so the
-  // round-trip consistently fits — drill/roleplay calls use Sonnet via
-  // the function's default, but those return faster than this one did.
-  // We also skip the known-vocab list to keep prefill tiny.
-  const system = 'You are a Japanese tutor. Return only the JSON object — no markdown fences, no commentary.';
+  // round-trip consistently fits.
+  //
+  // We ask for a labelled line format instead of JSON. Haiku reliably
+  // produces a flat KEY: value layout, whereas JSON kept breaking on
+  // unescaped quotes inside the context strings.
+  const system = 'You are a Japanese tutor. Output exactly the 5 labelled lines requested, nothing before, nothing after, no markdown.';
   const user = `Word the learner keeps failing: ${w.jp}${w.rd ? ` (${w.rd})` : ''} — ${w.en}
 
-Return this JSON exactly:
-{
-  "microStory": "2-3 sentences of natural Japanese using ${w.jp} once.",
-  "storyTranslation": "English translation of microStory.",
-  "contexts": [
-    "1-sentence English scenario where the learner must reply in Japanese using ${w.jp}.",
-    "A second, distinct scenario — different domain — also demanding ${w.jp}."
-  ],
-  "nuance": "One sentence in English on why ${w.jp} is commonly confused or forgotten (collocations, similar kanji, near-synonyms)."
-}`;
+Produce exactly these 5 lines, in this order, one per line:
+
+STORY: <2-3 natural Japanese sentences using ${w.jp} exactly once>
+TRANSLATION: <English translation of STORY>
+CONTEXT1: <one-sentence English scenario where the learner must reply in Japanese using ${w.jp}>
+CONTEXT2: <a distinct scenario — different domain — also demanding ${w.jp}>
+NUANCE: <one English sentence on why ${w.jp} is commonly confused or forgotten — collocations, similar kanji, near-synonyms>
+
+Rules: never use literal newlines inside a value; don't quote the values; don't number or bullet anything.`;
   const raw = await claude([{ role: 'user', content: user }], system, 500, 'claude-haiku-4-5-20251001');
-  const clean = raw.replace(/```json|```/g, '').trim();
-  // Defensive parse — fall back to first {…} block on the line if extra text
-  let parsed;
-  try { parsed = JSON.parse(clean); }
-  catch (_) {
-    const m = clean.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error('Could not parse content JSON');
-    parsed = JSON.parse(m[0]);
+  return parseLabelledLeechContent(raw);
+}
+
+// Pulls the 5 expected fields out of a labelled response. Tolerant of
+// extra whitespace, accidental leading prose, or extra blank lines.
+function parseLabelledLeechContent(raw) {
+  const fields = { STORY: '', TRANSLATION: '', CONTEXT1: '', CONTEXT2: '', NUANCE: '' };
+  const re = /^\s*(STORY|TRANSLATION|CONTEXT1|CONTEXT2|NUANCE)\s*[:：]\s*(.*\S)\s*$/;
+  for (const line of raw.split(/\r?\n/)) {
+    const m = line.match(re);
+    if (m) fields[m[1]] = m[2];
   }
-  if (!parsed.microStory || !Array.isArray(parsed.contexts) || parsed.contexts.length < 2) {
+  if (!fields.STORY || !fields.CONTEXT1 || !fields.CONTEXT2) {
     throw new Error('Generated content missing fields');
   }
-  return parsed;
+  return {
+    microStory: fields.STORY,
+    storyTranslation: fields.TRANSLATION,
+    contexts: [fields.CONTEXT1, fields.CONTEXT2],
+    nuance: fields.NUANCE,
+  };
 }
 
 async function checkLeechReply(prompt, reply, word) {
