@@ -7157,15 +7157,20 @@ Learner reply: ${reply}`;
 
 async function loadLeechWordContent(idx) {
   const st = S.leech.session.states[idx];
-  if (st.content) return;
+  // Re-entry guard: renderLeechRehab() will see loading=true and skip the
+  // lazy-load branch, so we don't fire a second (or hundredth) parallel
+  // call while the first is in flight.
+  if (st.content || st.loading) return;
+  st.loading = true;
   st.contentError = '';
   renderLeechRehab();
   try {
     st.content = await generateLeechContent(st);
     saveLeechSession();
-    renderLeechRehab();
   } catch (e) {
     st.contentError = e.message || 'Failed to generate content';
+  } finally {
+    st.loading = false;
     renderLeechRehab();
   }
 }
@@ -7282,7 +7287,7 @@ function renderLeechRehab() {
     // Lazy-load content for current word
     const idx = S.leech.session.idx;
     const st = S.leech.session.states[idx];
-    if (st && !st.content && !st.contentError) loadLeechWordContent(idx);
+    if (st && !st.content && !st.contentError && !st.loading) loadLeechWordContent(idx);
     return;
   }
   // 2. No session yet — show intro / load state
