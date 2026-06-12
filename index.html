@@ -6775,26 +6775,24 @@ function getLeechKnownWords() {
 
 async function generateLeechContent(st) {
   const w = st.word;
-  const known = getLeechKnownWords();
-  const knownBlock = known.length ? `\nKNOWN VOCAB (prefer these for surrounding words): ${known.join('、')}\n` : '';
-  const system = 'You are a Japanese-language tutor producing strict JSON output for a vocabulary rehab exercise. No markdown fences, no commentary outside the JSON.';
-  const user = `Generate rehab material for this Japanese word the learner repeatedly fails.
+  // Netlify free-tier functions cap at 10s. Use Haiku here so the
+  // round-trip consistently fits — drill/roleplay calls use Sonnet via
+  // the function's default, but those return faster than this one did.
+  // We also skip the known-vocab list to keep prefill tiny.
+  const system = 'You are a Japanese tutor. Return only the JSON object — no markdown fences, no commentary.';
+  const user = `Word the learner keeps failing: ${w.jp}${w.rd ? ` (${w.rd})` : ''} — ${w.en}
 
-WORD: ${w.jp}${w.rd ? ` (${w.rd})` : ''} — ${w.en}
-${knownBlock}
-Return ONLY this JSON object:
+Return this JSON exactly:
 {
-  "microStory": "2–3 sentence natural Japanese passage using ${w.jp} exactly once. Surrounding words should come from the known vocab where reasonable.",
-  "storyTranslation": "Natural English translation of microStory.",
+  "microStory": "2-3 sentences of natural Japanese using ${w.jp} once.",
+  "storyTranslation": "English translation of microStory.",
   "contexts": [
-    "Short English scenario prompt (1 sentence) where the learner must answer in Japanese using ${w.jp} naturally.",
-    "A second, distinct scenario prompt — different domain — also demanding ${w.jp}."
+    "1-sentence English scenario where the learner must reply in Japanese using ${w.jp}.",
+    "A second, distinct scenario — different domain — also demanding ${w.jp}."
   ],
-  "nuance": "One sentence in English explaining why ${w.jp} is commonly confused or forgotten — collocations, similar kanji, near-synonyms. Name confusable words if relevant."
+  "nuance": "One sentence in English on why ${w.jp} is commonly confused or forgotten (collocations, similar kanji, near-synonyms)."
 }`;
-  // Tight max_tokens — the JSON we want is short (~300 tokens), capping low
-  // keeps us well under Netlify function timeouts.
-  const raw = await claude([{ role: 'user', content: user }], system, 600);
+  const raw = await claude([{ role: 'user', content: user }], system, 500, 'claude-haiku-4-5-20251001');
   const clean = raw.replace(/```json|```/g, '').trim();
   // Defensive parse — fall back to first {…} block on the line if extra text
   let parsed;
@@ -6815,7 +6813,7 @@ async function checkLeechReply(prompt, reply, word) {
   const user = `Prompt: ${prompt}
 Target word that must be used: ${word.jp}${word.rd ? ` (${word.rd})` : ''} — ${word.en}
 Learner reply: ${reply}`;
-  const raw = await claude([{ role: 'user', content: user }], system, 200);
+  const raw = await claude([{ role: 'user', content: user }], system, 200, 'claude-haiku-4-5-20251001');
   return raw.trim();
 }
 
