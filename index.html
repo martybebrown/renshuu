@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;700&family=Nunito+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/wanakana@5/umd/wanakana.min.js"></script>
 <script src="https://aka.ms/csspeech/jsbrowserpackageraw"></script>
+<script src="genkiGrammar.js"></script>
 <style>
 :root {
   --bg: #f6f2eb;
@@ -1584,6 +1585,41 @@ pre.code {
   .logo { font-size: 15px; }
 }
 
+/* ── Grammar Target ─────────────────────────────────────────────────────────── */
+.gt-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; max-width: 340px; }
+.gt-chip { font-size: 10px; padding: 3px 9px; border-radius: 10px; border: 1px solid var(--gold); color: var(--gold); cursor: pointer; user-select: none; background: rgba(168,110,26,0.06); }
+.gt-chip.off { border-color: var(--border); color: var(--muted); background: none; opacity: 0.65; }
+.gt-stepper { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 11px; color: var(--text); }
+.gt-step-btn { width: 22px; height: 22px; line-height: 1; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 4px; cursor: pointer; font-size: 13px; }
+.gt-warn { margin-top: 6px; font-size: 10px; color: var(--red); max-width: 340px; }
+.gt-note { margin-top: 6px; font-size: 9px; color: var(--muted); max-width: 340px; }
+.chat-wrap { position: relative; }
+.rpg-scene-half { position: relative; }
+.gt-hud { position: absolute; top: 8px; right: 8px; z-index: 40; background: rgba(255,255,255,0.94); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 9px; font-size: 10px; max-width: 190px; box-shadow: 0 2px 10px rgba(0,0,0,0.12); }
+.gt-hud-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 4px; }
+.gt-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 2px 0; cursor: pointer; }
+.gt-row-name { color: var(--text); white-space: nowrap; }
+.gt-dots { display: flex; gap: 3px; align-items: center; }
+.gt-dot { width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--gold); background: none; opacity: 0.4; }
+.gt-dot.hit { background: var(--gold); opacity: 1; }
+.gt-dot.assisted { background: none; border-width: 2px; opacity: 1; }
+.gt-hint { font-size: 9px; color: var(--muted); padding: 2px 0 4px; border-bottom: 1px dashed var(--border); }
+.gt-hud.rpg { background: rgba(8,8,15,0.88); border: 2px solid #3a3a5a; font-family: 'Courier New', monospace; }
+.gt-hud.rpg .gt-hud-title { color: #8a8aaa; }
+.gt-hud.rpg .gt-row-name { color: #e0e0f0; }
+.gt-hud.rpg .gt-dot { border-color: #d4a017; }
+.gt-hud.rpg .gt-dot.hit { background: #d4a017; }
+.gt-hud.rpg .gt-hint { color: #8a8aaa; border-bottom-color: #3a3a5a; }
+.gt-summary { background: var(--surface); border: 1px solid var(--gold); border-radius: var(--radius); padding: 12px 14px; margin: 8px 0; font-size: 12px; max-width: 560px; }
+.gt-sum-title { font-weight: 700; color: var(--gold); font-size: 12px; margin-bottom: 8px; }
+.gt-sum-point { margin-bottom: 8px; }
+.gt-sum-name { font-weight: 600; color: var(--text); font-size: 11px; }
+.gt-sum-sent { color: var(--text); font-size: 12px; padding: 2px 0 2px 12px; }
+.gt-sum-tag { font-size: 9px; color: var(--muted); }
+.gt-sum-recast { color: var(--muted); font-size: 11px; padding: 2px 0 2px 12px; }
+.rpg-dialogue .gt-summary, .rpg-chat-messages .gt-summary { background: rgba(8,8,15,0.7); border-color: #d4a017; color: #e0e0f0; }
+.rpg-dialogue .gt-summary .gt-sum-name, .rpg-dialogue .gt-summary .gt-sum-sent, .rpg-chat-messages .gt-summary .gt-sum-name, .rpg-chat-messages .gt-summary .gt-sum-sent { color: #e0e0f0; }
+@media (max-width: 640px) { .gt-hud { max-width: 150px; font-size: 9px; } }
 </style>
 </head>
 <body>
@@ -1629,6 +1665,9 @@ pre.code {
     <input type="checkbox" id="sierraToggle" onchange="S.sierraMode=this.checked;localStorage.setItem('renshuu_sierra_mode',this.checked);if(S.mode==='roleplay')renderRoleplay()" />
     Sierra RPG mode <span style="font-size:9px;color:var(--muted)">(pixel art scenes)</span>
   </label>
+  <div class="label" style="margin-top:12px">Grammar Target <span style="font-size:9px;color:var(--muted);text-transform:none;letter-spacing:0">(Genki · applies to new roleplay conversations)</span></div>
+  <select class="field" id="gtChapterSel" onchange="gtSetChapter(this.value)" style="margin-top:4px;font-size:11px"></select>
+  <div id="gtSetupBody"></div>
 </div>
 
 <!-- RPG World Overlay -->
@@ -1768,6 +1807,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const vocabConstrain = localStorage.getItem('renshuu_vocab_constrain');
   if (vocabConstrain === '0') document.getElementById('vocabConstrain').checked = false;
   document.getElementById('sierraToggle').checked = S.sierraMode;
+  gtInitSetup();
   // Migrate old favorites format (array of IDs → array of objects)
   if (S.favorites.length && typeof S.favorites[0] === 'string') {
     S.favorites = S.favorites.map(id => SCENARIO_POOL.find(s => s.id === id)).filter(Boolean);
@@ -1974,6 +2014,7 @@ const S = {
   convo: [],
   sysPrompt: '',
   sessionWords: [],
+  gt: null,  // Grammar Target session state (see initGrammarTarget)
   story: null,
   sierraMode: localStorage.getItem('renshuu_sierra_mode') !== 'false',
   // English roleplay (reverse mode)
@@ -3494,6 +3535,267 @@ function retryDrill(i) {
     const inp = document.getElementById(`ai-${i}`);
     if (inp) inp.focus();
   }, 50);
+}
+
+// ── GRAMMAR TARGET (Genki) ────────────────────────────────────────────────────
+// Optional layer on top of Roleplay: forces production of a chapter's grammar
+// points. Setup lives in the settings panel; session state lives in S.gt.
+
+function gtChapterData(num) {
+  if (typeof GENKI_GRAMMAR === 'undefined' || !num) return null;
+  return GENKI_GRAMMAR.find(c => String(c.chapter) === String(num)) || null;
+}
+
+// Read persisted setup. Returns null when the feature is off (no chapter).
+// ids may be empty (= effectively off) so chips can be re-enabled in the UI.
+function gtGetConfig() {
+  const data = gtChapterData(localStorage.getItem('renshuu_gt_chapter'));
+  if (!data) return null;
+  let sel = null;
+  try { sel = JSON.parse(localStorage.getItem('renshuu_gt_points') || 'null'); } catch (_) {}
+  const ids = Array.isArray(sel)
+    ? sel.filter(id => data.points.some(p => p.id === id))
+    : data.points.map(p => p.id);
+  const required = Math.max(1, Math.min(5, parseInt(localStorage.getItem('renshuu_gt_required') || '2', 10) || 2));
+  return { chapter: data, ids, required };
+}
+
+function gtInitSetup() {
+  const sel = document.getElementById('gtChapterSel');
+  if (!sel || typeof GENKI_GRAMMAR === 'undefined') return;
+  sel.innerHTML = '<option value="">Off</option>' + GENKI_GRAMMAR.map(c =>
+    `<option value="${c.chapter}">${c.book} · Ch.${c.chapter} — ${escHtml(c.label)}</option>`).join('');
+  sel.value = localStorage.getItem('renshuu_gt_chapter') || '';
+  if (sel.selectedIndex === -1) sel.value = '';
+  gtRenderSetup();
+}
+
+function gtSetChapter(v) {
+  localStorage.setItem('renshuu_gt_chapter', v || '');
+  const data = gtChapterData(v);
+  // New chapter: all points on by default
+  localStorage.setItem('renshuu_gt_points', JSON.stringify(data ? data.points.map(p => p.id) : []));
+  gtRenderSetup();
+}
+
+function gtTogglePoint(id) {
+  const cfg = gtGetConfig();
+  if (!cfg) return;
+  const ids = cfg.ids.includes(id) ? cfg.ids.filter(x => x !== id) : [...cfg.ids, id];
+  localStorage.setItem('renshuu_gt_points', JSON.stringify(ids));
+  gtRenderSetup();
+}
+
+function gtStepRequired(d) {
+  const cur = parseInt(localStorage.getItem('renshuu_gt_required') || '2', 10) || 2;
+  localStorage.setItem('renshuu_gt_required', String(Math.max(1, Math.min(5, cur + d))));
+  gtRenderSetup();
+}
+
+function gtRenderSetup() {
+  const body = document.getElementById('gtSetupBody');
+  if (!body) return;
+  const cfg = gtGetConfig();
+  if (!cfg) { body.innerHTML = ''; return; }
+  const total = cfg.ids.length * cfg.required;
+  body.innerHTML = `
+    <div class="gt-chips">${cfg.chapter.points.map(p =>
+      `<span class="gt-chip${cfg.ids.includes(p.id) ? '' : ' off'}" onclick="gtTogglePoint('${p.id}')" title="${escAttr(p.note)}">${escHtml(p.jp)}</span>`).join('')}
+    </div>
+    <div class="gt-stepper">
+      <span>Required uses each:</span>
+      <button class="gt-step-btn" onclick="gtStepRequired(-1)">−</button>
+      <strong>${cfg.required}</strong>
+      <button class="gt-step-btn" onclick="gtStepRequired(1)">+</button>
+    </div>
+    ${cfg.ids.length === 0
+      ? '<div class="gt-warn">No grammar points selected — Grammar Target is off.</div>'
+      : `<div class="gt-note">${cfg.ids.length} point${cfg.ids.length > 1 ? 's' : ''} × ${cfg.required} = ${total} required productions per session.</div>`}
+    ${total > 12 ? '<div class="gt-warn">' + total + ' total required hits — sessions may drag. Consider deselecting points or lowering the count.</div>' : ''}
+  `;
+}
+
+// ── Session state ──
+function initGrammarTarget(sc) {
+  const cfg = gtGetConfig();
+  if (!cfg || !cfg.ids.length) { S.gt = null; return; }
+  S.gt = {
+    scenarioId: sc.id,
+    required: cfg.required,
+    points: cfg.chapter.points.filter(p => cfg.ids.includes(p.id)).map(p => ({
+      id: p.id, name: p.name, jp: p.jp, note: p.note, examples: p.examples,
+      hits: [], assistedNext: false, hintOpen: false,
+    })),
+    recasts: [],
+    turnsSinceHit: 0,
+    goalReached: false,
+    completed: false,
+  };
+}
+
+function gtAllDone() {
+  return !!S.gt && S.gt.points.every(p => p.hits.length >= S.gt.required);
+}
+
+// ── Prompt building ──
+function gtPromptSection() {
+  if (!S.gt) return '';
+  const list = S.gt.points.map(p =>
+    `- id "${p.id}": ${p.name} — ${p.note} Example: ${p.examples[0]}`).join('\n');
+  return `
+
+GRAMMAR TARGETS — the student is deliberately practising these Genki grammar patterns. The STUDENT must produce each one correctly ${S.gt.required} time(s) this session:
+${list}
+
+Grammar-target rules (these apply ON TOP of all rules above — the vocabulary rules still apply at the same time):
+A. Naturally engineer situations that invite each target pattern (e.g. ask hypothetical questions to invite conditionals, ask about abilities to invite the potential form). NEVER name or explain a grammar point inside the Japanese conversation, and never reveal that this is an exercise.
+B. Do NOT let the scenario reach its goal or a natural conclusion until the student has produced every target pattern the required number of times. Redirect naturally, in character — never announce this rule, never lecture.
+C. A production only counts if it is grammatically correct. If the student attempts a target pattern but gets it wrong, weave the corrected sentence naturally into your reply as a gentle recast, and explain the error in the [Correction: ...] block as usual. Do not count it as a hit.
+
+RESPONSE FORMAT — return ONLY one raw JSON object, no markdown fences, no text outside it:
+{"reply":"...","grammarHits":[],"note":"...","goalReached":false}
+- "reply": your normal Japanese reply, exactly as the rules above describe (1–3 sentences, [[word|reading|english]] markers, optional [Correction: ...] block at the end). Escape newlines as \\n.
+- "grammarHits": ids (from the target list above) that the student's MOST RECENT message used CORRECTLY. Your own usage never counts. Empty array if none, or for your opening line.
+- "note": OPTIONAL very brief English note when the student attempted a target but got it wrong. Omit otherwise.
+- "goalReached": true ONLY when every target has been met the required number of times AND the scenario has just reached a natural, satisfying conclusion. Otherwise false.`;
+}
+
+// Per-turn steering nudge, appended like the vocab-reinforcement nudge.
+function gtTurnNudge() {
+  if (!S.gt || S.gt.completed) return null;
+  const remaining = S.gt.points
+    .filter(p => p.hits.length < S.gt.required)
+    .map(p => `${p.name} (id ${p.id}): ${S.gt.required - p.hits.length} more`);
+  if (!remaining.length) {
+    return '[System: All grammar targets are complete. You may now let the scenario flow to its natural conclusion — when it concludes, set goalReached to true. Keep returning the JSON format.]';
+  }
+  const escalate = S.gt.turnsSinceHit >= 3
+    ? ' The student has not produced a target pattern in several turns — escalate your steering: ask more direct questions that practically require these patterns, but stay fully in character and never lecture or name the grammar.'
+    : '';
+  return `[System: Grammar targets still needed from the student: ${remaining.join('; ')}. Keep engineering natural openings for these patterns and do not conclude the scenario yet.${escalate} Remember to return only the JSON object format.]`;
+}
+
+// ── Reply parsing: JSON envelope with plain-text fallback ──
+function gtProcessReply(raw) {
+  const out = { text: raw, grammarHits: [], note: null, goalReached: false };
+  if (!S.gt) return out;
+  let txt = (raw || '').trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/```\s*$/, '')
+    .trim();
+  let candidate = null;
+  if (txt.startsWith('{')) candidate = txt;
+  else {
+    const first = txt.indexOf('{"'), last = txt.lastIndexOf('}');
+    if (first !== -1 && last > first) candidate = txt.slice(first, last + 1);
+  }
+  if (!candidate) return out;
+  let obj = null;
+  try { obj = JSON.parse(candidate); }
+  catch (_) {
+    // Repair literal control chars (e.g. raw newlines inside strings)
+    try { obj = JSON.parse(candidate.replace(/[\u0000-\u001f]+/g, ' ')); } catch (_) {}
+  }
+  if (!obj || typeof obj.reply !== 'string' || !obj.reply.trim()) return out;
+  out.text = obj.reply.trim();
+  if (Array.isArray(obj.grammarHits)) out.grammarHits = obj.grammarHits.filter(h => typeof h === 'string');
+  if (typeof obj.note === 'string' && obj.note.trim()) out.note = obj.note.trim();
+  out.goalReached = obj.goalReached === true;
+  return out;
+}
+
+// Record hits for the player's latest message. Returns true when the whole
+// session just completed (all targets met + scenario goal reached).
+function gtRecordHits(playerText, env, correction) {
+  if (!S.gt || S.gt.completed) return false;
+  let scored = false;
+  for (const id of env.grammarHits || []) {
+    const p = S.gt.points.find(x => x.id === id);
+    if (!p || p.hits.length >= S.gt.required) continue;
+    p.hits.push({ text: playerText, assisted: p.assistedNext });
+    p.assistedNext = false;
+    scored = true;
+  }
+  S.gt.turnsSinceHit = scored ? 0 : S.gt.turnsSinceHit + 1;
+  if (correction) S.gt.recasts.push({ player: playerText, correction });
+  if (env.goalReached) S.gt.goalReached = true;
+  if (gtAllDone() && S.gt.goalReached && !S.gt.completed) {
+    S.gt.completed = true;
+    return true;
+  }
+  return false;
+}
+
+// ── HUD ──
+function gtHudHtml() {
+  if (!S.gt) return '';
+  const rows = S.gt.points.map(p => {
+    const dots = [];
+    for (let i = 0; i < S.gt.required; i++) {
+      const h = p.hits[i];
+      dots.push(`<span class="gt-dot${h ? (h.assisted ? ' assisted' : ' hit') : ''}"></span>`);
+    }
+    return `
+      <div class="gt-row" onclick="gtToggleHint('${p.id}')" title="Tap for a hint (marks the next hit as assisted)">
+        <span class="gt-row-name">${escHtml(p.jp)}</span>
+        <span class="gt-dots">${dots.join('')}</span>
+      </div>
+      <div class="gt-hint" id="gtHint-${p.id}" style="display:${p.hintOpen ? 'block' : 'none'}">
+        ${escHtml(p.note)}<br>${p.examples.map(e => '・' + escHtml(e)).join('<br>')}
+      </div>`;
+  }).join('');
+  return `<div class="gt-hud${S.sierraMode ? ' rpg' : ''}" id="gtHud">
+    <div class="gt-hud-title">${gtAllDone() ? 'Targets done — wrap up' : 'Grammar targets'}</div>
+    ${rows}
+  </div>`;
+}
+
+function updateGtHud() {
+  const el = document.getElementById('gtHud');
+  if (el) el.outerHTML = gtHudHtml();
+}
+
+function gtToggleHint(id) {
+  if (!S.gt) return;
+  const p = S.gt.points.find(x => x.id === id);
+  if (!p) return;
+  p.hintOpen = !p.hintOpen;
+  // Peeking at the hint marks this pattern's next hit as assisted
+  if (p.hintOpen && p.hits.length < S.gt.required) p.assistedNext = true;
+  updateGtHud();
+}
+
+// ── Completion summary card ──
+function gtSummaryHtml() {
+  if (!S.gt) return '';
+  const pts = S.gt.points.map(p => `
+    <div class="gt-sum-point">
+      <div class="gt-sum-name">${escHtml(p.name)}</div>
+      ${p.hits.map(h => `<div class="gt-sum-sent">${escHtml(h.text)}${h.assisted ? ' <span class="gt-sum-tag">(hint used)</span>' : ''}</div>`).join('')}
+    </div>`).join('');
+  const recasts = S.gt.recasts.length ? `
+    <div class="gt-sum-name" style="margin-top:8px">Recasts issued</div>
+    ${S.gt.recasts.map(r => `<div class="gt-sum-recast">${escHtml(r.player)}<br>↳ ${formatCorrection(r.correction)}</div>`).join('')}` : '';
+  return `<div class="gt-summary">
+    <div class="gt-sum-title">Grammar Target complete — every pattern produced and the scene wrapped up</div>
+    ${pts}${recasts}
+  </div>`;
+}
+
+function gtSummaryMsg() {
+  return { role: 'assistant', content: '(Grammar Target summary)', gtSummary: true, display: gtSummaryHtml() };
+}
+
+// Completion score (0–100): full marks for unassisted points, half for assisted.
+function gtCompletionScore() {
+  if (!S.gt || !S.gt.points.length) return 0;
+  const per = 100 / S.gt.points.length;
+  let total = 0;
+  for (const p of S.gt.points) {
+    const assisted = p.hits.some(h => h.assisted);
+    total += assisted ? per / 2 : per;
+  }
+  return Math.round(total);
 }
 
 // ── ROLEPLAY MODE ─────────────────────────────────────────────────────────────
@@ -5310,6 +5612,7 @@ function renderRoleplay() {
         <div class="rpg-scene">
           ${renderScene(S.scenario)}
           <div class="rpg-scene-label">${S.scenario.jp} — ${S.scenario.en}</div>
+          ${gtHudHtml()}
         </div>
         <div class="rpg-dialogue-wrap">
           <div class="rpg-head">
@@ -5338,6 +5641,7 @@ function renderRoleplay() {
       </div>
     ` : `
       <div class="chat-wrap">
+        ${gtHudHtml()}
         <div class="chat-head">
           <button class="btn" onclick="backToScenarios()">${IC.back} Back</button>
           <div class="label">${S.scenario.jp} — ${S.scenario.en}</div>
@@ -5396,6 +5700,7 @@ function renderMessages() {
     if (msg.divider) {
       return '<div class="rpg-episode-divider"><span class="ep-label">${IC.ff} Time passes…</span></div>';
     }
+    if (msg.gtSummary) return msg.display || gtSummaryHtml();
     const isReal = msg.role === 'assistant' && msg.content && msg.content !== '…';
     let body = msg.role === 'assistant'
       ? (msg.display || safeAnnotated(buildAnnotated(msg.content)))
@@ -5465,6 +5770,11 @@ function escHtml(s) {
   return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+// Attribute-safe escape (also escapes quotes) for use inside title="" etc.
+function escAttr(s) {
+  return escHtml(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 function formatCorrection(s) {
   // Escape HTML, then convert numbered points to line breaks and bold the error arrows
   return escHtml(s || '')
@@ -5493,6 +5803,7 @@ function pickScenario(id) {
   if (fav && fav.convo && fav.convo.length) {
     S.scenario = fav;
     S.convo = fav.convo;
+    S.gt = null;  // Grammar Target applies to fresh sessions only
     renderRoleplay();
     buildSysPrompt(S.scenario);
     scrollChat();
@@ -5500,6 +5811,7 @@ function pickScenario(id) {
   }
   S.scenario = S.scenarios.find(s => s.id === id) || S.favorites.find(f => f.id === id) || SCENARIO_POOL.find(s => s.id === id) || null;
   S.convo = [];
+  initGrammarTarget(S.scenario);
   renderRoleplay();
   startChat();
 }
@@ -5507,6 +5819,7 @@ function pickScenario(id) {
 function resetChat() {
   cancelSpeech();
   S.convo = [];
+  initGrammarTarget(S.scenario);
   renderRoleplay();
   startChat();
 }
@@ -5536,6 +5849,8 @@ Rules:
 7. The student may write in rōmaji (e.g. "watashi wa gakusei desu") — understand it as Japanese and respond naturally. Only correct it if there is an actual grammar or vocab mistake, not just for using romaji.
 
 REMEMBER: 1–3 sentences MAX for your Japanese reply. This is the most important rule. Short and conversational.`;
+  // Grammar Target layer (no-op string when the feature is off / S.gt is null)
+  S.sysPrompt += gtPromptSection();
 }
 
 function saveConvoToFavorite() {
@@ -5543,7 +5858,7 @@ function saveConvoToFavorite() {
   const fav = S.favorites.find(f => f.id === S.scenario.id);
   if (fav) {
     fav.convo = S.convo
-      .filter(m => m.content !== '…')
+      .filter(m => m.content !== '…' && !m.gtSummary)
       .map(m => { const o = { role: m.role, content: m.content, _id: m._id, correction: m.correction || undefined }; if (m.divider) o.divider = true; return o; });
     saveFavorites();
   }
@@ -5611,9 +5926,10 @@ async function startChat() {
   try {
     const opening = await claude(
       [{ role: 'user', content: '[Open the scenario with a natural, brief Japanese greeting or question — 1–2 sentences only.]' }],
-      S.sysPrompt
+      S.sysPrompt, S.gt ? 800 : 1000
     );
-    S.convo = [{ role: 'assistant', content: opening, _id: msgId() }];
+    const openText = gtProcessReply(opening).text;
+    S.convo = [{ role: 'assistant', content: openText, _id: msgId() }];
     updateChat();
     saveConvoToFavorite();
   } catch (e) {
@@ -5668,12 +5984,19 @@ async function sendMsg() {
       }
     }
 
-    const reply = await claude(msgs, S.sysPrompt, 500);
+    // Grammar Target steering nudge (no-op when feature off)
+    const gtNudge = gtTurnNudge();
+    if (gtNudge) msgs.push({ role: 'user', content: gtNudge });
+
+    const reply = await claude(msgs, S.sysPrompt, S.gt ? 800 : 500);
+
+    // Unwrap the Grammar Target JSON envelope (passthrough when off)
+    const env = gtProcessReply(reply);
 
     // parse optional [Correction: ...] — greedy match to final ] since corrections may contain ]] annotation markers
     const corrRx = /\[Corrections?:\s*([\s\S]*?)\]?\s*$/i;
-    const corrMatch = reply.match(corrRx);
-    const clean = reply.replace(corrRx, '').trim();
+    const corrMatch = env.text.match(corrRx);
+    const clean = env.text.replace(corrRx, '').trim();
     const correction = corrMatch ? corrMatch[1].replace(/\[\[([^\[\]|]+)\|[^\[\]]+\]\]/g, '$1').trim() : null;
 
     // Track newly used vocab words from this reply
@@ -5686,6 +6009,12 @@ async function sendMsg() {
     // replace spinner
     S.convo.pop();
     S.convo.push({ role: 'assistant', content: clean, correction, _id: msgId() });
+    // Record grammar hits and append the completion summary if the session just finished
+    if (S.gt) {
+      const done = gtRecordHits(text, env, correction);
+      updateGtHud();
+      if (done) S.convo.push(gtSummaryMsg());
+    }
     updateChat();
     saveConvoToFavorite();
   } catch (e) {
@@ -8143,9 +8472,14 @@ function renderLeechEnd() {
     const chatMessages = document.getElementById('rpgChatMessages');
     const chatInput = document.getElementById('rpgChatInput');
 
-    // Render the scenario background SVG into the scene half
+    // Grammar Target: initialise for fresh sessions only (restored convos run as today)
+    const isFresh = !(savedConvo && savedConvo.length > 0);
+    if (isFresh) initGrammarTarget(sc); else S.gt = null;
+
+    // Render the scenario background SVG into the scene half (+ Grammar Target HUD)
     sceneHalf.innerHTML = renderScene(sc) +
-      `<div class="rpg-scene-label">${escHtml(sc.jp)} — ${escHtml(sc.en)}</div>`;
+      `<div class="rpg-scene-label">${escHtml(sc.jp)} — ${escHtml(sc.en)}</div>` +
+      gtHudHtml();
     chatName.textContent = escHtml(sc.char);
     chatInput.value = '';
 
@@ -8185,7 +8519,7 @@ function renderLeechEnd() {
         rpg.dialogueState.sysPrompt,
         800
       ).then(reply => {
-        const { correction: corr, clean } = extractCorrection(reply);
+        const { correction: corr, clean } = extractCorrection(gtProcessReply(reply).text);
         const msg = { role: 'assistant', content: clean, correction: corr, display: safeAnnotated(buildAnnotated(clean)) };
         rpg.dialogueState.convo.push(msg);
         rpg.dialogueState.phase = 'chat';
@@ -8274,10 +8608,26 @@ function renderLeechEnd() {
       }
     }
 
-    claude(messages, ds.sysPrompt, 500).then(reply => {
-      const { correction: corr, clean } = extractCorrection(reply);
+    // Grammar Target steering nudge (no-op when feature off)
+    const gtNudge = gtTurnNudge();
+    if (gtNudge) messages.push({ role: 'user', content: gtNudge });
+
+    claude(messages, ds.sysPrompt, S.gt ? 800 : 500).then(reply => {
+      const env = gtProcessReply(reply);
+      const { correction: corr, clean } = extractCorrection(env.text);
       const msg = { role: 'assistant', content: clean, correction: corr, display: safeAnnotated(buildAnnotated(clean)) };
       ds.convo.push(msg);
+      if (S.gt) {
+        const done = gtRecordHits(txt, env, corr);
+        updateGtHud();
+        if (done) {
+          ds.convo.push(gtSummaryMsg());
+          // Feed completion into the RPG score counter
+          rpg.score = Math.min(100, rpg.score + gtCompletionScore());
+          const scoreEl = document.getElementById('rpgScore');
+          if (scoreEl) scoreEl.textContent = `Score: ${rpg.score} of 100`;
+        }
+      }
       // Rolling trim — keep last MAX_MSGS_PER_CONVO in memory
       if (ds.convo.length > MAX_MSGS_PER_CONVO) {
         ds.convo = ds.convo.slice(-MAX_MSGS_PER_CONVO);
@@ -8430,7 +8780,7 @@ function renderLeechEnd() {
   function saveConvo(scenarioId, convo) {
     const all = loadAllConvos();
     // Store only role + content (strip display, correction, etc to save space)
-    const trimmed = convo.slice(-MAX_MSGS_PER_CONVO).map(m => {
+    const trimmed = convo.slice(-MAX_MSGS_PER_CONVO).filter(m => !m.gtSummary).map(m => {
       const o = { role: m.role, content: m.content };
       if (m.divider) o.divider = true;
       return o;
