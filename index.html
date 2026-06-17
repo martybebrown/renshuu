@@ -484,6 +484,33 @@ pre.code {
 .retry-btn { margin-top: 8px; font-size: 11px; padding: 4px 14px; float: right; }
 .tl { color: var(--muted); margin-top: 4px; font-size: 11px; }
 
+/* Compose mode */
+.compose-theme-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 12px 0 18px; padding: 12px 14px;
+  background: var(--surface2); border-radius: var(--radius);
+}
+.compose-theme-bar .theme-name { font-family: 'Shippori Mincho', serif; font-size: 16px; }
+.compose-theme-bar .theme-jp { color: var(--muted); font-size: 13px; }
+.compose-theme-input {
+  flex: 1; min-width: 160px;
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  padding: 7px 10px; border-radius: var(--radius); font-size: 13px; outline: none;
+}
+.compose-theme-input:focus { border-color: var(--red); }
+.compose-idea { font-family: 'Shippori Mincho', serif; font-size: 17px; line-height: 1.6; margin-bottom: 10px; }
+.compose-hints { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.hint-chip {
+  display: inline-flex; align-items: baseline; gap: 5px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 999px; padding: 3px 10px; font-size: 12px;
+}
+.hint-chip .hc-jp { font-family: 'Shippori Mincho', serif; }
+.hint-chip .hc-rd { color: var(--muted); font-size: 10px; }
+.hint-chip .hc-en { color: var(--muted); font-size: 11px; }
+.compose-input { min-height: 38px; resize: vertical; line-height: 1.5; }
+.compose-correction { font-family: 'Shippori Mincho', serif; font-size: 18px; line-height: 1.7; margin: 2px 0 4px; }
+
 /* Toast */
 .renshuu-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 3px; font-size: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.18); opacity: 0; pointer-events: none; transition: all 0.2s; z-index: 9999; }
 .renshuu-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -1516,6 +1543,7 @@ pre.code {
   </div>
   <div class="header-mode-toggle" id="headerModeToggle">
     <button class="header-mode active" id="hm-drill" onclick="switchMode('drill')">Drills</button>
+    <button class="header-mode" id="hm-compose" onclick="switchMode('compose')">Compose</button>
     <button class="header-mode" id="hm-roleplay" onclick="switchMode('roleplay')">Roleplay</button>
     <button class="header-mode" id="hm-story" onclick="switchMode('story')">Story</button>
   </div>
@@ -1654,6 +1682,7 @@ pre.code {
       <div class="label">Mode</div>
       <div class="tabs">
         <button class="tab active" id="tab-drill" onclick="switchMode('drill')">Drills</button>
+        <button class="tab" id="tab-compose" onclick="switchMode('compose')">Compose</button>
         <button class="tab" id="tab-roleplay" onclick="switchMode('roleplay')">Roleplay</button>
         <button class="tab" id="tab-story" onclick="switchMode('story')">Story</button>
       </div>
@@ -1741,6 +1770,10 @@ document.addEventListener('click', e => {
   // Drill submit button
   const btn = e.target.closest('.drill-submit[data-di]');
   if (btn) { checkDrill(parseInt(btn.dataset.di, 10)); return; }
+
+  // Compose submit button
+  const cBtn = e.target.closest('.compose-submit[data-ci]');
+  if (cBtn) { submitCompose(parseInt(cBtn.dataset.ci, 10)); return; }
 
   // Drill speak button
   const drillSpeak = e.target.closest('.drill-speak[data-sentence]');
@@ -1855,6 +1888,15 @@ document.addEventListener('click', e => {
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
+  // Compose textarea: submit on Cmd/Ctrl+Enter (plain Enter inserts a newline)
+  const cInp = e.target.closest('.compose-input[data-ci]');
+  if (cInp) {
+    if (e.metaKey || e.ctrlKey) {
+      e.preventDefault();
+      submitCompose(parseInt(cInp.dataset.ci, 10));
+    }
+    return;
+  }
   const inp = e.target.closest('.answer-input[data-di]');
   if (!inp) return;
   e.preventDefault();
@@ -1887,6 +1929,7 @@ const S = {
   focus: new Set(['n', 'y', 'm']),
   cards: { new: [], young: [], mature: [] },
   drills: [],
+  compose: { theme: '', themeJp: '', prompts: [], pendingTheme: '' },
   scenario: null,
   scenarios: [],
   favorites: JSON.parse(localStorage.getItem('renshuu_favorites') || '[]'),
@@ -3119,6 +3162,7 @@ function switchMode(m) {
 
 function renderMode() {
   if (S.mode === 'drill') renderDrills();
+  else if (S.mode === 'compose') renderCompose();
   else if (S.mode === 'roleplay') renderRoleplay();
   else if (S.mode === 'eng_roleplay') renderEngRoleplay();
   else if (S.mode === 'story') renderStory();
@@ -3401,6 +3445,260 @@ function retryDrill(i) {
   setTimeout(() => {
     const inp = document.getElementById(`ai-${i}`);
     if (inp) inp.focus();
+  }, 50);
+}
+
+// ── COMPOSE MODE ──────────────────────────────────────────────────────────────
+// Write full sentences expressing a given idea, then submit for AI review.
+function renderCompose() {
+  const m = document.getElementById('mainContent');
+  m.innerHTML = `
+    <div class="row-between">
+      <div>
+        <div class="label">Sentence Composition</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:2px">Write a sentence expressing each idea — your structure, your words. Romaji or kana. Submit for review.</div>
+      </div>
+      <button class="btn" onclick="genComposeBatch()" id="genComposeBtn">New batch →</button>
+    </div>
+    <div id="composeZone"><div class="loading-row"><span class="spin"></span> building a batch from your vocab…</div></div>
+  `;
+  if (S.compose.prompts.length > 0) {
+    paintCompose();
+  } else {
+    genComposeBatch();
+  }
+}
+
+function applyComposeTheme() {
+  const inp = document.getElementById('composeThemeInput');
+  const v = inp ? inp.value.trim() : '';
+  S.compose.pendingTheme = v;
+  genComposeBatch(v);
+}
+
+async function genComposeBatch(override = '') {
+  const zone = document.getElementById('composeZone');
+  const btn = document.getElementById('genComposeBtn');
+  if (btn) btn.disabled = true;
+  if (zone) zone.innerHTML = '<div class="loading-row"><span class="spin"></span> building a batch from your vocab…</div>';
+
+  const words = pickWords(16);
+  S.sessionWords = words;
+  const wordBlock = words.map(w =>
+    `${w.jp}${w.rd ? `（${w.rd}）` : ''} = ${w.en} [${w.tier === 'n' ? 'NEW' : w.tier === 'y' ? 'young' : 'mature'}]`
+  ).join('\n');
+
+  const sys = `You are a Japanese teacher designing a sentence-WRITING exercise (the student composes their own sentences from scratch).
+Return ONLY valid JSON, no markdown fences, no preamble.
+
+You are given the student's vocabulary list. Do two things:
+1. Choose ONE theme that ties a batch of 5 prompts together — either a SUBJECT (e.g. "daily routine", "talking about the weather") or a GRAMMAR concept (e.g. "～たい to express wants", "comparing two things with より"). Pick something the supplied vocab supports well.
+2. Write 5 prompts. Each prompt is an English instruction describing an IDEA the student should express in a single Japanese sentence. Describe the meaning/situation only — do NOT dictate the sentence, structure, or exact words. Order them easiest → hardest.
+
+For each prompt, include 2–3 "hints": words drawn ONLY from the supplied vocabulary list that would be genuinely useful for that idea. These are optional suggestions, not requirements. Use the exact jp/reading/meaning from the list.
+
+Schema:
+{
+  "theme": "short English label for the theme",
+  "theme_jp": "short Japanese label for the theme",
+  "prompts": [
+    {
+      "idea": "English instruction, e.g. 'Tell a friend you want to go to the new café this weekend.'",
+      "hints": [ { "jp": "週末", "reading": "しゅうまつ", "en": "weekend" } ]
+    }
+  ]
+}
+Rules:
+- Exactly 5 prompts.
+- Target N4–N3 level; ideas should be expressible in one natural sentence.
+- Hints must come from the supplied list (exact forms); 2–3 per prompt.
+- Vary the prompts so they don't all share the same grammar.`;
+
+  const themeLine = override
+    ? `Use this theme (a subject or grammar concept): "${override}".`
+    : `Choose a fitting theme yourself.`;
+
+  try {
+    const raw = await claude(
+      [{ role: 'user', content: `${themeLine}\n\nStudent's vocabulary:\n\n${wordBlock}` }],
+      sys,
+      1200
+    );
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean.match(/\{[\s\S]*\}/)?.[0] || clean);
+    S.compose.theme = parsed.theme || (override || 'Free composition');
+    S.compose.themeJp = parsed.theme_jp || '';
+    S.compose.pendingTheme = '';
+    S.compose.prompts = (parsed.prompts || []).slice(0, 5).map((p, i) => ({
+      i,
+      idea: p.idea || '',
+      hints: Array.isArray(p.hints) ? p.hints : [],
+      input: '',
+      submitted: false,
+      loading: false,
+      review: null,
+    }));
+    paintCompose();
+  } catch (e) {
+    if (zone) zone.innerHTML = `<div style="color:var(--red);font-size:12px">Error: ${e.message}</div>`;
+  }
+  if (btn) btn.disabled = false;
+}
+
+// Preserve in-progress text from all textareas back into state before any repaint
+function syncComposeInputs() {
+  document.querySelectorAll('.compose-input[data-ci]').forEach(el => {
+    const p = S.compose.prompts[parseInt(el.dataset.ci, 10)];
+    if (p && !p.submitted) p.input = el.value;
+  });
+}
+
+function paintCompose() {
+  const zone = document.getElementById('composeZone');
+  if (!zone) return;
+  const c = S.compose;
+  const done = c.prompts.filter(p => p.submitted);
+  const ok = done.filter(p => p.review && p.review.verdict === 'correct').length;
+  const minor = done.filter(p => p.review && p.review.verdict === 'minor').length;
+  const wrong = done.filter(p => p.review && p.review.verdict === 'wrong').length;
+
+  const themeBar = `
+    <div class="compose-theme-bar">
+      <span class="theme-name">${escHtml(c.theme)}</span>
+      ${c.themeJp ? `<span class="theme-jp">${escHtml(c.themeJp)}</span>` : ''}
+      <input class="compose-theme-input" id="composeThemeInput" placeholder="your own theme — a subject or grammar point…" value="${escHtml(c.pendingTheme)}">
+      <button class="btn" onclick="applyComposeTheme()">Go →</button>
+    </div>`;
+
+  const scoreHTML = done.length > 0 ? `
+    <div class="drill-score-row">
+      <span class="score-chip score-correct">✓ ${ok}</span>
+      <span class="score-chip score-close">△ ${minor}</span>
+      <span class="score-chip score-wrong">✗ ${wrong}</span>
+      <span class="score-total">${done.length} / ${c.prompts.length} reviewed</span>
+    </div>` : '';
+
+  const bottomBtn = `
+    <div style="text-align:center;margin-top:16px">
+      <button class="btn" onclick="genComposeBatch()">New batch →</button>
+    </div>`;
+
+  zone.innerHTML = themeBar + c.prompts.map(p => composeCardHTML(p)).join('') + scoreHTML + bottomBtn;
+}
+
+function composeCardHTML(p) {
+  const hints = (p.hints || []).map(h =>
+    `<span class="hint-chip"><span class="hc-jp">${escHtml(h.jp || '')}</span>${h.reading ? `<span class="hc-rd">${escHtml(h.reading)}</span>` : ''}<span class="hc-en">${escHtml(h.en || '')}</span></span>`
+  ).join('');
+
+  const verdictClass = p.submitted && p.review
+    ? (p.review.verdict === 'correct' ? ' correct-card' : p.review.verdict === 'minor' ? ' partial-card' : ' wrong-card')
+    : '';
+
+  return `
+    <div class="drill-card${verdictClass}" id="cc-${p.i}">
+      <div class="drill-head">
+        <span class="tier-badge n">作 compose</span>
+        <span class="num">${p.i + 1} / ${S.compose.prompts.length}</span>
+      </div>
+      <div class="compose-idea">${escHtml(p.idea)}</div>
+      ${hints ? `<div class="compose-hints">${hints}</div>` : ''}
+      <div class="answer-row">
+        <textarea
+          class="answer-input compose-input"
+          id="ci-${p.i}"
+          data-ci="${p.i}"
+          placeholder="write your sentence (romaji or kana)…  ⌘/Ctrl+Enter to submit"
+          autocomplete="off"
+          ${p.submitted ? 'disabled' : ''}
+        >${escHtml(p.input)}</textarea>
+        <button class="btn compose-submit" data-ci="${p.i}" ${p.submitted ? 'disabled' : ''}>${IC.send}</button>
+      </div>
+      ${p.submitted ? `<div class="feedback ${p.review ? (p.review.verdict === 'correct' ? 'ok' : p.review.verdict === 'minor' ? 'partial' : 'no') : ''}" id="cfb-${p.i}">${composeReviewHTML(p)}</div>` : ''}
+    </div>
+  `;
+}
+
+function composeReviewHTML(p) {
+  if (p.loading || !p.review) return '<span class="spin"></span> reviewing…';
+  const r = p.review;
+  const mark = r.verdict === 'correct' ? '✓ Looks good' : r.verdict === 'minor' ? '△ Minor fixes' : '✗ Needs work';
+  const annotated = safeAnnotated(buildAnnotated(r.annotated || r.correction || ''));
+  const speak = r.correction
+    ? `<button class="speak-btn drill-speak" data-sentence="${escHtml(stripMarkers(r.correction))}" title="Listen">${IC.volume}</button>`
+    : '';
+  return `
+    <div>${mark}</div>
+    ${r.correction ? `<div class="compose-correction">${annotated} ${speak}</div>` : ''}
+    ${r.translation ? `<div class="tl">${escHtml(r.translation)}</div>` : ''}
+    ${r.note ? `<div style="margin-top:6px">${escHtml(r.note)}</div>` : ''}
+    <button class="btn retry-btn" onclick="retryCompose(${p.i})">Try again</button>
+  `;
+}
+
+async function submitCompose(i) {
+  const p = S.compose.prompts[i];
+  if (!p || p.submitted) return;
+  const inputEl = document.getElementById(`ci-${i}`);
+  const ans = (inputEl ? inputEl.value : p.input).trim();
+  if (!ans) return;
+  syncComposeInputs();
+  p.input = ans;
+  p.submitted = true;
+  p.loading = true;
+  p.review = null;
+  paintCompose();
+
+  const hintBlock = (p.hints || []).map(h => `${h.jp}（${h.reading}）= ${h.en}`).join('; ');
+  const sys = `You are a warm but precise Japanese tutor. A student was asked to write ONE Japanese sentence expressing a given idea. They may have typed romaji or kana — interpret romaji as the intended kana.
+Judge whether their sentence naturally and grammatically expresses the intended idea. Do not penalise valid alternative phrasings or word choices — only correct what is actually wrong or unnatural.
+Return ONLY a JSON object, no markdown fences:
+{
+  "verdict": "correct" | "minor" | "wrong",
+  "correction": "the natural Japanese sentence in normal orthography (kanji + kana), plain text",
+  "annotated": "the SAME corrected sentence with [[word|reading|english]] markers on every word — kanji compounds, katakana, and hiragana words (2+ chars); reading in hiragana",
+  "translation": "English translation of the corrected sentence",
+  "note": "1–2 short sentences: if correct, brief praise; otherwise what you changed and why"
+}
+verdict guide: "correct" = already natural and grammatical (correction may equal their sentence, just normalised); "minor" = small fixes (particle, conjugation, kana→kanji, word choice); "wrong" = wrong meaning, ungrammatical, not Japanese, or empty.`;
+
+  const msg = `Idea to express (in English): ${p.idea}
+${hintBlock ? `Suggested vocab (optional): ${hintBlock}\n` : ''}Student wrote: "${ans}"`;
+
+  try {
+    const raw = await claude([{ role: 'user', content: msg }], sys, 600);
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const r = JSON.parse(clean.match(/\{[\s\S]*\}/)?.[0] || clean);
+    p.review = {
+      verdict: ['correct', 'minor', 'wrong'].includes(r.verdict) ? r.verdict : 'minor',
+      correction: r.correction || '',
+      annotated: r.annotated || r.correction || '',
+      translation: r.translation || '',
+      note: r.note || '',
+    };
+  } catch (e) {
+    p.review = { verdict: 'minor', correction: '', annotated: '', translation: '', note: `Couldn't load review: ${e.message}` };
+  }
+  p.loading = false;
+
+  // Full repaint so the card state, feedback, and score row all refresh together.
+  // syncComposeInputs preserves anything typed in other cards during the await.
+  syncComposeInputs();
+  paintCompose();
+  if (p.review && p.review.correction) speakJapanese(stripMarkers(p.review.correction));
+}
+
+function retryCompose(i) {
+  const p = S.compose.prompts[i];
+  if (!p) return;
+  syncComposeInputs();
+  p.submitted = false;
+  p.loading = false;
+  p.review = null;
+  paintCompose();
+  setTimeout(() => {
+    const el = document.getElementById(`ci-${i}`);
+    if (el) el.focus();
   }, 50);
 }
 
