@@ -508,6 +508,10 @@ pre.code {
 .split-menu[hidden] { display: none; }
 .split-menu .compose-theme-input { flex: 1; min-width: 0; }
 .split-menu .btn { white-space: nowrap; }
+.compose-card { padding: 18px 20px; }
+.compose-top { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; margin-bottom: 12px; }
+.compose-top .compose-idea { flex: 1; margin-bottom: 0; }
+.compose-top .num { flex: none; }
 .compose-idea { font-family: 'Shippori Mincho', serif; font-size: 17px; line-height: 1.55; margin-bottom: 12px; }
 .compose-hints { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
 .compose-constraint { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); background: var(--surface2); border: 1px dashed var(--border); border-radius: 6px; padding: 4px 9px; }
@@ -3681,11 +3685,11 @@ function composeCardHTML(p) {
     : '';
 
   return `
-    <div class="drill-card${verdictClass}" id="cc-${p.i}">
-      <div class="drill-head" style="justify-content:flex-end;margin-bottom:6px">
+    <div class="drill-card compose-card${verdictClass}" id="cc-${p.i}">
+      <div class="compose-top">
+        <div class="compose-idea">${escHtml(p.idea)}</div>
         <span class="num">${p.i + 1} / ${S.compose.prompts.length}</span>
       </div>
-      <div class="compose-idea">${escHtml(p.idea)}</div>
       <div class="compose-pre">${constraintBlock}${hintBlock}</div>
       <div class="answer-row">
         <textarea
