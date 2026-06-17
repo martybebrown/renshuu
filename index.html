@@ -499,12 +499,15 @@ pre.code {
   padding: 7px 10px; border-radius: var(--radius); font-size: 13px; outline: none;
 }
 .compose-theme-input:focus { border-color: var(--red); }
-.compose-idea { font-family: 'Shippori Mincho', serif; font-size: 17px; line-height: 1.6; margin-bottom: 10px; }
+.compose-idea { font-family: 'Shippori Mincho', serif; font-size: 17px; line-height: 1.55; margin-bottom: 12px; }
 .compose-hints { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
-.compose-constraint { display: inline-flex; align-items: center; gap: 5px; margin-bottom: 12px; font-size: 11px; color: var(--muted); background: var(--surface2); border: 1px dashed var(--border); border-radius: 6px; padding: 3px 9px; }
+.compose-constraint { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); background: var(--surface2); border: 1px dashed var(--border); border-radius: 6px; padding: 4px 9px; }
 .compose-constraint b { color: var(--text); font-weight: 600; }
-.hint-reveal-btn { font-size: 11px; padding: 4px 12px; margin-bottom: 14px; display: inline-flex; align-items: center; gap: 5px; }
-.compose-hints { align-items: center; }
+.hint-reveal-btn { font-size: 11px; padding: 4px 12px; display: inline-flex; align-items: center; gap: 5px; }
+/* constraint tag + Hint button share one row with consistent spacing below */
+.compose-pre { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+.compose-pre:empty { display: none; }
+.compose-hints { align-items: center; margin-bottom: 0; }
 .hint-hide-btn { margin-bottom: 0; padding: 3px 10px; color: var(--muted); }
 .hint-chip {
   display: inline-flex; align-items: baseline; gap: 5px;
@@ -3632,12 +3635,11 @@ function composeCardHTML(p) {
 
   return `
     <div class="drill-card${verdictClass}" id="cc-${p.i}">
-      <div class="drill-head" style="justify-content:flex-end">
+      <div class="drill-head" style="justify-content:flex-end;margin-bottom:6px">
         <span class="num">${p.i + 1} / ${S.compose.prompts.length}</span>
       </div>
       <div class="compose-idea">${escHtml(p.idea)}</div>
-      ${constraintBlock}
-      ${hintBlock}
+      <div class="compose-pre">${constraintBlock}${hintBlock}</div>
       <div class="answer-row">
         <textarea
           class="answer-input compose-input"
