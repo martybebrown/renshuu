@@ -501,6 +501,9 @@ pre.code {
 .compose-theme-input:focus { border-color: var(--red); }
 .compose-idea { font-family: 'Shippori Mincho', serif; font-size: 17px; line-height: 1.6; margin-bottom: 10px; }
 .compose-hints { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.compose-constraint { display: inline-flex; align-items: center; gap: 5px; margin-bottom: 12px; font-size: 11px; color: var(--muted); background: var(--surface2); border: 1px dashed var(--border); border-radius: 6px; padding: 3px 9px; }
+.compose-constraint b { color: var(--text); font-weight: 600; }
+.hint-reveal-btn { font-size: 11px; padding: 4px 12px; margin-bottom: 14px; display: inline-flex; align-items: center; gap: 5px; }
 .hint-chip {
   display: inline-flex; align-items: baseline; gap: 5px;
   background: var(--surface2); border: 1px solid var(--border);
@@ -1922,6 +1925,7 @@ const IC = {
   chevLL:   '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>',
   chevRR:   '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 17 5-5-5-5"/><path d="m13 17 5-5-5-5"/></svg>',
   refresh:  '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>',
+  bulb:     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>',
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -3494,7 +3498,9 @@ Return ONLY valid JSON, no markdown fences, no preamble.
 
 You are given the student's vocabulary list. Do two things:
 1. Choose ONE theme that ties a batch of 5 prompts together — either a SUBJECT (e.g. "daily routine", "talking about the weather") or a GRAMMAR concept (e.g. "～たい to express wants", "comparing two things with より"). Pick something the supplied vocab supports well.
-2. Write 5 prompts. Each prompt is an English instruction describing an IDEA the student should express in a single Japanese sentence. Describe the meaning/situation only — do NOT dictate the sentence, structure, or exact words. Order them easiest → hardest.
+2. Write 5 prompts. Each prompt is an English instruction describing an IDEA the student should express in a single Japanese sentence. Order them easiest → hardest, and deliberately VARY how constrained they are so the student can't always route around weak grammar:
+   - 2–3 OPEN prompts: describe the meaning/situation only, no "constraint" (omit the field or leave it ""). The student picks any structure.
+   - 2–3 CONSTRAINED prompts: set "constraint" to a specific grammar pattern the answer MUST use (e.g. "～てから (after doing X)", "～なければならない (must)", "より to compare", "～たほうがいい"). Still describe only the idea in "idea" — do not write the sentence for them. Tie constrained patterns to the theme, especially if the theme is a grammar concept.
 
 For each prompt, include 2–3 "hints": content words (nouns, verbs, adjectives) drawn ONLY from the supplied vocabulary list that would actually APPEAR in a natural answer sentence. These are optional suggestions, not requirements. Use the exact jp/reading/meaning from the list.
 - Do NOT hint interrogatives or framing words that belong to the English instruction but not the answer (e.g. if the idea is "say WHEN you arrive", do not hint いつ "when" — the answer states a time, it doesn't ask one).
@@ -3507,6 +3513,7 @@ Schema:
   "prompts": [
     {
       "idea": "English instruction, e.g. 'Tell a friend you want to go to the new café this weekend.'",
+      "constraint": "" or "the grammar pattern the answer must use, e.g. '～てから (after doing X)'",
       "hints": [ { "jp": "週末", "reading": "しゅうまつ", "en": "weekend" } ]
     }
   ]
@@ -3535,7 +3542,9 @@ Rules:
     S.compose.prompts = (parsed.prompts || []).slice(0, 5).map((p, i) => ({
       i,
       idea: p.idea || '',
+      constraint: (p.constraint || '').trim(),
       hints: Array.isArray(p.hints) ? p.hints : [],
+      showHints: false,
       input: '',
       submitted: false,
       loading: false,
@@ -3596,6 +3605,14 @@ function composeCardHTML(p) {
     return `<span class="hint-chip"><span class="hc-jp">${escHtml(h.jp || '')}</span>${rd ? `<span class="hc-rd">${escHtml(rd)}</span>` : ''}<span class="hc-en">${escHtml(h.en || '')}</span></span>`;
   }).join('');
 
+  const hasHints = (p.hints || []).length > 0;
+  const hintBlock = !hasHints ? '' : p.showHints
+    ? `<div class="compose-hints">${hints}</div>`
+    : `<button class="btn hint-reveal-btn" onclick="toggleComposeHint(${p.i})">${IC.bulb} Hint</button>`;
+  const constraintBlock = p.constraint
+    ? `<div class="compose-constraint">${IC.star} must use: <b>${escHtml(p.constraint)}</b></div>`
+    : '';
+
   const verdictClass = p.submitted && p.review
     ? (p.review.verdict === 'correct' ? ' correct-card' : p.review.verdict === 'minor' ? ' partial-card' : ' wrong-card')
     : '';
@@ -3607,7 +3624,8 @@ function composeCardHTML(p) {
         <span class="num">${p.i + 1} / ${S.compose.prompts.length}</span>
       </div>
       <div class="compose-idea">${escHtml(p.idea)}</div>
-      ${hints ? `<div class="compose-hints">${hints}</div>` : ''}
+      ${constraintBlock}
+      ${hintBlock}
       <div class="answer-row">
         <textarea
           class="answer-input compose-input"
@@ -3668,11 +3686,12 @@ Return ONLY a JSON object, no markdown fences:
   "translation": "English translation of the corrected sentence",
   "note": "1–2 short sentences: if correct, brief praise; otherwise what you actually changed (grammar/word choice only) and why"
 }
+If the exercise specifies a REQUIRED grammar pattern, the answer must use it: if the Japanese is otherwise fine but does not use the required pattern, the verdict is "minor" and the note should nudge them toward it (rewrite the correction to use it). Wrong/unnatural Japanese is still "wrong".
 Whenever the note mentions a Japanese word or phrase as a suggestion or example, append its romaji in parentheses, e.g. 洗濯をしなければならない (sentaku o shinakereba naranai).
 verdict guide: "correct" = grammatical and natural meaning (correction may equal their sentence, just written in normal orthography); "minor" = small grammar fixes (particle, conjugation, word choice); "wrong" = wrong meaning, ungrammatical, not Japanese, or empty. Choosing romaji or kana is never a reason to drop below "correct".`;
 
   const msg = `Idea to express (in English): ${p.idea}
-${hintBlock ? `Suggested vocab (optional): ${hintBlock}\n` : ''}Student wrote: "${ans}"`;
+${p.constraint ? `REQUIRED grammar pattern the answer must use: ${p.constraint}\n` : ''}${hintBlock ? `Suggested vocab (optional): ${hintBlock}\n` : ''}Student wrote: "${ans}"`;
 
   try {
     const raw = await claude([{ role: 'user', content: msg }], sys, 600);
@@ -3695,6 +3714,14 @@ ${hintBlock ? `Suggested vocab (optional): ${hintBlock}\n` : ''}Student wrote: "
   syncComposeInputs();
   paintCompose();
   if (p.review && p.review.correction) speakJapanese(stripMarkers(p.review.correction));
+}
+
+function toggleComposeHint(i) {
+  const p = S.compose.prompts[i];
+  if (!p) return;
+  p.showHints = !p.showHints;
+  syncComposeInputs();
+  paintCompose();
 }
 
 function retryCompose(i) {
