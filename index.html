@@ -477,6 +477,7 @@ pre.code {
   font-size: 12px;
   line-height: 1.6;
   border-left: 2px solid transparent;
+  display: flow-root;
 }
 .feedback.ok { border-color: var(--green); }
 .feedback.no { border-color: var(--red); }
@@ -3495,7 +3496,9 @@ You are given the student's vocabulary list. Do two things:
 1. Choose ONE theme that ties a batch of 5 prompts together — either a SUBJECT (e.g. "daily routine", "talking about the weather") or a GRAMMAR concept (e.g. "～たい to express wants", "comparing two things with より"). Pick something the supplied vocab supports well.
 2. Write 5 prompts. Each prompt is an English instruction describing an IDEA the student should express in a single Japanese sentence. Describe the meaning/situation only — do NOT dictate the sentence, structure, or exact words. Order them easiest → hardest.
 
-For each prompt, include 2–3 "hints": words drawn ONLY from the supplied vocabulary list that would be genuinely useful for that idea. These are optional suggestions, not requirements. Use the exact jp/reading/meaning from the list.
+For each prompt, include 2–3 "hints": content words (nouns, verbs, adjectives) drawn ONLY from the supplied vocabulary list that would actually APPEAR in a natural answer sentence. These are optional suggestions, not requirements. Use the exact jp/reading/meaning from the list.
+- Do NOT hint interrogatives or framing words that belong to the English instruction but not the answer (e.g. if the idea is "say WHEN you arrive", do not hint いつ "when" — the answer states a time, it doesn't ask one).
+- A hint must be a word the student would plausibly type into their sentence; if it wouldn't, leave it out.
 
 Schema:
 {
@@ -3610,7 +3613,6 @@ function composeCardHTML(p) {
           class="answer-input compose-input"
           id="ci-${p.i}"
           data-ci="${p.i}"
-          placeholder="write your sentence (romaji or kana)…  ⌘/Ctrl+Enter to submit"
           autocomplete="off"
           ${p.submitted ? 'disabled' : ''}
         >${escHtml(p.input)}</textarea>
