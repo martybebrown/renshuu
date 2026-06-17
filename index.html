@@ -504,6 +504,8 @@ pre.code {
 .compose-constraint { display: inline-flex; align-items: center; gap: 5px; margin-bottom: 12px; font-size: 11px; color: var(--muted); background: var(--surface2); border: 1px dashed var(--border); border-radius: 6px; padding: 3px 9px; }
 .compose-constraint b { color: var(--text); font-weight: 600; }
 .hint-reveal-btn { font-size: 11px; padding: 4px 12px; margin-bottom: 14px; display: inline-flex; align-items: center; gap: 5px; }
+.compose-hints { align-items: center; }
+.hint-hide-btn { margin-bottom: 0; padding: 3px 10px; color: var(--muted); }
 .hint-chip {
   display: inline-flex; align-items: baseline; gap: 5px;
   background: var(--surface2); border: 1px solid var(--border);
@@ -3481,6 +3483,18 @@ function applyComposeTheme() {
   genComposeBatch(v);
 }
 
+// Tolerant JSON parse for Claude output: strips ```fences, isolates the
+// outermost {...} or [...], and removes trailing commas before } or ].
+function parseLooseJSON(raw) {
+  let s = String(raw).replace(/```json|```/g, '').trim();
+  const objStart = s.indexOf('{'), arrStart = s.indexOf('[');
+  const start = arrStart !== -1 && (objStart === -1 || arrStart < objStart) ? arrStart : objStart;
+  const end = Math.max(s.lastIndexOf('}'), s.lastIndexOf(']'));
+  if (start !== -1 && end !== -1 && end > start) s = s.slice(start, end + 1);
+  try { return JSON.parse(s); } catch (_) {}
+  return JSON.parse(s.replace(/,(\s*[}\]])/g, '$1'));
+}
+
 async function genComposeBatch(override = '') {
   const zone = document.getElementById('composeZone');
   const btn = document.getElementById('genComposeBtn');
@@ -3534,8 +3548,7 @@ Rules:
       sys,
       1200
     );
-    const clean = raw.replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(clean.match(/\{[\s\S]*\}/)?.[0] || clean);
+    const parsed = parseLooseJSON(raw);
     S.compose.theme = parsed.theme || (override || 'Free composition');
     S.compose.themeJp = parsed.theme_jp || '';
     S.compose.pendingTheme = '';
@@ -3607,7 +3620,7 @@ function composeCardHTML(p) {
 
   const hasHints = (p.hints || []).length > 0;
   const hintBlock = !hasHints ? '' : p.showHints
-    ? `<div class="compose-hints">${hints}</div>`
+    ? `<div class="compose-hints">${hints}<button class="btn hint-reveal-btn hint-hide-btn" onclick="toggleComposeHint(${p.i})">${IC.x} hide</button></div>`
     : `<button class="btn hint-reveal-btn" onclick="toggleComposeHint(${p.i})">${IC.bulb} Hint</button>`;
   const constraintBlock = p.constraint
     ? `<div class="compose-constraint">${IC.star} must use: <b>${escHtml(p.constraint)}</b></div>`
@@ -3619,8 +3632,7 @@ function composeCardHTML(p) {
 
   return `
     <div class="drill-card${verdictClass}" id="cc-${p.i}">
-      <div class="drill-head">
-        <span class="tier-badge n">作 compose</span>
+      <div class="drill-head" style="justify-content:flex-end">
         <span class="num">${p.i + 1} / ${S.compose.prompts.length}</span>
       </div>
       <div class="compose-idea">${escHtml(p.idea)}</div>
@@ -3695,8 +3707,7 @@ ${p.constraint ? `REQUIRED grammar pattern the answer must use: ${p.constraint}\
 
   try {
     const raw = await claude([{ role: 'user', content: msg }], sys, 600);
-    const clean = raw.replace(/```json|```/g, '').trim();
-    const r = JSON.parse(clean.match(/\{[\s\S]*\}/)?.[0] || clean);
+    const r = parseLooseJSON(raw);
     p.review = {
       verdict: ['correct', 'minor', 'wrong'].includes(r.verdict) ? r.verdict : 'minor',
       correction: r.correction || '',
