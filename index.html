@@ -3587,9 +3587,11 @@ function paintCompose() {
 }
 
 function composeCardHTML(p) {
-  const hints = (p.hints || []).map(h =>
-    `<span class="hint-chip"><span class="hc-jp">${escHtml(h.jp || '')}</span>${h.reading ? `<span class="hc-rd">${escHtml(h.reading)}</span>` : ''}<span class="hc-en">${escHtml(h.en || '')}</span></span>`
-  ).join('');
+  const hints = (p.hints || []).map(h => {
+    const romaji = h.reading ? readingToRomaji(h.reading) : '';
+    const rd = [h.reading, romaji].filter(Boolean).join(' · ');
+    return `<span class="hint-chip"><span class="hc-jp">${escHtml(h.jp || '')}</span>${rd ? `<span class="hc-rd">${escHtml(rd)}</span>` : ''}<span class="hc-en">${escHtml(h.en || '')}</span></span>`;
+  }).join('');
 
   const verdictClass = p.submitted && p.review
     ? (p.review.verdict === 'correct' ? ' correct-card' : p.review.verdict === 'minor' ? ' partial-card' : ' wrong-card')
@@ -3650,17 +3652,22 @@ async function submitCompose(i) {
   paintCompose();
 
   const hintBlock = (p.hints || []).map(h => `${h.jp}（${h.reading}）= ${h.en}`).join('; ');
-  const sys = `You are a warm but precise Japanese tutor. A student was asked to write ONE Japanese sentence expressing a given idea. They may have typed romaji or kana — interpret romaji as the intended kana.
-Judge whether their sentence naturally and grammatically expresses the intended idea. Do not penalise valid alternative phrasings or word choices — only correct what is actually wrong or unnatural.
+  const sys = `You are a warm but precise Japanese tutor. A student was asked to write ONE Japanese sentence expressing a given idea.
+The student may write in romaji, kana, or kanji — these are ALL equally acceptable. Script and orthography are NOT graded:
+- NEVER treat a romaji-spelled particle (o for を, wa for は, e for へ) as an error.
+- NEVER flag "use kanji" or "kana should be kanji" (or vice versa) as a correction.
+- Do not let script/orthography choice affect the verdict at all.
+Judge ONLY the actual Japanese: grammar, particle choice, conjugation, word choice, and whether it naturally expresses the intended meaning. Do not penalise valid alternative phrasings.
 Return ONLY a JSON object, no markdown fences:
 {
   "verdict": "correct" | "minor" | "wrong",
   "correction": "the natural Japanese sentence in normal orthography (kanji + kana), plain text",
   "annotated": "the SAME corrected sentence with [[word|reading|english]] markers on every word — kanji compounds, katakana, and hiragana words (2+ chars); reading in hiragana",
   "translation": "English translation of the corrected sentence",
-  "note": "1–2 short sentences: if correct, brief praise; otherwise what you changed and why"
+  "note": "1–2 short sentences: if correct, brief praise; otherwise what you actually changed (grammar/word choice only) and why"
 }
-verdict guide: "correct" = already natural and grammatical (correction may equal their sentence, just normalised); "minor" = small fixes (particle, conjugation, kana→kanji, word choice); "wrong" = wrong meaning, ungrammatical, not Japanese, or empty.`;
+Whenever the note mentions a Japanese word or phrase as a suggestion or example, append its romaji in parentheses, e.g. 洗濯をしなければならない (sentaku o shinakereba naranai).
+verdict guide: "correct" = grammatical and natural meaning (correction may equal their sentence, just written in normal orthography); "minor" = small grammar fixes (particle, conjugation, word choice); "wrong" = wrong meaning, ungrammatical, not Japanese, or empty. Choosing romaji or kana is never a reason to drop below "correct".`;
 
   const msg = `Idea to express (in English): ${p.idea}
 ${hintBlock ? `Suggested vocab (optional): ${hintBlock}\n` : ''}Student wrote: "${ans}"`;
