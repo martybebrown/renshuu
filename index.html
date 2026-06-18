@@ -509,6 +509,7 @@ pre.code {
 .split-menu .compose-theme-input { flex: 1; min-width: 0; }
 .split-menu .btn { white-space: nowrap; }
 .compose-card { padding: 18px 20px; }
+.compose-card + .compose-card { margin-top: 16px; }
 .compose-top { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; margin-bottom: 12px; }
 .compose-top .compose-idea { flex: 1; margin-bottom: 0; }
 .compose-top .num { flex: none; }
@@ -1935,6 +1936,15 @@ document.addEventListener('keydown', e => {
   if (!inp) return;
   e.preventDefault();
   checkDrill(parseInt(inp.dataset.di, 10));
+});
+
+document.addEventListener('input', e => {
+  const cInp = e.target.closest('.compose-input[data-ci]');
+  if (!cInp) return;
+  const i = parseInt(cInp.dataset.ci, 10);
+  const p = S.compose && S.compose.prompts[i];
+  if (!p || !p.submitted) return;
+  retryCompose(i);
 });
 
 // ── Icons (inline SVGs for use in template literals) ─────────────────────────
@@ -3697,7 +3707,6 @@ function composeCardHTML(p) {
           id="ci-${p.i}"
           data-ci="${p.i}"
           autocomplete="off"
-          ${p.submitted ? 'disabled' : ''}
         >${escHtml(p.input)}</textarea>
         <button class="btn compose-submit" data-ci="${p.i}" ${p.submitted ? 'disabled' : ''}>${IC.send}</button>
       </div>
@@ -3719,7 +3728,6 @@ function composeReviewHTML(p) {
     ${r.correction ? `<div class="compose-correction">${annotated} ${speak}</div>` : ''}
     ${r.translation ? `<div class="tl">${escHtml(r.translation)}</div>` : ''}
     ${r.note ? `<div style="margin-top:6px">${escHtml(r.note)}</div>` : ''}
-    <button class="btn retry-btn" onclick="retryCompose(${p.i})">Try again</button>
   `;
 }
 
@@ -3791,10 +3799,10 @@ function toggleComposeHint(i) {
 function retryCompose(i) {
   const p = S.compose.prompts[i];
   if (!p) return;
-  syncComposeInputs();
   p.submitted = false;
   p.loading = false;
   p.review = null;
+  syncComposeInputs();
   paintCompose();
   setTimeout(() => {
     const el = document.getElementById(`ci-${i}`);
