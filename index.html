@@ -422,18 +422,18 @@ pre.code {
 /* Smart-batch theme bar */
 .compose-theme-bar.smart { border: 1px solid rgba(201,79,60,0.35); background: rgba(201,79,60,0.06); }
 .compose-theme-bar .theme-focus { font-size: 11px; color: var(--red); }
-/* Focus areas panel — the AI tutor's notes */
-.focus-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin: 0 0 14px; }
-.focus-panel.empty { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.focus-head { display: flex; align-items: center; gap: 8px; }
+/* Focus areas panel — the AI tutor's notes (lives in the sidebar) */
+.focus-panel { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+.focus-panel.empty { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.focus-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .focus-toggle { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; display: inline-flex; }
 .focus-title { font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 5px; }
-.focus-sub { font-size: 11px; color: var(--muted); }
-.focus-refresh { margin-left: auto; font-size: 10px; padding: 3px 10px; }
-.focus-summary { font-size: 12px; line-height: 1.6; color: var(--text); margin: 10px 0 4px; }
-.focus-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.focus-item { border-left: 2px solid var(--border); padding-left: 10px; }
-.fi-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.focus-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+.focus-refresh { font-size: 10px; padding: 4px 10px; margin-top: 10px; }
+.focus-summary { font-size: 11.5px; line-height: 1.55; color: var(--text); margin: 10px 0 4px; }
+.focus-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.focus-item { border-left: 2px solid var(--border); padding-left: 9px; }
+.fi-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 2px; }
 .fi-sev { display: inline-flex; gap: 2px; }
 .sev { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
 .sev.sev-5 { background: var(--red); }
@@ -1654,6 +1654,8 @@ pre.code {
       </div>
     </div>
 
+    <!-- Weak-point focus areas (AI tutor's notes) -->
+    <div id="focusSidebar"></div>
 
   </aside>
 
@@ -2268,6 +2270,7 @@ function logMistake({ src, wrote, fix, note, idea, constraint }) {
   if (S.mistakes.length > MAX_MISTAKES) S.mistakes = S.mistakes.slice(-MAX_MISTAKES);
   localStorage.setItem('renshuu_mistakes', JSON.stringify(S.mistakes));
   scheduleMistakePush();
+  renderFocusSidebar();
 }
 
 // Pull the log + profile from the gist on startup (authoritative across devices).
@@ -2283,6 +2286,7 @@ async function loadMistakeData() {
       localStorage.setItem('renshuu_weakpoints', JSON.stringify(w));
     }
   } catch (_) {}
+  renderFocusSidebar();
 }
 
 function newMistakeCount() {
@@ -2349,6 +2353,7 @@ Return STRICT JSON only, no prose, no fences:
   } finally {
     S.analyzing = false;
   }
+  renderFocusSidebar();
   return S.weakPoints;
 }
 
@@ -3688,16 +3693,16 @@ function smartBatch() {
 async function reanalyzeWeak() {
   if (S.analyzing) return;
   S._uiAnalyzing = true;
-  paintCompose();
+  renderFocusSidebar();
   await analyzeWeakPoints(true);
   S._uiAnalyzing = false;
-  paintCompose();
+  renderFocusSidebar();
 }
 
 function toggleFocusPanel() {
   const collapsed = localStorage.getItem('renshuu_focus_collapsed') === '1';
   localStorage.setItem('renshuu_focus_collapsed', collapsed ? '0' : '1');
-  paintCompose();
+  renderFocusSidebar();
 }
 
 function toggleBatchMenu(e, btn) {
@@ -3865,11 +3870,17 @@ function paintCompose() {
       ${composeBatchSplit('')}
     </div>`;
 
-  zone.innerHTML = composeFocusPanel() + themeBar + c.prompts.map(p => composeCardHTML(p)).join('') + scoreHTML + bottomBtn;
+  zone.innerHTML = themeBar + c.prompts.map(p => composeCardHTML(p)).join('') + scoreHTML + bottomBtn;
 }
 
 // "Teacher's notes" — the AI-distilled weak-point profile, shown above the batch.
-function composeFocusPanel() {
+// Render the weak-point "Focus areas" panel into the sidebar.
+function renderFocusSidebar() {
+  const el = document.getElementById('focusSidebar');
+  if (el) el.innerHTML = focusPanelHTML();
+}
+
+function focusPanelHTML() {
   const wp = S.weakPoints;
   const busy = S.analyzing || S._uiAnalyzing;
   const total = S.mistakes.length;
@@ -3879,33 +3890,32 @@ function composeFocusPanel() {
     const need = Math.max(0, ANALYZE_THRESHOLD - total);
     return `<div class="focus-panel empty">
       <span class="focus-title">${IC.bulb} Focus areas</span>
-      <span class="focus-sub">${total} correction${total === 1 ? '' : 's'} logged${need > 0 ? ` · ~${need} more to unlock` : ''}</span>
-      ${total >= ANALYZE_THRESHOLD ? `<button class="btn focus-refresh" onclick="reanalyzeWeak()" ${busy ? 'disabled' : ''}>${busy ? 'analysing…' : 'analyse now'}</button>` : ''}
+      <div class="focus-sub">${total} correction${total === 1 ? '' : 's'} logged${need > 0 ? ` · ~${need} more to unlock` : ''}</div>
+      ${total >= ANALYZE_THRESHOLD ? `<button class="btn focus-refresh w100" onclick="reanalyzeWeak()" ${busy ? 'disabled' : ''}>${busy ? 'analysing…' : 'analyse now'}</button>` : ''}
     </div>`;
   }
   const collapsed = localStorage.getItem('renshuu_focus_collapsed') === '1';
   const newN = newMistakeCount();
-  const sevDot = n => `<span class="sev sev-${Math.max(1, Math.min(5, n || 1))}"></span>`;
   const items = wp.weakPoints.slice(0, 5).map(w => `
     <li class="focus-item">
       <div class="fi-top">
-        <span class="fi-sev" title="severity ${w.severity || 1}/5">${Array.from({ length: 5 }, (_, k) => sevDot(k < (w.severity || 1) ? 5 : 0)).join('')}</span>
-        <span class="fi-label">${escHtml(w.label || '')}</span>
+        <span class="fi-sev" title="severity ${w.severity || 1}/5">${Array.from({ length: 5 }, (_, k) => `<span class="sev${k < (w.severity || 1) ? ' sev-5' : ''}"></span>`).join('')}</span>
         ${w.trend ? `<span class="fi-trend tr-${escHtml(w.trend)}">${escHtml(w.trend)}</span>` : ''}
       </div>
+      <div class="fi-label">${escHtml(w.label || '')}</div>
       ${w.diagnosis ? `<div class="fi-diag">${escHtml(w.diagnosis)}</div>` : ''}
     </li>`).join('');
 
   return `<div class="focus-panel">
     <div class="focus-head">
+      <span class="focus-title">${IC.bulb} Focus areas</span>
       <button class="focus-toggle" onclick="toggleFocusPanel()" aria-label="Toggle focus areas">${collapsed ? IC.chevD : IC.chevD.replace('m6 9 6 6 6-6', 'm18 15-6-6-6 6')}</button>
-      <span class="focus-title">${IC.bulb} Your focus areas</span>
-      <span class="focus-sub">${wp.mistakeCount || total} corrections${newN > 0 ? ` · ${newN} new since last analysis` : ''}</span>
-      <button class="btn focus-refresh" onclick="reanalyzeWeak()" ${busy ? 'disabled' : ''}>${busy ? 'analysing…' : 're-analyse'}</button>
     </div>
+    <div class="focus-sub">${wp.mistakeCount || total} corrections${newN > 0 ? ` · ${newN} new` : ''}</div>
     ${collapsed ? '' : `
       ${wp.summary ? `<div class="focus-summary">${escHtml(wp.summary)}</div>` : ''}
       <ul class="focus-list">${items}</ul>`}
+    <button class="btn focus-refresh w100" onclick="reanalyzeWeak()" ${busy ? 'disabled' : ''}>${busy ? 'analysing…' : 're-analyse'}</button>
   </div>`;
 }
 
