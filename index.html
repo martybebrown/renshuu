@@ -504,10 +504,39 @@ pre.code {
 .split-btn { position: relative; display: inline-flex; }
 .split-btn .split-main { border-top-right-radius: 0; border-bottom-right-radius: 0; white-space: nowrap; }
 .split-btn .split-toggle { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: 1px solid var(--border); margin-left: -1px; padding: 8px 7px; }
-.split-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 60; display: flex; gap: 8px; align-items: center; width: min(360px, 78vw); padding: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,0.14); }
+.split-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 60; display: flex; flex-direction: column; gap: 8px; width: min(340px, 80vw); padding: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,0.14); }
 .split-menu[hidden] { display: none; }
-.split-menu .compose-theme-input { flex: 1; min-width: 0; }
+.split-menu-row { display: flex; gap: 8px; align-items: center; }
+.split-menu-row .compose-theme-input { flex: 1; min-width: 0; }
 .split-menu .btn { white-space: nowrap; }
+.smart-batch-btn { justify-content: center; background: var(--red); color: #fff; border-color: var(--red); font-weight: 600; padding: 8px 12px; }
+.smart-batch-btn:hover { opacity: 0.9; }
+.split-menu-hint { font-size: 10px; color: var(--muted); line-height: 1.4; }
+.split-menu-divider { border-top: 1px solid var(--border); margin: 2px 0; }
+/* Smart-batch theme bar */
+.compose-theme-bar.smart { border: 1px solid rgba(201,79,60,0.35); background: rgba(201,79,60,0.06); }
+.compose-theme-bar .theme-focus { font-size: 11px; color: var(--red); }
+/* Focus areas panel — the AI tutor's notes */
+.focus-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin: 0 0 14px; }
+.focus-panel.empty { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.focus-head { display: flex; align-items: center; gap: 8px; }
+.focus-toggle { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; display: inline-flex; }
+.focus-title { font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 5px; }
+.focus-sub { font-size: 11px; color: var(--muted); }
+.focus-refresh { margin-left: auto; font-size: 10px; padding: 3px 10px; }
+.focus-summary { font-size: 12px; line-height: 1.6; color: var(--text); margin: 10px 0 4px; }
+.focus-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.focus-item { border-left: 2px solid var(--border); padding-left: 10px; }
+.fi-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fi-sev { display: inline-flex; gap: 2px; }
+.sev { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+.sev.sev-5 { background: var(--red); }
+.fi-label { font-weight: 600; font-size: 12px; }
+.fi-trend { font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; padding: 1px 6px; border-radius: 999px; color: var(--muted); border: 1px solid var(--border); }
+.fi-trend.tr-persistent { color: var(--red); border-color: rgba(201,79,60,0.4); }
+.fi-trend.tr-improving { color: var(--green); border-color: rgba(90,158,106,0.4); }
+.fi-trend.tr-new { color: var(--blue); border-color: rgba(74,144,184,0.4); }
+.fi-diag { font-size: 11px; color: var(--muted); line-height: 1.5; margin-top: 3px; }
 .compose-card { padding: 18px 20px; }
 .compose-card + .compose-card { margin-top: 16px; }
 .compose-top { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; margin-bottom: 12px; }
@@ -1749,6 +1778,7 @@ pre.code {
 <script>
 // ── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  loadMistakeData(); // refresh mistake log + weak-point profile from the gist
   const speechSpeed = localStorage.getItem('renshuu_speech_speed') || '100';
   document.getElementById('speechSpeed').value = speechSpeed;
   document.getElementById('speedVal').textContent = speechSpeed + '%';
@@ -2080,6 +2110,10 @@ const S = {
   engFavorites: JSON.parse(localStorage.getItem('renshuu_eng_favorites') || '[]'),
   engConvo: [],
   engSysPrompt: '',
+  // Mistake log + AI-distilled weak-point profile (the "teacher's notes")
+  mistakes: JSON.parse(localStorage.getItem('renshuu_mistakes') || '[]'),
+  weakPoints: JSON.parse(localStorage.getItem('renshuu_weakpoints') || 'null'),
+  analyzing: false,
 };
 
 
@@ -2291,6 +2325,144 @@ async function gistFetch() {
   }).then(r => r.json());
   const raw = gist.files?.[GIST_FILE]?.content;
   return raw ? JSON.parse(raw) : null;
+}
+
+// Generic per-file gist read/write (reuses the same gist as the cards file).
+// Writes only when a gist already exists — otherwise we rely on localStorage
+// until the cards sync creates the gist, to avoid fragmenting into many gists.
+async function gistPushFile(file, obj) {
+  const id = await gistGetId();
+  if (!id) return;
+  await fetch('/.netlify/functions/gist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'update', id, file, content: JSON.stringify(obj) }),
+  });
+}
+async function gistFetchFile(file) {
+  const id = await gistGetId();
+  if (!id) return null;
+  const gist = await fetch('/.netlify/functions/gist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'get', id }),
+  }).then(r => r.json());
+  const raw = gist.files?.[file]?.content;
+  return raw ? JSON.parse(raw) : null;
+}
+
+// ── Mistake log + weak-point analysis ─────────────────────────────────────────
+const MISTAKES_FILE = 'renshuu-mistakes.json';
+const WEAK_FILE = 'renshuu-weakpoints.json';
+const MAX_MISTAKES = 200;       // rolling cap — keeps gist storage small
+const ANALYZE_THRESHOLD = 6;    // new mistakes needed before a re-analysis runs
+const ANALYZE_FIRST_RUN = 60;   // mistakes to seed the very first profile
+
+function clip(s, n) { s = String(s || '').trim(); return s.length > n ? s.slice(0, n) : s; }
+
+let _mistakePushTimer = null;
+function scheduleMistakePush() {
+  clearTimeout(_mistakePushTimer);
+  _mistakePushTimer = setTimeout(() => gistPushFile(MISTAKES_FILE, S.mistakes), 4000);
+}
+
+// Record one corrected mistake. wrote = what the student wrote, fix = corrected
+// form. Cheap, deduped against no-op corrections; bounded; debounced to gist.
+function logMistake({ src, wrote, fix, note, idea, constraint }) {
+  wrote = clip(wrote, 200); fix = clip(fix, 200);
+  if (!wrote || !fix) return;
+  const norm = s => s.replace(/[\s。、！？.,!?]/g, '');
+  if (norm(wrote) === norm(fix)) return; // nothing actually changed
+  const e = { t: Math.floor(Date.now() / 1000), src, wrote, fix };
+  if (note) e.note = clip(note, 240);
+  if (idea) e.idea = clip(idea, 160);
+  if (constraint) e.cn = clip(constraint, 60);
+  S.mistakes.push(e);
+  if (S.mistakes.length > MAX_MISTAKES) S.mistakes = S.mistakes.slice(-MAX_MISTAKES);
+  localStorage.setItem('renshuu_mistakes', JSON.stringify(S.mistakes));
+  scheduleMistakePush();
+}
+
+// Pull the log + profile from the gist on startup (authoritative across devices).
+async function loadMistakeData() {
+  try {
+    const [m, w] = await Promise.all([gistFetchFile(MISTAKES_FILE), gistFetchFile(WEAK_FILE)]);
+    if (Array.isArray(m)) {
+      S.mistakes = m.slice(-MAX_MISTAKES);
+      localStorage.setItem('renshuu_mistakes', JSON.stringify(S.mistakes));
+    }
+    if (w && w.weakPoints) {
+      S.weakPoints = w;
+      localStorage.setItem('renshuu_weakpoints', JSON.stringify(w));
+    }
+  } catch (_) {}
+}
+
+function newMistakeCount() {
+  const through = S.weakPoints?.analyzedThrough || 0;
+  return S.mistakes.filter(m => m.t > through).length;
+}
+
+// Incrementally update the weak-point profile. Feeds the existing profile +
+// only the NEW mistakes to Claude, so cost stays flat as history grows.
+async function analyzeWeakPoints(force = false) {
+  if (S.analyzing) return S.weakPoints;
+  if (S.mistakes.length === 0) return S.weakPoints;
+  const profile = S.weakPoints;
+  const through = profile?.analyzedThrough || 0;
+  const fresh = S.mistakes.filter(m => m.t > through);
+  if (!force && fresh.length < ANALYZE_THRESHOLD) return profile;
+
+  // First run analyses a recent window; later runs only the new mistakes.
+  const toAnalyze = profile ? fresh : S.mistakes.slice(-ANALYZE_FIRST_RUN);
+  if (toAnalyze.length === 0) return profile;
+
+  S.analyzing = true;
+  try {
+    const lines = toAnalyze.map(m => {
+      const where = m.src === 'r' ? 'roleplay' : 'compose';
+      const ctx = m.idea ? ` | task: ${m.idea}` : '';
+      const cn = m.cn ? ` | required pattern: ${m.cn}` : '';
+      const nt = m.note ? ` | tutor note: ${m.note}` : '';
+      return `(${where}) wrote: "${m.wrote}" → fix: "${m.fix}"${ctx}${cn}${nt}`;
+    }).join('\n');
+
+    const prior = profile ? JSON.stringify({ weakPoints: profile.weakPoints, summary: profile.summary }) : 'none yet';
+
+    const sys = `You are an expert Japanese teacher keeping private longitudinal notes on ONE student's recurring errors, exactly as a professional tutor would between lessons.
+You receive the CURRENT error profile (may be empty) and a batch of NEW mistakes. Each mistake shows what the student wrote and the corrected form (sometimes with the task and a tutor note).
+Your job: diagnose the UNDERLYING competence gaps, not surface slips. For each mistake, mentally diff wrote→fix and ask "what rule does the student not yet control?" Then maintain the profile:
+- Reinforce existing weak points when new mistakes show the same gap (raise severity, keep trend "persistent"); if a gap stops appearing, lower its severity and mark trend "improving".
+- Add genuinely new weak points only when there is real evidence.
+- Be specific and diagnostic: "に vs で — marks location of existence vs action" NOT "particles"; "transitive/intransitive pairs (なる vs する, 開く vs 開ける)" NOT "verbs".
+- Prioritise gaps that recur across multiple mistakes. Keep the 6 most important, ordered by severity (highest first).
+Return STRICT JSON only, no prose, no fences:
+{
+  "weakPoints": [
+    { "id": "kebab-case-stable-id", "label": "short specific name", "category": "particles|conjugation|transitivity|word-choice|word-order|politeness|tense-aspect|counters|other", "diagnosis": "one sentence: the rule the student is missing and how to fix it", "examples": ["wrote → fix"], "severity": 1, "trend": "new|persistent|improving" }
+  ],
+  "summary": "2-3 sentences: the student's overall pattern and what to drill next, in plain encouraging language."
+}`;
+
+    const msg = `CURRENT PROFILE:\n${prior}\n\nNEW MISTAKES (${toAnalyze.length}):\n${lines}`;
+    const raw = await claude([{ role: 'user', content: msg }], sys, 1500);
+    const parsed = parseLooseJSON(raw);
+    const maxT = toAnalyze.reduce((a, m) => Math.max(a, m.t), through);
+    S.weakPoints = {
+      updated: Math.floor(Date.now() / 1000),
+      analyzedThrough: maxT,
+      mistakeCount: S.mistakes.length,
+      weakPoints: Array.isArray(parsed.weakPoints) ? parsed.weakPoints.slice(0, 6) : [],
+      summary: parsed.summary || '',
+    };
+    localStorage.setItem('renshuu_weakpoints', JSON.stringify(S.weakPoints));
+    gistPushFile(WEAK_FILE, S.weakPoints);
+  } catch (e) {
+    showToast('Weak-point analysis failed: ' + e.message, true);
+  } finally {
+    S.analyzing = false;
+  }
+  return S.weakPoints;
 }
 
 // ── Util ──────────────────────────────────────────────────────────────────────
@@ -3612,10 +3784,35 @@ function composeBatchSplit(mainId) {
       <button class="btn split-main"${idAttr} onclick="genComposeBatch()">New batch →</button>
       <button class="btn split-toggle" onclick="toggleBatchMenu(event, this)" aria-label="Use your own theme" title="Use your own theme">${IC.chevD}</button>
       <div class="split-menu" hidden>
-        <input class="compose-theme-input batch-theme-input" placeholder="your own theme — a subject or grammar point…" value="${escHtml(S.compose.pendingTheme || '')}">
-        <button class="btn" onclick="applyComposeThemeFromMenu(this)">Generate →</button>
+        <button type="button" class="btn smart-batch-btn" onclick="smartBatch()">${IC.bulb} Smart batch — drill my weak points</button>
+        <div class="split-menu-hint">Targets the recurring mistakes the AI has spotted in your writing &amp; roleplay.</div>
+        <div class="split-menu-divider"></div>
+        <div class="split-menu-row">
+          <input class="compose-theme-input batch-theme-input" placeholder="your own theme — a subject or grammar point…" value="${escHtml(S.compose.pendingTheme || '')}">
+          <button class="btn" onclick="applyComposeThemeFromMenu(this)">Generate →</button>
+        </div>
       </div>
     </div>`;
+}
+
+function smartBatch() {
+  document.querySelectorAll('.split-menu').forEach(m => m.setAttribute('hidden', ''));
+  genComposeBatch('', true);
+}
+
+async function reanalyzeWeak() {
+  if (S.analyzing) return;
+  S._uiAnalyzing = true;
+  paintCompose();
+  await analyzeWeakPoints(true);
+  S._uiAnalyzing = false;
+  paintCompose();
+}
+
+function toggleFocusPanel() {
+  const collapsed = localStorage.getItem('renshuu_focus_collapsed') === '1';
+  localStorage.setItem('renshuu_focus_collapsed', collapsed ? '0' : '1');
+  paintCompose();
 }
 
 function toggleBatchMenu(e, btn) {
@@ -3650,11 +3847,26 @@ function parseLooseJSON(raw) {
   return JSON.parse(s.replace(/,(\s*[}\]])/g, '$1'));
 }
 
-async function genComposeBatch(override = '') {
+async function genComposeBatch(override = '', smart = false) {
   const zone = document.getElementById('composeZone');
   const btn = document.getElementById('genComposeBtn');
   if (btn) btn.disabled = true;
-  if (zone) zone.innerHTML = '<div class="loading-row"><span class="spin"></span> building a batch from your vocab…</div>';
+
+  // Smart batch: refresh the weak-point profile, then target the top gaps.
+  let focusDirective = '', focusLabels = [];
+  if (smart) {
+    if (zone) zone.innerHTML = '<div class="loading-row"><span class="spin"></span> analysing your weak points and building a targeted batch…</div>';
+    await analyzeWeakPoints();
+    const tops = (S.weakPoints?.weakPoints || []).slice(0, 3);
+    if (tops.length === 0) {
+      showToast('Not enough corrections logged yet — keep practising to unlock Smart Batches');
+      smart = false;
+    } else {
+      focusLabels = tops.map(w => w.label);
+      focusDirective = `\n\nTARGETED REMEDIATION MODE — this batch must drill the student's specific recurring weak points (from a tutor's longitudinal error profile). Design ALL 5 prompts so the student is forced to confront these gaps: strongly prefer CONSTRAINED prompts whose required pattern is exactly the structure they get wrong, and spread the prompts across the listed weak points rather than fixating on one. Still escalate difficulty #1→#5.\nWEAK POINTS TO TARGET:\n${tops.map((w, i) => `${i + 1}. ${w.label} [${w.category}] — ${w.diagnosis}`).join('\n')}`;
+    }
+  }
+  if (zone && !smart) zone.innerHTML = '<div class="loading-row"><span class="spin"></span> building a batch from your vocab…</div>';
 
   const words = pickWords(16);
   S.sessionWords = words;
@@ -3694,18 +3906,22 @@ Rules:
 - Hints must come from the supplied list (exact forms); 2–3 per prompt.
 - Vary the prompts so they don't all share the same grammar.`;
 
-  const themeLine = override
-    ? `Use this theme (a subject or grammar concept): "${override}".`
-    : `Choose a fitting theme yourself.`;
+  const themeLine = smart
+    ? `Focus the entire batch on the student's weak points listed below — ignore generic themes.`
+    : override
+      ? `Use this theme (a subject or grammar concept): "${override}".`
+      : `Choose a fitting theme yourself.`;
 
   try {
     const raw = await claude(
-      [{ role: 'user', content: `${themeLine}\n\nStudent's vocabulary:\n\n${wordBlock}` }],
+      [{ role: 'user', content: `${themeLine}${focusDirective}\n\nStudent's vocabulary:\n\n${wordBlock}` }],
       sys,
       1200
     );
     const parsed = parseLooseJSON(raw);
-    S.compose.theme = parsed.theme || (override || 'Free composition');
+    S.compose.smart = smart;
+    S.compose.focusLabels = focusLabels;
+    S.compose.theme = smart ? (parsed.theme || 'Targeted practice') : (parsed.theme || (override || 'Free composition'));
     S.compose.themeJp = parsed.theme_jp || '';
     S.compose.pendingTheme = '';
     S.compose.prompts = (parsed.prompts || []).slice(0, 5).map((p, i) => ({
@@ -3744,10 +3960,11 @@ function paintCompose() {
   const wrong = done.filter(p => p.review && p.review.verdict === 'wrong').length;
 
   const themeBar = `
-    <div class="compose-theme-bar">
-      <span class="theme-prefix">theme</span>
+    <div class="compose-theme-bar${c.smart ? ' smart' : ''}">
+      <span class="theme-prefix">${c.smart ? '✨ focus' : 'theme'}</span>
       <span class="theme-name">${escHtml(c.theme)}</span>
       ${c.themeJp ? `<span class="theme-jp">${escHtml(c.themeJp)}</span>` : ''}
+      ${c.smart && c.focusLabels?.length ? `<span class="theme-focus">${c.focusLabels.map(escHtml).join(' · ')}</span>` : ''}
     </div>`;
 
   const scoreHTML = done.length > 0 ? `
@@ -3763,7 +3980,48 @@ function paintCompose() {
       ${composeBatchSplit('')}
     </div>`;
 
-  zone.innerHTML = themeBar + c.prompts.map(p => composeCardHTML(p)).join('') + scoreHTML + bottomBtn;
+  zone.innerHTML = composeFocusPanel() + themeBar + c.prompts.map(p => composeCardHTML(p)).join('') + scoreHTML + bottomBtn;
+}
+
+// "Teacher's notes" — the AI-distilled weak-point profile, shown above the batch.
+function composeFocusPanel() {
+  const wp = S.weakPoints;
+  const busy = S.analyzing || S._uiAnalyzing;
+  const total = S.mistakes.length;
+  if (!wp || !wp.weakPoints || wp.weakPoints.length === 0) {
+    // Nothing analysed yet — show a gentle primer once a few mistakes exist.
+    if (total === 0) return '';
+    const need = Math.max(0, ANALYZE_THRESHOLD - total);
+    return `<div class="focus-panel empty">
+      <span class="focus-title">${IC.bulb} Focus areas</span>
+      <span class="focus-sub">${total} correction${total === 1 ? '' : 's'} logged${need > 0 ? ` · ~${need} more to unlock` : ''}</span>
+      ${total >= ANALYZE_THRESHOLD ? `<button class="btn focus-refresh" onclick="reanalyzeWeak()" ${busy ? 'disabled' : ''}>${busy ? 'analysing…' : 'analyse now'}</button>` : ''}
+    </div>`;
+  }
+  const collapsed = localStorage.getItem('renshuu_focus_collapsed') === '1';
+  const newN = newMistakeCount();
+  const sevDot = n => `<span class="sev sev-${Math.max(1, Math.min(5, n || 1))}"></span>`;
+  const items = wp.weakPoints.slice(0, 5).map(w => `
+    <li class="focus-item">
+      <div class="fi-top">
+        <span class="fi-sev" title="severity ${w.severity || 1}/5">${Array.from({ length: 5 }, (_, k) => sevDot(k < (w.severity || 1) ? 5 : 0)).join('')}</span>
+        <span class="fi-label">${escHtml(w.label || '')}</span>
+        ${w.trend ? `<span class="fi-trend tr-${escHtml(w.trend)}">${escHtml(w.trend)}</span>` : ''}
+      </div>
+      ${w.diagnosis ? `<div class="fi-diag">${escHtml(w.diagnosis)}</div>` : ''}
+    </li>`).join('');
+
+  return `<div class="focus-panel">
+    <div class="focus-head">
+      <button class="focus-toggle" onclick="toggleFocusPanel()" aria-label="Toggle focus areas">${collapsed ? IC.chevD : IC.chevD.replace('m6 9 6 6 6-6', 'm18 15-6-6-6 6')}</button>
+      <span class="focus-title">${IC.bulb} Your focus areas</span>
+      <span class="focus-sub">${wp.mistakeCount || total} corrections${newN > 0 ? ` · ${newN} new since last analysis` : ''}</span>
+      <button class="btn focus-refresh" onclick="reanalyzeWeak()" ${busy ? 'disabled' : ''}>${busy ? 'analysing…' : 're-analyse'}</button>
+    </div>
+    ${collapsed ? '' : `
+      ${wp.summary ? `<div class="focus-summary">${escHtml(wp.summary)}</div>` : ''}
+      <ul class="focus-list">${items}</ul>`}
+  </div>`;
 }
 
 function composeCardHTML(p) {
@@ -3868,6 +4126,10 @@ ${p.constraint ? `REQUIRED grammar pattern the answer must use: ${p.constraint}\
       translation: r.translation || '',
       note: r.note || '',
     };
+    // Record corrected mistakes for weak-point analysis
+    if (p.review.verdict !== 'correct' && p.review.correction) {
+      logMistake({ src: 'c', wrote: ans, fix: stripMarkers(p.review.correction), note: p.review.note, idea: p.idea, constraint: p.constraint });
+    }
   } catch (e) {
     p.review = { verdict: 'minor', correction: '', annotated: '', translation: '', note: `Couldn't load review: ${e.message}` };
   }
@@ -6077,6 +6339,8 @@ async function sendMsg() {
       }
     }
 
+    if (correction) logMistake({ src: 'r', wrote: text, fix: correction });
+
     // replace spinner
     S.convo.pop();
     S.convo.push({ role: 'assistant', content: clean, correction, _id: msgId() });
@@ -8149,6 +8413,7 @@ function renderStoryCard() {
 
     claude(messages, ds.sysPrompt, 500).then(reply => {
       const { correction: corr, clean } = extractCorrection(reply);
+      if (corr) logMistake({ src: 'r', wrote: txt, fix: corr });
       const msg = { role: 'assistant', content: clean, correction: corr, display: safeAnnotated(buildAnnotated(clean)) };
       ds.convo.push(msg);
       // Rolling trim — keep last MAX_MSGS_PER_CONVO in memory
