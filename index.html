@@ -3879,7 +3879,7 @@ Return ONLY valid JSON, no markdown fences, no preamble.
 
 You are given the student's vocabulary list. Do two things:
 1. Choose ONE theme that ties a batch of 5 prompts together — either a SUBJECT (e.g. "daily routine", "talking about the weather") or a GRAMMAR concept (e.g. "～たい to express wants", "comparing two things with より"). Pick something the supplied vocab supports well.
-2. Write 5 prompts, STRICTLY ordered by escalating difficulty — prompt 1 is the easiest and each one is clearly harder than the last, so #5 is the hardest. The array order IS the order shown to the student, so it must be a clean difficulty gradient. Use these levers to escalate: a present/simple-tense single clause → past/negative or a second idea → two linked clauses (cause, sequence, condition) → more abstract meaning or a less common grammar pattern. Roughly: #1 short and concrete, #5 a multi-clause or abstract sentence.
+2. Write 5 prompts, STRICTLY ordered by gently escalating difficulty — prompt 1 is the easiest and each one is a little harder than the last. Keep them EASY overall: every prompt should be answerable in ONE short, everyday sentence. Use these levers to escalate mildly: a present/simple-tense single clause → past or negative → adding one extra detail (time, place, object) → a simple two-clause sentence (e.g. cause with から/ので). Roughly: #1 very short and concrete, #5 still a single everyday sentence — NOT multi-clause, abstract, or literary. When in doubt, make it simpler.
 Also VARY how constrained the prompts are so the student can't always route around weak grammar. Constrained prompts tend to be harder, so lean them toward the later positions:
    - 2–3 OPEN prompts: describe the meaning/situation only, no "constraint" (omit the field or leave it ""). The student picks any structure.
    - 2–3 CONSTRAINED prompts: set "constraint" to a specific grammar pattern the answer MUST use (e.g. "～てから (after doing X)", "～なければならない (must)", "より to compare", "～たほうがいい"). Still describe only the idea in "idea" — do not write the sentence for them. Tie constrained patterns to the theme, especially if the theme is a grammar concept.
@@ -3902,7 +3902,7 @@ Schema:
 }
 Rules:
 - Exactly 5 prompts, ordered easiest (#1) to hardest (#5) — this ordering is required, not optional.
-- Target N4–N3 level; ideas should be expressible in one natural sentence.
+- Target N5–N4 (beginner) level; every idea must be expressible in one short, everyday sentence.
 - Hints must come from the supplied list (exact forms); 2–3 per prompt.
 - Vary the prompts so they don't all share the same grammar.`;
 
