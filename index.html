@@ -715,6 +715,22 @@ pre.code {
   border-left: 2px solid var(--border); border-radius: 0 var(--radius) var(--radius) 0;
 }
 .msg-breakdown .bd-list { color: var(--text); margin-left: 4px; }
+/* Vocab bullet with one-click "add to Anki" button */
+.msg-breakdown .bd-vocab { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.msg-breakdown .bd-vocab-text { flex: 1 1 auto; min-width: 0; }
+.bd-add {
+  flex: none; cursor: pointer; font-size: 10px; line-height: 1.4; white-space: nowrap;
+  padding: 2px 7px; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--surface2); color: var(--muted);
+  transition: background .12s, color .12s, border-color .12s;
+}
+.bd-add:hover { border-color: var(--red); color: var(--red); }
+.bd-add.added { color: var(--green); border-color: var(--green); background: transparent; cursor: default; }
+.bd-add.busy { opacity: .55; cursor: default; }
+/* Roleplay (dark) breakdown variant */
+.rpg-msg .bd-add, .rpg-bd-drawer-body .bd-add { background: #1e1e2e; border-color: #2a2a3a; color: #9a9aba; }
+.rpg-msg .bd-add:hover, .rpg-bd-drawer-body .bd-add:hover { border-color: #c94f3c; color: #e0876f; }
+.rpg-msg .bd-add.added, .rpg-bd-drawer-body .bd-add.added { color: #7ac083; border-color: #3a5a3e; background: transparent; }
 .bd-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 8px; }
 .bd-card-translation .bd-translation { font-size: 13px; }
 .bd-tr-sentence {
@@ -2007,6 +2023,9 @@ const S = {
 
 
 // ── AnkiConnect ───────────────────────────────────────────────────────────────
+// Deck that one-click "mined" vocab (from roleplay breakdowns) is added to.
+const MINED_DECK = 'Renshuu Mined';
+
 async function anki(action, params = {}) {
   const r = await fetch('http://localhost:8765', {
     method: 'POST',
@@ -3193,6 +3212,61 @@ function splitVocabItems(text) {
   return [text.trim()];
 }
 
+// Parse a breakdown vocab bullet ("word（reading）— meaning") into its parts so
+// it can be one-click added to Anki. Returns null if it isn't a vocab line.
+function parseVocabItem(raw) {
+  const s = (raw || '').replace(/^[・•\-\*\s]+/, '').trim();
+  // word（reading）— meaning
+  let m = s.match(/^(.+?)\s*[（(]\s*([^（）()]+?)\s*[）)]\s*[—–:\-]\s*(.+)$/);
+  if (m) return { jp: m[1].trim(), reading: m[2].trim(), meaning: m[3].trim() };
+  // word — meaning (no reading given)
+  m = s.match(/^(.+?)\s*[—–:]\s*(.+)$/);
+  if (m) return { jp: m[1].trim(), reading: '', meaning: m[2].trim() };
+  return null;
+}
+
+// A vocab bullet, with a one-click "add to Anki" button when it parses cleanly.
+function vocabBulletHTML(item) {
+  const v = parseVocabItem(item);
+  if (!v) return `<div class="bd-bullet">${escHtml(item)}</div>`;
+  return `<div class="bd-bullet bd-vocab">` +
+    `<span class="bd-vocab-text">${escHtml(item)}</span>` +
+    `<button class="bd-add" title="Add to Anki — ${escAttr(MINED_DECK)}"` +
+    ` data-jp="${escAttr(v.jp)}" data-reading="${escAttr(v.reading)}" data-meaning="${escAttr(v.meaning)}"` +
+    ` onclick="addVocabToAnki(this)">+ Anki</button>` +
+    `</div>`;
+}
+
+// Add one mined vocab word to the dedicated Anki deck via AnkiConnect.
+async function addVocabToAnki(btn) {
+  if (btn.disabled) return;
+  const jp = btn.dataset.jp || '';
+  const reading = btn.dataset.reading || '';
+  const meaning = btn.dataset.meaning || '';
+  const front = reading && reading !== jp ? `${jp}（${reading}）` : jp;
+  btn.disabled = true; btn.classList.add('busy'); btn.textContent = '…';
+  try {
+    await anki('createDeck', { deck: MINED_DECK }); // idempotent
+    await anki('addNote', { note: {
+      deckName: MINED_DECK,
+      modelName: 'Basic',
+      fields: { Front: front, Back: meaning },
+      options: { allowDuplicate: false, duplicateScope: 'deck' },
+      tags: ['renshuu', 'mined'],
+    } });
+    btn.classList.remove('busy'); btn.classList.add('added');
+    btn.textContent = '✓ Added';
+  } catch (e) {
+    btn.classList.remove('busy');
+    if (/duplicate/i.test(e.message || '')) {
+      btn.classList.add('added'); btn.textContent = '✓ In deck';
+    } else {
+      btn.disabled = false; btn.textContent = '+ Anki';
+      showToast('Could not add to Anki: ' + e.message, true);
+    }
+  }
+}
+
 function formatBreakdown(text) {
   const clean = text.replace(/\*\*/g, '');
   const lines = clean.split('\n');
@@ -3236,7 +3310,7 @@ function formatBreakdown(text) {
       const content = stripped.replace(/^VOCAB:?\s*/i, '').trim();
       parts.push(`<div class="bd-label">Vocab</div>`);
       parts.push(`<div class="bd-bullets">`); inBulletSection = true;
-      if (content) splitVocabItems(content).forEach(item => parts.push(`<div class="bd-bullet">${escHtml(item)}</div>`));
+      if (content) splitVocabItems(content).forEach(item => parts.push(vocabBulletHTML(item)));
     } else if (/^STRUCTURE\b/i.test(stripped)) {
       closeBullets(); awaitingSentenceContent = false; lastSection = 'structure';
       const content = stripped.replace(/^STRUCTURE:?\s*/i, '').trim();
@@ -3255,7 +3329,8 @@ function formatBreakdown(text) {
         // Skip — sentence text comes from state.sentences[i], not Claude's response
         awaitingSentenceContent = false;
       } else if (inBulletSection) {
-        splitVocabItems(bulletText).forEach(item => parts.push(`<div class="bd-bullet">${escHtml(item)}</div>`));
+        const render = lastSection === 'vocab' ? vocabBulletHTML : (item => `<div class="bd-bullet">${escHtml(item)}</div>`);
+        splitVocabItems(bulletText).forEach(item => parts.push(render(item)));
       } else {
         // Prose continuation — append to last bd-item or start new one
         const last = parts.length - 1;
@@ -6077,6 +6152,11 @@ function renderMessages() {
 
 function escHtml(s) {
   return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Safe for use inside a double-quoted HTML attribute (escHtml + the quote char).
+function escAttr(s) {
+  return escHtml(s).replace(/"/g, '&quot;');
 }
 
 function formatCorrection(s) {
