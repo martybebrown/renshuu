@@ -1938,15 +1938,6 @@ document.addEventListener('keydown', e => {
   checkDrill(parseInt(inp.dataset.di, 10));
 });
 
-document.addEventListener('input', e => {
-  const cInp = e.target.closest('.compose-input[data-ci]');
-  if (!cInp) return;
-  const i = parseInt(cInp.dataset.ci, 10);
-  const p = S.compose && S.compose.prompts[i];
-  if (!p || !p.submitted) return;
-  retryCompose(i);
-});
-
 // ── Icons (inline SVGs for use in template literals) ─────────────────────────
 const IC = {
   volume:   '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>',
@@ -3577,7 +3568,8 @@ Return ONLY valid JSON, no markdown fences, no preamble.
 
 You are given the student's vocabulary list. Do two things:
 1. Choose ONE theme that ties a batch of 5 prompts together — either a SUBJECT (e.g. "daily routine", "talking about the weather") or a GRAMMAR concept (e.g. "～たい to express wants", "comparing two things with より"). Pick something the supplied vocab supports well.
-2. Write 5 prompts. Each prompt is an English instruction describing an IDEA the student should express in a single Japanese sentence. Order them easiest → hardest, and deliberately VARY how constrained they are so the student can't always route around weak grammar:
+2. Write 5 prompts, STRICTLY ordered by escalating difficulty — prompt 1 is the easiest and each one is clearly harder than the last, so #5 is the hardest. The array order IS the order shown to the student, so it must be a clean difficulty gradient. Use these levers to escalate: a present/simple-tense single clause → past/negative or a second idea → two linked clauses (cause, sequence, condition) → more abstract meaning or a less common grammar pattern. Roughly: #1 short and concrete, #5 a multi-clause or abstract sentence.
+Also VARY how constrained the prompts are so the student can't always route around weak grammar. Constrained prompts tend to be harder, so lean them toward the later positions:
    - 2–3 OPEN prompts: describe the meaning/situation only, no "constraint" (omit the field or leave it ""). The student picks any structure.
    - 2–3 CONSTRAINED prompts: set "constraint" to a specific grammar pattern the answer MUST use (e.g. "～てから (after doing X)", "～なければならない (must)", "より to compare", "～たほうがいい"). Still describe only the idea in "idea" — do not write the sentence for them. Tie constrained patterns to the theme, especially if the theme is a grammar concept.
 
@@ -3598,7 +3590,7 @@ Schema:
   ]
 }
 Rules:
-- Exactly 5 prompts.
+- Exactly 5 prompts, ordered easiest (#1) to hardest (#5) — this ordering is required, not optional.
 - Target N4–N3 level; ideas should be expressible in one natural sentence.
 - Hints must come from the supplied list (exact forms); 2–3 per prompt.
 - Vary the prompts so they don't all share the same grammar.`;
@@ -3639,7 +3631,7 @@ Rules:
 function syncComposeInputs() {
   document.querySelectorAll('.compose-input[data-ci]').forEach(el => {
     const p = S.compose.prompts[parseInt(el.dataset.ci, 10)];
-    if (p && !p.submitted) p.input = el.value;
+    if (p) p.input = el.value;
   });
 }
 
@@ -3708,7 +3700,7 @@ function composeCardHTML(p) {
           data-ci="${p.i}"
           autocomplete="off"
         >${escHtml(p.input)}</textarea>
-        <button class="btn compose-submit" data-ci="${p.i}" ${p.submitted ? 'disabled' : ''}>${IC.send}</button>
+        <button class="btn compose-submit" data-ci="${p.i}">${IC.send}</button>
       </div>
       ${p.submitted ? `<div class="feedback ${p.review ? (p.review.verdict === 'correct' ? 'ok' : p.review.verdict === 'minor' ? 'partial' : 'no') : ''}" id="cfb-${p.i}">${composeReviewHTML(p)}</div>` : ''}
     </div>
@@ -3733,7 +3725,7 @@ function composeReviewHTML(p) {
 
 async function submitCompose(i) {
   const p = S.compose.prompts[i];
-  if (!p || p.submitted) return;
+  if (!p || p.loading) return;
   const inputEl = document.getElementById(`ci-${i}`);
   const ans = (inputEl ? inputEl.value : p.input).trim();
   if (!ans) return;
@@ -3794,20 +3786,6 @@ function toggleComposeHint(i) {
   p.showHints = !p.showHints;
   syncComposeInputs();
   paintCompose();
-}
-
-function retryCompose(i) {
-  const p = S.compose.prompts[i];
-  if (!p) return;
-  p.submitted = false;
-  p.loading = false;
-  p.review = null;
-  syncComposeInputs();
-  paintCompose();
-  setTimeout(() => {
-    const el = document.getElementById(`ci-${i}`);
-    if (el) el.focus();
-  }, 50);
 }
 
 // ── ROLEPLAY MODE ─────────────────────────────────────────────────────────────
