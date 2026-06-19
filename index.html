@@ -535,6 +535,24 @@ pre.code {
 .compose-correction { font-family: 'Shippori Mincho', serif; font-size: 18px; line-height: 1.7; margin: 2px 0 4px; }
 
 /* Toast */
+/* Speech-to-text mic button — one modular class, sized by its container */
+.mic-btn {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; border-radius: var(--radius); border: 1px solid var(--border);
+  background: var(--surface2); color: var(--text); transition: all 0.15s;
+}
+.mic-btn:hover { background: var(--border); }
+.mic-btn.recording { background: var(--red); color: #fff; border-color: var(--red); animation: micpulse 1.25s ease-in-out infinite; }
+.mic-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+@keyframes micpulse { 0%,100% { box-shadow: 0 0 0 0 rgba(201,79,60,0.5); } 50% { box-shadow: 0 0 0 6px rgba(201,79,60,0); } }
+/* compose: stretch to match the textarea/send height */
+.answer-row .mic-btn { align-self: stretch; padding: 0 12px; }
+/* roleplay dark scene input */
+.rpg-input-area .mic-btn { width: 36px; height: 36px; background: #2a2a3a; border-color: #3a3a5a; color: #c0b080; }
+.rpg-input-area .mic-btn:hover { background: #3a3a5a; }
+.rpg-input-area .mic-btn.recording { background: var(--red); border-color: var(--red); color: #fff; }
+/* roleplay light chat input */
+.chat-foot .mic-btn { width: 40px; height: 40px; }
 .renshuu-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 3px; font-size: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.18); opacity: 0; pointer-events: none; transition: all 0.2s; z-index: 9999; }
 .renshuu-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .renshuu-toast.err { background: var(--red); }
@@ -1958,7 +1976,88 @@ const IC = {
   refresh:  '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>',
   bulb:     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>',
   chevD:    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+  mic:      '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>',
 };
+
+// Lightweight transient toast (uses the .renshuu-toast styles)
+function showToast(msg, isErr) {
+  let t = document.querySelector('.renshuu-toast');
+  if (!t) { t = document.createElement('div'); t.className = 'renshuu-toast'; document.body.appendChild(t); }
+  t.textContent = msg;
+  t.classList.toggle('err', !!isErr);
+  requestAnimationFrame(() => t.classList.add('show'));
+  clearTimeout(t._hide);
+  t._hide = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// ── Speech-to-text (modular) ──────────────────────────────────────────────────
+// Web Speech API dictation that targets any <input>/<textarea>. Drop a mic
+// button next to a field with micButtonHTML(targetId); it transcribes speech
+// into that field. Reused by Compose and Roleplay.
+const Mic = (() => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const supported = !!SR;
+  let active = null; // { rec, btn, target, base }
+
+  function cleanup() {
+    if (active && active.btn) active.btn.classList.remove('recording');
+    active = null;
+  }
+
+  function stop() {
+    if (active && active.rec) { try { active.rec.stop(); } catch (_) {} }
+  }
+
+  function start(btn, target, lang) {
+    const rec = new SR();
+    rec.lang = lang || 'ja-JP';
+    rec.interimResults = true;
+    rec.continuous = true;
+    // Append to whatever is already in the field, on a fresh line if non-empty.
+    const existing = target.value || '';
+    const base = existing && !/\s$/.test(existing) ? existing + ' ' : existing;
+    active = { rec, btn, target, base };
+    btn.classList.add('recording');
+
+    rec.onresult = (e) => {
+      if (!target.isConnected) { stop(); return; }
+      let txt = '';
+      for (let i = 0; i < e.results.length; i++) txt += e.results[i][0].transcript;
+      target.value = active.base + txt;
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    rec.onend = () => { cleanup(); try { target.focus(); } catch (_) {} };
+    rec.onerror = (ev) => {
+      cleanup();
+      if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+        showToast('Microphone blocked — allow mic access for this site', true);
+      } else if (ev.error !== 'aborted' && ev.error !== 'no-speech') {
+        showToast('Speech input error: ' + ev.error, true);
+      }
+    };
+    try { rec.start(); } catch (_) { cleanup(); }
+  }
+
+  function toggle(btn) {
+    if (!supported) { showToast('Speech input isn’t supported in this browser', true); return; }
+    const target = document.getElementById(btn.dataset.micTarget);
+    if (!target) return;
+    if (active && active.btn === btn) { stop(); return; }
+    if (active) stop();
+    start(btn, target, btn.dataset.micLang);
+  }
+
+  return { supported, toggle, stop };
+})();
+
+// Inline handler target (function declarations are reachable from onclick="")
+function micToggle(btn) { Mic.toggle(btn); }
+
+// Returns a mic button bound to the given field id, or '' when unsupported.
+function micButtonHTML(targetId, lang = 'ja-JP') {
+  if (!Mic.supported) return '';
+  return `<button type="button" class="mic-btn" data-mic-target="${targetId}" data-mic-lang="${lang}" onclick="micToggle(this)" title="Speak — click to start/stop dictation" aria-label="Dictate by voice">${IC.mic}</button>`;
+}
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const S = {
@@ -3700,6 +3799,7 @@ function composeCardHTML(p) {
           data-ci="${p.i}"
           autocomplete="off"
         >${escHtml(p.input)}</textarea>
+        ${micButtonHTML(`ci-${p.i}`)}
         <button class="btn compose-submit" data-ci="${p.i}">${IC.send}</button>
       </div>
       ${p.submitted ? `<div class="feedback ${p.review ? (p.review.verdict === 'correct' ? 'ok' : p.review.verdict === 'minor' ? 'partial' : 'no') : ''}" id="cfb-${p.i}">${composeReviewHTML(p)}</div>` : ''}
@@ -5616,6 +5716,7 @@ function renderRoleplay() {
               placeholder="日本語か romaji で…"
               onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"
             ></textarea>
+            ${micButtonHTML('chatIn')}
             <button class="rpg-send" id="sendBtn" onclick="sendMsg()">${IC.send}</button>
           </div>
           <div class="rpg-tip">Enter to send · Shift+Enter for new line · romaji auto-converted</div>
@@ -5642,6 +5743,7 @@ function renderRoleplay() {
             placeholder="日本語か romaji で…"
             onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"
           ></textarea>
+          ${micButtonHTML('chatIn')}
           <button class="send-btn" id="sendBtn" onclick="sendMsg()">${IC.send}</button>
         </div>
         <div class="chat-tip">Enter to send · Shift+Enter for new line · romaji auto-converted</div>
