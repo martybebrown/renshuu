@@ -2323,10 +2323,11 @@ async function analyzeWeakPoints(force = false) {
     const sys = `You are an expert Japanese teacher keeping private longitudinal notes on ONE student's recurring errors, exactly as a professional tutor would between lessons.
 You receive the CURRENT error profile (may be empty) and a batch of NEW mistakes. Each mistake shows what the student wrote and the corrected form (sometimes with the task and a tutor note).
 Your job: diagnose the UNDERLYING competence gaps, not surface slips. For each mistake, mentally diff wrote→fix and ask "what rule does the student not yet control?" Then maintain the profile:
-- Reinforce existing weak points when new mistakes show the same gap (raise severity, keep trend "persistent"); if a gap stops appearing, lower its severity and mark trend "improving".
-- Add genuinely new weak points only when there is real evidence.
+- The NEW MISTAKES below are the student's MOST RECENT work. Weight recency heavily: a gap they are getting wrong RIGHT NOW matters far more than one they struggled with long ago. The profile must track what they're struggling with *now*, weighted against their past.
+- Reinforce existing weak points when these recent mistakes show the same gap (raise severity, set trend "persistent"). When an existing gap does NOT appear in this recent batch, DECAY it — lower its severity and set trend "improving" — and let long-dormant gaps drift down the list.
+- Add genuinely new weak points (trend "new") only when there is real evidence.
 - Be specific and diagnostic: "に vs で — marks location of existence vs action" NOT "particles"; "transitive/intransitive pairs (なる vs する, 開く vs 開ける)" NOT "verbs".
-- Prioritise gaps that recur across multiple mistakes. Keep the 6 most important, ordered by severity (highest first).
+- Order so the student's CURRENT struggles come first: rank by recent activity, using severity as the tiebreaker. Keep up to 15 weak points so smaller and emerging gaps stay tracked, but the top of the list must reflect what they're getting wrong now.
 Return STRICT JSON only, no prose, no fences:
 {
   "weakPoints": [
@@ -2339,11 +2340,20 @@ Return STRICT JSON only, no prose, no fences:
     const raw = await claude([{ role: 'user', content: msg }], sys, 1500);
     const parsed = parseLooseJSON(raw);
     const maxT = toAnalyze.reduce((a, m) => Math.max(a, m.t), through);
+    // Recency-weighted ordering: actively-recurring gaps ("new"/"persistent")
+    // outrank ones that are fading ("improving"), with severity as the lever
+    // within each. Keeps "what I'm struggling with now" at the top.
+    const recencyWeight = t => (t === 'improving' ? 0.45 : t === 'new' ? 1.2 : 1);
+    const score = w => (w.severity || 1) * recencyWeight(w.trend);
+    const weakPoints = (Array.isArray(parsed.weakPoints) ? parsed.weakPoints : [])
+      .slice()
+      .sort((a, b) => score(b) - score(a))
+      .slice(0, 15);
     S.weakPoints = {
       updated: Math.floor(Date.now() / 1000),
       analyzedThrough: maxT,
       mistakeCount: S.mistakes.length,
-      weakPoints: Array.isArray(parsed.weakPoints) ? parsed.weakPoints.slice(0, 6) : [],
+      weakPoints,
       summary: parsed.summary || '',
     };
     localStorage.setItem('renshuu_weakpoints', JSON.stringify(S.weakPoints));
@@ -3724,6 +3734,22 @@ function smartBatch() {
   genComposeBatch('', true);
 }
 
+// Pick n distinct weak points to drill, weighted by severity so the worst gaps
+// come up more often but the batch still varies across the whole pool (so Smart
+// Batch doesn't fixate on the same top 3 every time).
+function sampleWeakPoints(pool, n) {
+  const rest = pool.slice();
+  const out = [];
+  while (out.length < n && rest.length) {
+    const weights = rest.map(w => Math.max(1, w.severity || 1));
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = Math.random() * total, idx = 0;
+    for (; idx < rest.length - 1; idx++) { r -= weights[idx]; if (r <= 0) break; }
+    out.push(rest.splice(idx, 1)[0]);
+  }
+  return out;
+}
+
 async function reanalyzeWeak() {
   if (S.analyzing) return;
   S._uiAnalyzing = true;
@@ -3781,13 +3807,16 @@ async function genComposeBatch(override = '', smart = false) {
   if (smart) {
     if (zone) zone.innerHTML = '<div class="loading-row"><span class="spin"></span> analysing your weak points and building a targeted batch…</div>';
     await analyzeWeakPoints();
-    const tops = (S.weakPoints?.weakPoints || []).slice(0, 3);
+    // Draw a varied mix from the top ~15 gaps (weighted toward the worst) so
+    // every Smart Batch hits different weak points, not just the same top 3.
+    const pool = (S.weakPoints?.weakPoints || []).slice(0, 15);
+    const tops = sampleWeakPoints(pool, 5);
     if (tops.length === 0) {
       showToast('Not enough corrections logged yet — keep practising to unlock Smart Batches');
       smart = false;
     } else {
       focusLabels = tops.map(w => w.label);
-      focusDirective = `\n\nTARGETED REMEDIATION MODE — this batch must drill the student's specific recurring weak points (from a tutor's longitudinal error profile). Design ALL 5 prompts so the student is forced to confront these gaps: strongly prefer CONSTRAINED prompts whose required pattern is exactly the structure they get wrong, and spread the prompts across the listed weak points rather than fixating on one. Still escalate difficulty #1→#5.\nWEAK POINTS TO TARGET:\n${tops.map((w, i) => `${i + 1}. ${w.label} [${w.category}] — ${w.diagnosis}`).join('\n')}`;
+      focusDirective = `\n\nTARGETED REMEDIATION MODE — this batch must drill the student's specific recurring weak points (from a tutor's longitudinal error profile). Design the 5 prompts so the student is forced to confront these gaps: strongly prefer CONSTRAINED prompts whose required pattern is exactly the structure they get wrong, and spread the prompts ACROSS the listed weak points (ideally a different one per prompt) rather than fixating on one. Still escalate difficulty #1→#5.\nWEAK POINTS TO TARGET:\n${tops.map((w, i) => `${i + 1}. ${w.label} [${w.category}] — ${w.diagnosis}`).join('\n')}`;
     }
   }
   if (zone && !smart) zone.innerHTML = '<div class="loading-row"><span class="spin"></span> building a batch from your vocab…</div>';
@@ -3945,7 +3974,7 @@ function focusPanelHTML() {
       <span class="focus-title">${IC.bulb} Focus areas</span>
       <button class="focus-toggle" onclick="toggleFocusPanel()" aria-label="Toggle focus areas">${collapsed ? IC.chevD : IC.chevD.replace('m6 9 6 6 6-6', 'm18 15-6-6-6 6')}</button>
     </div>
-    <div class="focus-sub">${wp.mistakeCount || total} corrections${newN > 0 ? ` · ${newN} new` : ''}</div>
+    <div class="focus-sub">${newN > 0 ? `${newN} new since last analysis` : 'up to date'}</div>
     ${collapsed ? '' : `
       ${wp.summary ? `<div class="focus-summary">${escHtml(wp.summary)}</div>` : ''}
       <ul class="focus-list">${items}</ul>`}
