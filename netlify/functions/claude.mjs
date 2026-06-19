@@ -25,18 +25,33 @@ export default async (req) => {
         max_tokens: max_tokens || 1000,
         system: system || '',
         messages,
+        // Stream so bytes start flowing within ~1-2s. A synchronous Netlify
+        // function is killed at 10s of wall-clock time; an actively streaming
+        // response keeps the connection alive for the full generation, so long
+        // completions no longer surface as a gateway 504.
+        stream: true,
       }),
     });
   } catch (e) {
     return json({ error: { message: `Upstream fetch failed: ${e.message}` } }, 502);
   }
 
-  let data;
-  try {
-    data = await r.json();
-  } catch {
-    return json({ error: { message: `API error ${r.status}` } }, r.status);
+  // Errors (auth, rate limit, 529 overloaded) come back before the stream as a
+  // normal JSON body with an error status — propagate them as-is so the client
+  // can show the message and keep its 529 retry behaviour.
+  if (!r.ok) {
+    const text = await r.text().catch(() => '');
+    let body;
+    try { body = JSON.parse(text); } catch { body = { error: { message: text || `API error ${r.status}` } }; }
+    return json(body, r.status);
   }
 
-  return json(data, r.status);
+  // Pipe the Anthropic SSE stream straight through to the browser.
+  return new Response(r.body, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache',
+    },
+  });
 };

@@ -3385,10 +3385,44 @@ async function claude(messages, system = '', maxTokens = 1000, model = null) {
       const text = await r.text().catch(() => '');
       throw new Error(`API error ${r.status}${text && !text.startsWith('<') ? ': ' + text : ''}`);
     }
+    // Success is a streamed SSE body — accumulate the text deltas and return
+    // the full string, so every caller keeps its plain-text contract.
+    if ((r.headers.get('content-type') || '').includes('text/event-stream')) {
+      return await readClaudeStream(r);
+    }
+    // Fallback for a non-streamed JSON response (shouldn't normally happen).
     const d = await r.json();
     if (d.error) throw new Error(d.error.message || JSON.stringify(d.error));
     return d.content[0].text;
   }
+}
+
+// Read an Anthropic SSE stream and return the concatenated assistant text.
+async function readClaudeStream(r) {
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '', text = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split('\n');
+    buf = lines.pop(); // keep the trailing, possibly-incomplete line
+    for (const line of lines) {
+      const s = line.trim();
+      if (!s.startsWith('data:')) continue;
+      const payload = s.slice(5).trim();
+      if (!payload || payload === '[DONE]') continue;
+      let evt;
+      try { evt = JSON.parse(payload); } catch { continue; }
+      if (evt.type === 'content_block_delta' && typeof evt.delta?.text === 'string') {
+        text += evt.delta.text;
+      } else if (evt.type === 'error') {
+        throw new Error(evt.error?.message || 'stream error');
+      }
+    }
+  }
+  return text;
 }
 
 // ── DRILL MODE ────────────────────────────────────────────────────────────────
