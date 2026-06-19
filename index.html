@@ -275,105 +275,11 @@ select.field:focus { border-color: var(--muted); }
   z-index: 11;
 }
 
-/* Story Time: all annotated kanji get a subtle underline so they look interactive */
-.story-body [data-rt],
-.story-title [data-rt] {
-  text-decoration: underline dotted var(--gold);
-  text-underline-offset: 3px;
-}
-/* New words override with blue */
-.story-body [data-new],
-.story-title [data-new],
+/* New words get a subtle blue dotted underline in annotated text */
 [data-new] {
   text-decoration: underline dotted var(--blue);
   text-underline-offset: 3px;
 }
-
-/* Story Time */
-.story-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 28px;
-}
-.story-topic {
-  font-size: 10px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.story-title {
-  font-family: 'Shippori Mincho', serif;
-  font-size: 22px;
-  font-weight: 700;
-  margin-bottom: 20px;
-  line-height: 1.4;
-}
-.story-body {
-  font-family: 'Shippori Mincho', serif;
-  font-size: 18px;
-  line-height: 2.2;
-  color: var(--text);
-}
-.story-legend {
-  margin-top: 20px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-  font-size: 10px;
-  color: var(--muted);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-.story-legend-item { display: flex; align-items: center; gap: 6px; }
-
-/* Story quiz */
-.quiz-section {
-  margin-top: 28px;
-  padding-top: 20px;
-  border-top: 1px solid var(--border);
-}
-.quiz-label {
-  font-size: 10px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 12px;
-}
-.quiz-item {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 12px 14px;
-  margin-bottom: 8px;
-}
-.quiz-q-text { font-size: 12px; line-height: 1.6; margin-bottom: 8px; }
-.quiz-reveal {
-  font-size: 10px;
-  padding: 4px 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  cursor: pointer;
-  color: var(--muted);
-  font-family: 'Nunito Sans', sans-serif;
-  transition: all 0.15s;
-}
-.quiz-reveal:hover { border-color: var(--muted); color: var(--text); }
-.quiz-answer {
-  display: none;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
-  font-size: 11px;
-  color: var(--green);
-  line-height: 1.6;
-}
-.quiz-answer.shown { display: block; }
 
 /* Main content */
 main {
@@ -1580,12 +1486,6 @@ pre.code {
   .chat-window { max-height: none; min-height: 200px; }
   .msg { max-width: 92%; }
 
-  /* Story card */
-  .story-card { padding: 16px; }
-  .story-title { font-size: 19px; }
-  .story-body { font-size: 16px; line-height: 2; }
-  .story-legend { gap: 10px; font-size: 9px; }
-
   /* Empty state */
   .empty-kanji { font-size: 36px; }
 }
@@ -1595,9 +1495,7 @@ pre.code {
   header { padding: 10px 10px; }
   main { padding: 12px 8px; }
   .scenario-grid { grid-template-columns: 1fr; }
-  .story-card { padding: 12px; }
   .drill-card { padding: 12px; }
-  .story-title { font-size: 17px; }
   .jp-sentence { font-size: 16px; }
   .logo { font-size: 15px; }
 }
@@ -1615,7 +1513,6 @@ pre.code {
     <button class="header-mode active" id="hm-drill" onclick="switchMode('drill')">Drills</button>
     <button class="header-mode" id="hm-compose" onclick="switchMode('compose')">Compose</button>
     <button class="header-mode" id="hm-roleplay" onclick="switchMode('roleplay')">Roleplay</button>
-    <button class="header-mode" id="hm-story" onclick="switchMode('story')">Story</button>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="status">
@@ -1754,7 +1651,6 @@ pre.code {
         <button class="tab active" id="tab-drill" onclick="switchMode('drill')">Drills</button>
         <button class="tab" id="tab-compose" onclick="switchMode('compose')">Compose</button>
         <button class="tab" id="tab-roleplay" onclick="switchMode('roleplay')">Roleplay</button>
-        <button class="tab" id="tab-story" onclick="switchMode('story')">Story</button>
       </div>
     </div>
 
@@ -1854,14 +1750,6 @@ document.addEventListener('click', e => {
   // Drill speak button
   const drillSpeak = e.target.closest('.drill-speak[data-sentence]');
   if (drillSpeak) { speakJapanese(drillSpeak.dataset.sentence, drillSpeak); return; }
-
-  // Quiz answer reveal
-  const revBtn = e.target.closest('.quiz-reveal');
-  if (revBtn) {
-    revBtn.style.display = 'none';
-    revBtn.nextElementSibling.classList.add('shown');
-    return;
-  }
 
   // Speak message aloud
   const speakBtn = e.target.closest('.speak-btn[data-mi]');
@@ -2102,7 +1990,6 @@ const S = {
   convo: [],
   sysPrompt: '',
   sessionWords: [],
-  story: null,
   sierraMode: localStorage.getItem('renshuu_sierra_mode') !== 'false',
   // English roleplay (reverse mode)
   engScenario: null,
@@ -2582,7 +2469,7 @@ function safeAnnotated(html) {
 }
 
 // Convert [[word|reading|english]] or [[word|reading|english|0or1]] markers → spans.
-// The 4th pipe field (new flag) is optional — drills/roleplay use 3-pipe, story uses 4-pipe.
+// The 4th pipe field (new flag) is optional.
 function buildAnnotated(body) {
   return (body || '')
     // 3-value: [[word|reading|english]] with optional |0/1 flag
@@ -3415,7 +3302,6 @@ function toggleFocus(tier) {
   // Reset session so next gen uses new focus
   S.drills = [];
   S.convo = [];
-  S.story = null;
   if (total() > 0) renderMode();
 }
 
@@ -3473,7 +3359,6 @@ function renderMode() {
   else if (S.mode === 'compose') renderCompose();
   else if (S.mode === 'roleplay') renderRoleplay();
   else if (S.mode === 'eng_roleplay') renderEngRoleplay();
-  else if (S.mode === 'story') renderStory();
 }
 
 // ── Claude ────────────────────────────────────────────────────────────────────
@@ -7093,213 +6978,6 @@ function formatEngBreakdown(text) {
   return parts.join('');
 }
 
-// ── STORY TIME MODE ────────────────────────────────────────────────────────────
-
-// Cache endwalker links for the session so we only fetch the archive once
-let _endwalkerLinks = null;
-
-async function tryEndwalker(onStatus) {
-  if (!_endwalkerLinks) {
-    onStatus('browsing endwalker archive…');
-    const res = await fetch('https://endwalker.com/archive.html');
-    if (!res.ok) throw new Error('endwalker not ok');
-    const html = await res.text();
-    const dom  = new DOMParser().parseFromString(html, 'text/html');
-    _endwalkerLinks = [...dom.querySelectorAll('a[href*="en.wikipedia.org/wiki/"]')]
-      .map(a => a.getAttribute('href'))
-      .filter(Boolean);
-    if (!_endwalkerLinks.length) throw new Error('no endwalker links');
-  }
-  const url      = _endwalkerLinks[Math.floor(Math.random() * _endwalkerLinks.length)];
-  const wikiSlug = decodeURIComponent(url.split('/wiki/')[1].split('#')[0].split('?')[0]);
-  onStatus('fetching article…');
-  const wr = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(wikiSlug)}`);
-  const wiki = await wr.json();
-  if (!wiki.title) throw new Error('bad wiki response');
-  return { wiki, source: 'endwalker.com' };
-}
-
-async function tryReddit(onStatus) {
-  onStatus('browsing r/wikipedia…');
-  const res = await fetch('https://www.reddit.com/r/wikipedia/hot.json?limit=50', {
-    headers: { 'Accept': 'application/json' },
-  });
-  if (!res.ok) throw new Error('reddit not ok');
-  const data  = await res.json();
-  const posts = data.data.children
-    .map(p => p.data)
-    .filter(p => p.url && p.url.includes('en.wikipedia.org/wiki/'));
-  if (!posts.length) throw new Error('no posts');
-  const post     = posts[Math.floor(Math.random() * posts.length)];
-  const wikiSlug = decodeURIComponent(post.url.split('/wiki/')[1].split('#')[0].split('?')[0]);
-  onStatus('fetching article…');
-  const wr   = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(wikiSlug)}`);
-  const wiki = await wr.json();
-  if (!wiki.title) throw new Error('bad wiki response');
-  return { wiki, source: 'r/wikipedia' };
-}
-
-async function fetchArticle(onStatus) {
-  // Try endwalker and Reddit in random order; fall back to Wikipedia random
-  const sources = [tryEndwalker, tryReddit];
-  if (Math.random() < 0.5) sources.reverse();
-  for (const fn of sources) {
-    try { return await fn(onStatus); } catch (_) {}
-  }
-  onStatus('picking a random article…');
-  const wr = await fetch('https://en.wikipedia.org/api/rest_v1/page/random/summary');
-  return { wiki: await wr.json(), source: 'Wikipedia' };
-}
-
-function renderStory() {
-  const m = document.getElementById('mainContent');
-  m.innerHTML = `
-    <div class="row-between">
-      <div>
-        <div class="label">Story Time</div>
-        <div style="color:var(--muted);font-size:11px;margin-top:2px">Wikipedia facts explained in Japanese using your vocabulary.</div>
-      </div>
-      <button class="btn" onclick="genStory()" id="storyBtn">New story →</button>
-    </div>
-    <div id="storyZone">
-      <div class="loading-row"><span class="spin"></span> fetching a story…</div>
-    </div>
-  `;
-  if (S.story) {
-    document.getElementById('storyZone').innerHTML = renderStoryCard();
-  } else {
-    genStory();
-  }
-}
-
-async function genStory() {
-  const zone = document.getElementById('storyZone');
-  const btn  = document.getElementById('storyBtn');
-  if (btn) btn.disabled = true;
-
-  const MAX_TRIES = 4;
-  for (let attempt = 0; attempt < MAX_TRIES; attempt++) {
-    try {
-      // ── Step 1: fetch an article ─────────────────────────────────────────
-      const onStatus = msg => {
-        const prefix = attempt > 0 ? `(skipped — trying again) ` : '';
-        zone.innerHTML = `<div class="loading-row"><span class="spin"></span> ${prefix}${msg}</div>`;
-      };
-      const { wiki, source } = await fetchArticle(onStatus);
-      const extract = (wiki.extract || wiki.description || '').slice(0, 1400);
-
-      // ── Step 2: ask Claude to write the story ────────────────────────────
-      zone.innerHTML = `<div class="loading-row"><span class="spin"></span> writing in Japanese…</div>`;
-
-      const words     = pickWords(15);
-      const vocabList = words.map(w => `${w.jp}${w.rd ? `（${w.rd}）` : ''} = ${w.en}`).join('\n');
-
-      const sys = `You are a Japanese reading teacher who writes vivid, casual short texts for learners.
-Return ONLY valid JSON — no markdown fences, no preamble.
-
-LANGUAGE: Write in casual, conversational Japanese — plain/dictionary form (だ・だった・じゃない etc.), NOT polite です/ます. Sound like a friend explaining something fascinating over coffee.
-
-SKIP RULE: If the topic is highly technical, dry, or domain-specific in a way that cannot be expressed naturally using mostly simple vocabulary (e.g. obscure maths theorems, niche biochemistry, specialist legal jargon), set "skip": true and leave all other fields as empty strings. The app will automatically fetch a different article.
-
-ANNOTATION FORMAT for "body" — mark EVERY Japanese word:
-  [[word|reading|english|new]]
-  • word = kanji/word exactly as written
-  • reading = hiragana reading
-  • english = brief English gloss (no quotes, no pipes)
-  • new = 1 if NOT in student vocab list, 0 if it IS
-  Mark EVERY word — kanji compounds, katakana words, AND hiragana words/phrases (2+ chars). Use hiragana as the reading for katakana and hiragana-only words. Do NOT leave any content word unmarked.
-  Example: [[日本語|にほんご|Japanese|0]]の[[勉強|べんきょう|study|1]]って[[やっぱり|やっぱり|as expected|0]][[楽しい|たのしい|fun|1]]よな。[[コーヒー|こーひー|coffee|1]]も[[最高|さいこう|the best|0]]。[[でも|でも|but|0]][[ちょっと|ちょっと|a little|0]][[むずかしい|むずかしい|difficult|1]]。
-
-Schema:
-{
-  "skip": false,
-  "title_jp": "Casual Japanese title (8–16 chars, punchy)",
-  "title_en": "English title (brief)",
-  "body": "3–5 casual Japanese sentences. EVERY kanji word must have a [[marker]].",
-  "quiz": [
-    { "q": "Question 1 in English?", "a": "Answer in English." },
-    { "q": "Question 2 in English?", "a": "Answer in English." },
-    { "q": "Question 3 in English?", "a": "Answer in English." }
-  ]
-}
-Quiz: test understanding of the Japanese text. Vary types (what/why/how/who). 1–2 sentences per answer.`;
-
-      const prompt = `Topic: ${wiki.title}
-Wikipedia extract: ${extract}
-
-Student's vocabulary — use naturally and mark with new=0:
-${vocabList}
-
-TASK: Find the single most surprising, counterintuitive, or little-known fact about this topic. Lead with that. Do NOT just restate the opening paragraph — look for what is genuinely fascinating. If the topic is too technical or dry to explain in simple Japanese, set skip: true.
-
-Write 3–5 casual Japanese sentences around that insight (annotate every kanji word), then 3 English comprehension questions.`;
-
-      const raw    = await claude([{ role: 'user', content: prompt }], sys, 1800);
-      const clean  = raw.replace(/```json|```/g, '').trim();
-      const parsed = JSON.parse(clean);
-
-      if (parsed.skip) continue;   // topic too dry — loop and try a new article
-
-      S.story = { topic: wiki.title, source, ...parsed };
-      zone.innerHTML = renderStoryCard();
-      if (btn) btn.disabled = false;
-      return;
-
-    } catch (e) {
-      if (attempt === MAX_TRIES - 1) {
-        zone.innerHTML = `<div style="color:var(--red);font-size:12px">Error: ${e.message}</div>`;
-      }
-      // else silently try again
-    }
-  }
-
-  if (btn) btn.disabled = false;
-}
-
-function renderStoryCard() {
-  const s = S.story;
-  if (!s) return '';
-  const safeBody = safeAnnotated(buildAnnotated(s.body || ''));
-
-  const quizHtml = (s.quiz || []).map((item, i) => `
-    <div class="quiz-item">
-      <div class="quiz-q-text">${i + 1}. ${escHtml(item.q)}</div>
-      <button class="quiz-reveal">Show answer</button>
-      <div class="quiz-answer">${escHtml(item.a)}</div>
-    </div>
-  `).join('');
-
-  return `
-    <div class="story-card">
-      <div class="story-topic">
-        <span>${IC.book}</span>
-        <span>${escHtml(s.source || 'Wikipedia')}</span>
-        <span style="opacity:0.4">·</span>
-        <span>${escHtml(s.topic)}</span>
-      </div>
-      <div class="story-title">
-        ${safeAnnotated(buildAnnotated(s.title_jp || ''))}
-        <span style="font-size:0.5em;color:var(--muted);font-family:'Nunito Sans',sans-serif;font-weight:400;margin-left:8px">${escHtml(s.title_en)}</span>
-      </div>
-      <div class="story-body">${safeBody}</div>
-      <div class="story-legend">
-        <div class="story-legend-item">
-          <span style="display:inline-block;width:20px;border-bottom:2px dotted var(--gold);vertical-align:middle"></span>
-          <span>known vocab — hover for reading, click for meaning</span>
-        </div>
-        <div class="story-legend-item">
-          <span style="display:inline-block;width:20px;border-bottom:2px dotted var(--blue);vertical-align:middle"></span>
-          <span>new word — hover for reading, click for meaning</span>
-        </div>
-      </div>
-      ${quizHtml ? `
-      <div class="quiz-section">
-        <div class="quiz-label">Comprehension check</div>
-        ${quizHtml}
-      </div>` : ''}
-    </div>
-  `;
-}
 // ── RPG WORLD ENGINE ─────────────────────────────────────────────────────────
 // Sierra-style overworld: canvas-based, 320×200 virtual resolution scaled up
 (function() {
