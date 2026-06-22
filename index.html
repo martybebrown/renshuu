@@ -3869,7 +3869,17 @@ function parseLooseJSON(raw) {
   const end = Math.max(s.lastIndexOf('}'), s.lastIndexOf(']'));
   if (start !== -1 && end !== -1 && end > start) s = s.slice(start, end + 1);
   try { return JSON.parse(s); } catch (_) {}
-  return JSON.parse(s.replace(/,(\s*[}\]])/g, '$1'));
+  // Fix trailing commas
+  const s2 = s.replace(/,(\s*[}\]])/g, '$1');
+  try { return JSON.parse(s2); } catch (_) {}
+  // Fix literal newlines/tabs inside string values (Claude sometimes emits these)
+  try {
+    const s3 = s2.replace(/"((?:[^"\\]|\\.)*)"/gs, (_, inner) =>
+      '"' + inner.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t') + '"'
+    );
+    return JSON.parse(s3);
+  } catch (_) {}
+  throw new SyntaxError('Could not parse JSON response');
 }
 
 async function genComposeBatch(override = '', smart = false) {
