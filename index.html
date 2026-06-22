@@ -2356,7 +2356,7 @@ Return STRICT JSON only, no prose, no fences:
 }`;
 
     const msg = `CURRENT PROFILE:\n${prior}\n\nNEW MISTAKES (${toAnalyze.length}):\n${lines}`;
-    const raw = await claude([{ role: 'user', content: msg }], sys, 1500);
+    const raw = await claude([{ role: 'user', content: msg }], sys, 2500);
     const parsed = parseLooseJSON(raw);
     const maxT = toAnalyze.reduce((a, m) => Math.max(a, m.t), through);
     // Recency-weighted ordering: actively-recurring gaps ("new"/"persistent")
@@ -3878,6 +3878,38 @@ function parseLooseJSON(raw) {
       '"' + inner.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t') + '"'
     );
     return JSON.parse(s3);
+  } catch (_) {}
+  // Fix truncated JSON: find the last complete array element and close open brackets
+  try {
+    let braces = 0, brackets = 0, inStr = false, esc = false, lastGoodEnd = -1;
+    for (let i = 0; i < s2.length; i++) {
+      const c = s2[i];
+      if (esc) { esc = false; continue; }
+      if (c === '\\' && inStr) { esc = true; continue; }
+      if (c === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (c === '{') braces++;
+      else if (c === '}') { braces--; if (braces === 1 && brackets === 1) lastGoodEnd = i; }
+      else if (c === '[') brackets++;
+      else if (c === ']') brackets--;
+    }
+    if (lastGoodEnd > 0) {
+      let t = s2.slice(0, lastGoodEnd + 1).replace(/,\s*$/, '');
+      braces = 0; brackets = 0; inStr = false; esc = false;
+      for (const c of t) {
+        if (esc) { esc = false; continue; }
+        if (c === '\\' && inStr) { esc = true; continue; }
+        if (c === '"') { inStr = !inStr; continue; }
+        if (inStr) continue;
+        if (c === '{') braces++;
+        else if (c === '}') braces--;
+        else if (c === '[') brackets++;
+        else if (c === ']') brackets--;
+      }
+      while (brackets > 0) { t += ']'; brackets--; }
+      while (braces > 0) { t += '}'; braces--; }
+      return JSON.parse(t);
+    }
   } catch (_) {}
   throw new SyntaxError('Could not parse JSON response');
 }
