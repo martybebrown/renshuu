@@ -2263,7 +2263,7 @@ async function gistFetchFile(file) {
 const MISTAKES_FILE = 'renshuu-mistakes.json';
 const WEAK_FILE = 'renshuu-weakpoints.json';
 const MAX_MISTAKES = 200;       // rolling cap — keeps gist storage small
-const ANALYZE_THRESHOLD = 6;    // new mistakes needed before a re-analysis runs
+const ANALYZE_THRESHOLD = 20;   // new mistakes needed before a re-analysis runs
 const ANALYZE_FIRST_RUN = 60;   // mistakes to seed the very first profile
 
 function clip(s, n) { s = String(s || '').trim(); return s.length > n ? s.slice(0, n) : s; }
@@ -2289,7 +2289,8 @@ function logMistake({ src, wrote, fix, note, idea, constraint }) {
   if (S.mistakes.length > MAX_MISTAKES) S.mistakes = S.mistakes.slice(-MAX_MISTAKES);
   localStorage.setItem('renshuu_mistakes', JSON.stringify(S.mistakes));
   scheduleMistakePush();
-  renderFocusSidebar();
+  if (newMistakeCount() >= ANALYZE_THRESHOLD) analyzeWeakPoints();
+  else renderFocusSidebar();
 }
 
 // Pull the log + profile from the gist on startup (authoritative across devices).
@@ -4065,17 +4066,13 @@ function focusPanelHTML() {
   const busy = S.analyzing || S._uiAnalyzing;
   const total = S.mistakes.length;
   if (!wp || !wp.weakPoints || wp.weakPoints.length === 0) {
-    // Nothing analysed yet — show a gentle primer once a few mistakes exist.
     if (total === 0) return '';
-    const need = Math.max(0, ANALYZE_THRESHOLD - total);
     return `<div class="focus-panel empty">
       <span class="focus-title">${IC.bulb} Focus areas</span>
-      <div class="focus-sub">${total} correction${total === 1 ? '' : 's'} logged${need > 0 ? ` · ~${need} more to unlock` : ''}</div>
-      ${total >= ANALYZE_THRESHOLD ? `<button class="btn focus-refresh w100" onclick="reanalyzeWeak()" ${busy ? 'disabled' : ''}>${busy ? 'analysing…' : 'analyse now'}</button>` : ''}
+      ${busy ? `<div class="focus-sub">analysing…</div>` : ''}
     </div>`;
   }
   const collapsed = localStorage.getItem('renshuu_focus_collapsed') === '1';
-  const newN = newMistakeCount();
   const items = wp.weakPoints.slice(0, 5).map(w => `
     <li class="focus-item">
       <div class="fi-top">
@@ -4091,7 +4088,6 @@ function focusPanelHTML() {
       <span class="focus-title">${IC.bulb} Focus areas</span>
       <button class="focus-toggle" onclick="toggleFocusPanel()" aria-label="Toggle focus areas">${collapsed ? IC.chevD : IC.chevD.replace('m6 9 6 6 6-6', 'm18 15-6-6-6 6')}</button>
     </div>
-    <div class="focus-sub">${newN > 0 ? `${newN} new since last analysis` : 'up to date'}</div>
     ${collapsed ? '' : `
       ${wp.summary ? `<div class="focus-summary">${escHtml(wp.summary)}</div>` : ''}
       <ul class="focus-list">${items}</ul>`}
