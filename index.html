@@ -3367,11 +3367,12 @@ function pickWords(n = 10) {
   if (f.has('n')) parts.push(...shuffle(nw).map(c => ({ ...c, tier: 'n' })));
   if (f.has('y')) parts.push(...shuffle(yw).map(c => ({ ...c, tier: 'y' })));
   if (f.has('m')) parts.push(...shuffle(mw).map(c => ({ ...c, tier: 'm' })));
-  // If multiple tiers active, weight towards newer words
+  // If multiple tiers active, weight towards YOUNG words — vocab the student has
+  // studied but not yet mastered (the highest-value words to reinforce).
   if (f.size > 1 && parts.length > n) {
     const weighted = [];
-    if (f.has('n')) weighted.push(...shuffle(nw).slice(0, Math.ceil(n * 0.55)).map(c => ({ ...c, tier: 'n' })));
-    if (f.has('y')) weighted.push(...shuffle(yw).slice(0, Math.ceil(n * 0.35)).map(c => ({ ...c, tier: 'y' })));
+    if (f.has('y')) weighted.push(...shuffle(yw).slice(0, Math.ceil(n * 0.55)).map(c => ({ ...c, tier: 'y' })));
+    if (f.has('n')) weighted.push(...shuffle(nw).slice(0, Math.ceil(n * 0.35)).map(c => ({ ...c, tier: 'n' })));
     if (f.has('m')) weighted.push(...shuffle(mw).slice(0, Math.ceil(n * 0.25)).map(c => ({ ...c, tier: 'm' })));
     return shuffle(weighted).slice(0, n);
   }
@@ -3518,7 +3519,7 @@ function renderDrills() {
     <div class="row-between">
       <div>
         <div class="label">Vocabulary Drills</div>
-        <div style="color:var(--muted);font-size:11px;margin-top:2px">Fill in the blank. New words (新) prioritised.</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:2px">Fill in the blank. Young words (若) prioritised.</div>
       </div>
       <button class="btn" onclick="genDrills()" id="genBtn">New set →</button>
     </div>
@@ -3568,14 +3569,14 @@ Schema:
 Rules:
 - Generate exactly 5 drills
 - Each drill uses ONE word from the list as the target (to be blanked)
-- Prioritise NEW words — use as many as possible
+- Prioritise YOUNG words (studied but not yet mastered) — use as many as possible
 - Sentences should be natural, N4-N3 level, 8-20 characters
 - 'target' must appear verbatim in 'sentence'
 - In annotated_sentence the target word must also be wrapped with a [[word|reading|english]] marker (it will be replaced by the blank in the UI)`;
 
   try {
     const raw = await claude(
-      [{ role: 'user', content: `Generate 5 drills from this vocab list. Prioritise [NEW] words:\n\n${wordBlock}` }],
+      [{ role: 'user', content: `Generate 5 drills from this vocab list. Prioritise [young] words:\n\n${wordBlock}` }],
       sys
     );
     const clean = raw.replace(/```json|```/g, '').trim();
@@ -6246,7 +6247,7 @@ function resetChat() {
 function buildSysPrompt(sc) {
   const words = pickWords(12);
   S.sessionWords = words;
-  const newList  = words.filter(w => w.tier === 'n').map(w => `${w.jp}（${w.en}）`).join('、');
+  const youngList = words.filter(w => w.tier === 'y').map(w => `${w.jp}（${w.en}）`).join('、');
   const allList  = words.map(w => `${w.jp} = ${w.en}`).join(', ');
   S.usedWords = new Set();
   // Build compact known-words list from entire Anki deck (when setting enabled)
@@ -6256,11 +6257,11 @@ function buildSysPrompt(sc) {
   S.sysPrompt = `You are playing the role of ${sc.char}. Scenario: ${sc.en}. ${sc.ctx}
 
 VOCABULARY TO USE NATURALLY: ${allList}
-PRIORITY — embed these NEW words whenever natural: ${newList || '(none this session)'}
+PRIORITY — embed these YOUNG words (studied but not yet mastered) whenever natural: ${youngList || '(none this session)'}
 ${knownList ? `\nSTUDENT'S KNOWN VOCABULARY (their full Anki deck): ${knownList}\nIMPORTANT: Strongly prefer words from this known vocabulary list. Minimise using words the student hasn't studied yet — keep unknown words to only essential particles, greetings, and words required by the scenario context. If you must use an unknown word, keep it simple and high-frequency.\n` : ''}
 Rules:
 1. Respond in Japanese only. STRICT LIMIT: 1–3 sentences. Most replies should be 1–2 sentences — like a real conversation, not a monologue. One-word or one-phrase reactions (え？本当？ / そうだね / いいね！) are great. NEVER write 4+ sentences. This is a back-and-forth dialogue, not a speech.
-2. Weave in vocab from the list, especially the priority new words.
+2. Weave in vocab from the list, especially the priority young words.
 3. Stay in character. Ask a natural follow-up question each turn (but not every single turn — sometimes just react).
 4. After your Japanese, if the student made errors in their MOST RECENT message ONLY (grammar, vocab, particle, conjugation, word choice, unnatural phrasing), add: [Correction: explain what was wrong, what it should be, and briefly why. Cover every mistake in that message — don't skip any. Be specific: show the wrong text → correct text. Use numbered points (1. 2. 3.) for multiple errors so each is clear. Do NOT correct errors from earlier messages — only the latest one. Example: "1. だれごらい → どのくらい (dono kurai) — だれごらい isn't a word; どのくらい means 'about how much/long'"]
 5. Aim for N4–N3 level.
