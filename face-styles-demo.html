@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Character Face Style Options</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1a1a2e;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #e0e0e0;
+    padding: 20px;
+  }
+  h1 { font-size: 20px; color: #fff; margin-bottom: 4px; }
+  .subtitle { color: #888; font-size: 13px; margin-bottom: 20px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .section {
+    margin-bottom: 0;
+    background: #12121f;
+    padding: 14px;
+    border-radius: 10px;
+    border: 1px solid #2a2a40;
+  }
+  .section.full { grid-column: 1 / -1; }
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #2a2a40;
+    flex-wrap: wrap;
+  }
+  .option-badge {
+    background: #2a2a4a;
+    color: #7a8fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .section-title { font-size: 15px; font-weight: 600; color: #fff; }
+  .section-desc { font-size: 11px; color: #888; flex-basis: 100%; }
+
+  .faces-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .face-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .face-label {
+    font-size: 9px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .current-face svg, .hires-face svg, .ultra-face svg {
+    width: 64px; height: 64px;
+    image-rendering: pixelated;
+    border-radius: 5px;
+    background: #f0e8dc;
+  }
+  .vector-face svg {
+    width: 64px; height: 64px;
+    border-radius: 5px;
+  }
+  .illustrated-face svg {
+    width: 60px; height: 72px;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  }
+  .dicebear-face svg {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  }
+
+  .size-compare { display: none; }
+</style>
+</head>
+<body>
+
+<h1>Character Face Style Options</h1>
+<p class="subtitle">Comparing the current 16×16 pixel art against 4 upgrade directions</p>
+
+<div class="grid">
+
+<!-- CURRENT -->
+<div class="section">
+  <div class="section-header">
+    <span class="option-badge" style="background:#2a2020;color:#ff8888">Current</span>
+    <span class="section-title">16×16 Pixel Art</span>
+    <span class="section-desc">— existing system, string-encoded character maps</span>
+  </div>
+  <div class="faces-row">
+    <div class="face-card">
+      <div class="current-face">
+        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+          <!-- mature male - grey hair -->
+          <rect x="4" y="0" width="8" height="1" fill="#8C8C8C"/>
+          <rect x="3" y="1" width="2" height="1" fill="#8C8C8C"/><rect x="5" y="1" width="6" height="1" fill="#EFC090"/><rect x="11" y="1" width="3" height="1" fill="#8C8C8C"/>
+          <rect x="2" y="2" width="1" height="1" fill="#8C8C8C"/><rect x="3" y="2" width="10" height="1" fill="#EFC090"/><rect x="13" y="2" width="1" height="1" fill="#8C8C8C"/>
+          <rect x="2" y="3" width="1" height="1" fill="#8C8C8C"/><rect x="3" y="3" width="10" height="1" fill="#EFC090"/><rect x="13" y="3" width="1" height="1" fill="#8C8C8C"/>
+          <rect x="2" y="4" width="1" height="1" fill="#8C8C8C"/><rect x="3" y="4" width="10" height="1" fill="#EFC090"/><rect x="13" y="4" width="1" height="1" fill="#8C8C8C"/>
+          <rect x="2" y="5" width="1" height="1" fill="#8C8C8C"/><rect x="3" y="5" width="1" height="1" fill="#EFC090"/><rect x="4" y="5" width="2" height="1" fill="#1A0800"/><rect x="6" y="5" width="4" height="1" fill="#EFC090"/><rect x="10" y="5" width="2" height="1" fill="#1A0800"/><rect x="12" y="5" width="1" height="1" fill="#EFC090"/><rect x="13" y="5" width="1" height="1" fill="#8C8C8C"/>
+          <rect x="2" y="6" width="1" height="1" fill="#8C8C8C"/><rect x="3" y="6" width="10" height="1" fill="#EFC090"/><rect x="13" y="6" width="1" height="1" fill="#8C8C8C"/>
+          <rect x="2" y="7" width="1" height="1" fill="#8C8C8C"/><rect x="3" y="7" width="5" height="1" fill="#EFC090"/><rect x="8" y="7" width="1" height="1" fill="#C09060"/><rect x="9" y="7" width="5" height="1" fill="#EFC090"/><rect x="14" y="7" width="1" height="1" fill="#8C8C8C"/>
+          <rect x="2" y="8" width="1" height="1" fill="#8C8C8C"/><rect x="3" y="8" width="10" height="1" fill="#EFC090"/><rect x="13" y="8" width="1" height="1" fill="#8C8C8C"/>
+          <rect x="2" y="9" width="1" height="1" fill="#8C8C8C"/><rect x="3" y="9" width="4" height="1" fill="#EFC090"/><rect x="7" y="9" width="2" height="1" fill="#8B4040"/><rect x="9" y="9" width="4" height="1" fill="#EFC090"/><rect x="13" y="9" width="1" height="1" fill="#8C8C8C"/>
+          <rect x="2" y="10" width="1" height="1" fill="#8C8C8C"/><rect x="3" y="10" width="10" height="1" fill="#EFC090"/><rect x="13" y="10" width="1" height="1" fill="#8C8C8C"/>
+          <rect x="2" y="11" width="2" height="1" fill="#8C8C8C"/><rect x="4" y="11" width="9" height="1" fill="#EFC090"/><rect x="13" y="11" width="1" height="1" fill="#8C8C8C"/>
+          <rect x="4" y="12" width="8" height="1" fill="#555"/>
+          <rect x="4" y="13" width="8" height="1" fill="#2E4A6A"/>
+          <rect x="4" y="14" width="2" height="1" fill="#2E4A6A"/><rect x="6" y="14" width="4" height="1" fill="#1A2A4A"/><rect x="10" y="14" width="2" height="1" fill="#2E4A6A"/>
+          <rect x="4" y="15" width="8" height="1" fill="#2E4A6A"/>
+        </svg>
+      </div>
+      <span class="face-label">Mature Male</span>
+    </div>
+    <div class="face-card">
+      <div class="current-face">
+        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+          <!-- adult female - dark hair, pink shirt -->
+          <rect x="2" y="0" width="12" height="1" fill="#1A0800"/>
+          <rect x="2" y="1" width="3" height="1" fill="#1A0800"/><rect x="5" y="1" width="5" height="1" fill="#3A2010"/><rect x="10" y="1" width="4" height="1" fill="#1A0800"/>
+          <rect x="2" y="2" width="1" height="1" fill="#1A0800"/><rect x="3" y="2" width="10" height="1" fill="#EFC090"/><rect x="13" y="2" width="1" height="1" fill="#1A0800"/>
+          <rect x="2" y="3" width="1" height="1" fill="#1A0800"/><rect x="3" y="3" width="10" height="1" fill="#EFC090"/><rect x="13" y="3" width="1" height="1" fill="#1A0800"/>
+          <rect x="2" y="4" width="1" height="1" fill="#1A0800"/><rect x="3" y="4" width="10" height="1" fill="#EFC090"/><rect x="13" y="4" width="1" height="1" fill="#1A0800"/>
+          <rect x="2" y="5" width="1" height="1" fill="#1A0800"/><rect x="3" y="5" width="1" height="1" fill="#EFC090"/><rect x="4" y="5" width="2" height="1" fill="#1A0800"/><rect x="6" y="5" width="4" height="1" fill="#EFC090"/><rect x="10" y="5" width="2" height="1" fill="#1A0800"/><rect x="12" y="5" width="1" height="1" fill="#EFC090"/><rect x="13" y="5" width="1" height="1" fill="#1A0800"/>
+          <rect x="2" y="6" width="1" height="1" fill="#1A0800"/><rect x="3" y="6" width="10" height="1" fill="#EFC090"/><rect x="13" y="6" width="1" height="1" fill="#1A0800"/>
+          <rect x="2" y="7" width="1" height="1" fill="#1A0800"/><rect x="3" y="7" width="5" height="1" fill="#EFC090"/><rect x="8" y="7" width="1" height="1" fill="#C09060"/><rect x="9" y="7" width="5" height="1" fill="#EFC090"/><rect x="14" y="7" width="1" height="1" fill="#1A0800"/>
+          <rect x="2" y="8" width="1" height="1" fill="#1A0800"/><rect x="3" y="8" width="10" height="1" fill="#EFC090"/><rect x="13" y="8" width="1" height="1" fill="#1A0800"/>
+          <rect x="2" y="9" width="1" height="1" fill="#1A0800"/><rect x="3" y="9" width="4" height="1" fill="#EFC090"/><rect x="7" y="9" width="2" height="1" fill="#8B4040"/><rect x="9" y="9" width="4" height="1" fill="#EFC090"/><rect x="13" y="9" width="1" height="1" fill="#1A0800"/>
+          <rect x="2" y="10" width="1" height="1" fill="#1A0800"/><rect x="3" y="10" width="10" height="1" fill="#EFC090"/><rect x="13" y="10" width="1" height="1" fill="#1A0800"/>
+          <rect x="2" y="11" width="2" height="1" fill="#1A0800"/><rect x="4" y="11" width="9" height="1" fill="#EFC090"/><rect x="13" y="11" width="1" height="1" fill="#1A0800"/>
+          <rect x="2" y="12" width="3" height="1" fill="#1A0800"/><rect x="5" y="12" width="5" height="1" fill="#3A2010"/><rect x="10" y="12" width="4" height="1" fill="#1A0800"/>
+          <rect x="1" y="13" width="2" height="1" fill="#1A0800"/><rect x="3" y="13" width="1" height="1" fill="#3A2010"/><rect x="4" y="13" width="8" height="1" fill="#8A2050"/><rect x="12" y="13" width="1" height="1" fill="#3A2010"/><rect x="13" y="13" width="2" height="1" fill="#1A0800"/>
+          <rect x="1" y="14" width="2" height="1" fill="#1A0800"/><rect x="3" y="14" width="1" height="1" fill="#3A2010"/><rect x="4" y="14" width="2" height="1" fill="#8A2050"/><rect x="6" y="14" width="4" height="1" fill="#5A1030"/><rect x="10" y="14" width="2" height="1" fill="#8A2050"/><rect x="12" y="14" width="1" height="1" fill="#3A2010"/><rect x="13" y="14" width="2" height="1" fill="#1A0800"/>
+          <rect x="1" y="15" width="2" height="1" fill="#1A0800"/><rect x="3" y="15" width="1" height="1" fill="#3A2010"/><rect x="4" y="15" width="8" height="1" fill="#8A2050"/><rect x="12" y="15" width="1" height="1" fill="#3A2010"/><rect x="13" y="15" width="2" height="1" fill="#1A0800"/>
+        </svg>
+      </div>
+      <span class="face-label">Adult Female</span>
+    </div>
+    <div class="face-card">
+      <div class="current-face">
+        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+          <!-- young male -->
+          <rect x="2" y="0" width="12" height="1" fill="#1A0800"/>
+          <rect x="2" y="0" width="1" height="1" fill="#4A2010"/><rect x="5" y="0" width="1" height="1" fill="#4A2010"/><rect x="10" y="0" width="1" height="1" fill="#4A2010"/>
+          <rect x="2" y="1" width="3" height="1" fill="#1A0800"/><rect x="5" y="1" width="6" height="1" fill="#EFC090"/><rect x="11" y="1" width="3" height="1" fill="#1A0800"/>
+          <rect x="2" y="2" width="1" height="1" fill="#1A0800"/><rect x="3" y="2" width="10" height="1" fill="#EFC090"/><rect x="13" y="2" width="1" height="1" fill="#1A0800"/>
+          <rect x="2" y="3" width="1" height="1" fill="#1A0800"/><rect x="3" y="3" width="10" height="1" fill="#EFC090"/><rect x="13" y="3" width="1" height="1" fill="#1A0800"/>
+          <rect x="2" y="4" width="1" height="1" fill="#1A0800"/><rect x="3" y="4" width="10" height="1" fill="#EFC090"/><rect x="13" y="4" width="1" height="1" fill="#1A0800"/>
+          <rect x="2" y="5" width="1" height="1" fill="#1A0800"/><rect x="3" y="5" width="1" height="1" fill="#EFC090"/><rect x="4" y="5" width="2" height="1" fill="#1A0800"/><rect x="6" y="5" width="4" height="1" fill="#EFC090"/><rect x="10" y="5" width="2" height="1" fill="#1A0800"/><rect x="12" y="5" width="1" height="1" fill="#EFC090"/><rect x="13" y="5" width="1" height="1" fill="#1A0800"/>
+          <rect x="2" y="6" width="1" height="1" fill="#1A0800"/><rect x="3" y="6" width="10" height="1" fill="#EFC090"/><rect x="13" y="6" width="1" height="1" fill="#1A0800"/>
+          <rect x="2" y="7" width="1" height="1" fill="#1A0800"/><rect x="3" y="7" width="5" height="1" fill="#EFC090"/><rect x="8" y="7" width="1" height="1" fill="#C09060"/><rect x="9" y="7" width="5" height="1" fill="#EFC090"/><rect x="14" y="7" width="1" height="1" fill="#1A0800"/>
+          <rect x="2" y="8" width="1" height="1" fill="#1A0800"/><rect x="3" y="8" width="10" height="1" fill="#EFC090"/><rect x="13" y="8" width="1" height="1" fill="#1A0800"/>
+          <rect x="2" y="9" width="1" height="1" fill="#1A0800"/><rect x="3" y="9" width="4" height="1" fill="#EFC090"/><rect x="7" y="9" width="2" height="1" fill="#8B4040"/><rect x="9" y="9" width="4" height="1" fill="#EFC090"/><rect x="13" y="9" width="1" height="1" fill="#1A0800"/>
+          <rect x="2" y="10" width="1" height="1" fill="#1A0800"/><rect x="3" y="10" width="10" height="1" fill="#EFC090"/><rect x="13" y="10" width="1" height="1" fill="#1A0800"/>
+          <rect x="2" y="11" width="2" height="1" fill="#1A0800"/><rect x="4" y="11" width="9" height="1" fill="#EFC090"/><rect x="13" y="11" width="1" height="1" fill="#1A0800"/>
+          <rect x="4" y="12" width="8" height="1" fill="#555"/>
+          <rect x="4" y="13" width="8" height="1" fill="#1A6030"/>
+          <rect x="4" y="14" width="2" height="1" fill="#1A6030"/><rect x="6" y="14" width="4" height="1" fill="#0A3010"/><rect x="10" y="14" width="2" height="1" fill="#1A6030"/>
+          <rect x="4" y="15" width="8" height="1" fill="#1A6030"/>
+        </svg>
+      </div>
+      <span class="face-label">Young Male</span>
+    </div>
+  </div>
+</div>
+
+<!-- OPTION 1: HIGH-RES PIXEL ART -->
+<div class="section">
+  <div class="section-header">
+    <span class="option-badge">Option 1</span>
+    <span class="section-title">High-Res Pixel Art (32×32)</span>
+    <span class="section-desc">— same technique, double resolution. More facial detail, shading, emotion.</span>
+  </div>
+  <div class="faces-row">
+
+    <div class="face-card">
+      <div class="hires-face">
+        <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+          <!-- mature male 32x32 - grey hair, more detail -->
+          <rect x="0" y="0" width="32" height="32" fill="#f0e8dc"/>
+          <!-- hair top -->
+          <rect x="8" y="1" width="16" height="1" fill="#8C8C8C"/>
+          <rect x="6" y="2" width="20" height="2" fill="#8C8C8C"/>
+          <rect x="5" y="4" width="22" height="1" fill="#8C8C8C"/>
+          <!-- hair sides -->
+          <rect x="5" y="5" width="2" height="10" fill="#8C8C8C"/>
+          <rect x="25" y="5" width="2" height="10" fill="#8C8C8C"/>
+          <!-- face skin -->
+          <rect x="7" y="5" width="18" height="14" fill="#EFC090"/>
+          <!-- forehead highlight -->
+          <rect x="9" y="5" width="6" height="2" fill="#F5D0A0"/>
+          <!-- ears -->
+          <rect x="5" y="10" width="2" height="4" fill="#D0A070"/>
+          <rect x="25" y="10" width="2" height="4" fill="#D0A070"/>
+          <!-- eyebrows - grey -->
+          <rect x="9" y="9" width="5" height="1" fill="#707070"/>
+          <rect x="18" y="9" width="5" height="1" fill="#707070"/>
+          <!-- eyes - white + dark pupil -->
+          <rect x="9" y="11" width="5" height="3" fill="#fff"/>
+          <rect x="18" y="11" width="5" height="3" fill="#fff"/>
+          <rect x="11" y="11" width="2" height="3" fill="#2A1808"/>
+          <rect x="20" y="11" width="2" height="3" fill="#2A1808"/>
+          <!-- eye shine -->
+          <rect x="11" y="11" width="1" height="1" fill="#6060AA"/>
+          <rect x="20" y="11" width="1" height="1" fill="#6060AA"/>
+          <!-- nose -->
+          <rect x="15" y="14" width="2" height="1" fill="#C88060"/>
+          <rect x="13" y="15" width="1" height="1" fill="#C88060"/>
+          <rect x="18" y="15" width="1" height="1" fill="#C88060"/>
+          <!-- cheeks -->
+          <rect x="8" y="15" width="3" height="2" fill="#F0B090"/>
+          <rect x="21" y="15" width="3" height="2" fill="#F0B090"/>
+          <!-- mouth -->
+          <rect x="11" y="17" width="10" height="1" fill="#C07060"/>
+          <rect x="12" y="18" width="8" height="1" fill="#E8A080"/>
+          <!-- chin -->
+          <rect x="7" y="19" width="18" height="2" fill="#EFC090"/>
+          <!-- neck -->
+          <rect x="12" y="21" width="8" height="2" fill="#D0A070"/>
+          <!-- shirt collar - dark blue -->
+          <rect x="8" y="23" width="16" height="9" fill="#2E4A6A"/>
+          <rect x="10" y="23" width="2" height="5" fill="#3A5A7A"/>
+          <rect x="20" y="23" width="2" height="5" fill="#3A5A7A"/>
+          <!-- collar v -->
+          <rect x="14" y="23" width="4" height="3" fill="#1A2A40"/>
+          <rect x="15" y="26" width="2" height="3" fill="#1A2A40"/>
+        </svg>
+      </div>
+      <span class="face-label">Mature Male</span>
+    </div>
+
+    <div class="face-card">
+      <div class="hires-face">
+        <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+          <!-- adult female 32x32 -->
+          <rect x="0" y="0" width="32" height="32" fill="#f0e8dc"/>
+          <!-- long dark hair top -->
+          <rect x="7" y="0" width="18" height="5" fill="#1A0800"/>
+          <rect x="5" y="5" width="2" height="18" fill="#1A0800"/>
+          <rect x="25" y="5" width="2" height="18" fill="#1A0800"/>
+          <!-- hair highlight -->
+          <rect x="10" y="1" width="4" height="3" fill="#3A2010"/>
+          <rect x="18" y="1" width="4" height="3" fill="#3A2010"/>
+          <!-- face skin -->
+          <rect x="7" y="5" width="18" height="16" fill="#EFC090"/>
+          <!-- forehead highlight -->
+          <rect x="10" y="5" width="5" height="2" fill="#F5D0A0"/>
+          <!-- ears -->
+          <rect x="5" y="10" width="2" height="4" fill="#D0A070"/>
+          <rect x="25" y="10" width="2" height="4" fill="#D0A070"/>
+          <!-- eyebrows - thin, dark -->
+          <rect x="9" y="9" width="6" height="1" fill="#2A1808"/>
+          <rect x="17" y="9" width="6" height="1" fill="#2A1808"/>
+          <!-- eyes - larger, expressive -->
+          <rect x="9" y="11" width="6" height="3" fill="#fff"/>
+          <rect x="17" y="11" width="6" height="3" fill="#fff"/>
+          <rect x="10" y="11" width="4" height="3" fill="#2A1808"/>
+          <rect x="18" y="11" width="4" height="3" fill="#2A1808"/>
+          <!-- iris -->
+          <rect x="11" y="11" width="2" height="3" fill="#5A3A20"/>
+          <rect x="19" y="11" width="2" height="3" fill="#5A3A20"/>
+          <!-- eye shine -->
+          <rect x="12" y="11" width="1" height="1" fill="#fff"/>
+          <rect x="20" y="11" width="1" height="1" fill="#fff"/>
+          <!-- lashes -->
+          <rect x="9" y="10" width="6" height="1" fill="#1A0800"/>
+          <rect x="17" y="10" width="6" height="1" fill="#1A0800"/>
+          <!-- nose - delicate -->
+          <rect x="15" y="15" width="2" height="1" fill="#C88060"/>
+          <!-- cheeks - rosy -->
+          <rect x="8" y="15" width="4" height="2" fill="#F5B0A0"/>
+          <rect x="20" y="15" width="4" height="2" fill="#F5B0A0"/>
+          <!-- mouth - lips -->
+          <rect x="11" y="17" width="10" height="1" fill="#C05060"/>
+          <rect x="12" y="18" width="8" height="1" fill="#D06070"/>
+          <rect x="12" y="18" width="3" height="1" fill="#E07080"/>
+          <!-- chin -->
+          <rect x="8" y="19" width="16" height="2" fill="#EFC090"/>
+          <!-- neck -->
+          <rect x="12" y="21" width="8" height="2" fill="#D0A070"/>
+          <!-- shirt + hair framing -->
+          <rect x="5" y="23" width="22" height="9" fill="#8A2050"/>
+          <rect x="5" y="23" width="2" height="9" fill="#1A0800"/>
+          <rect x="25" y="23" width="2" height="9" fill="#1A0800"/>
+          <!-- collar detail -->
+          <rect x="12" y="23" width="8" height="2" fill="#6A1030"/>
+        </svg>
+      </div>
+      <span class="face-label">Adult Female</span>
+    </div>
+
+    <div class="face-card">
+      <div class="hires-face">
+        <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+          <!-- young male 32x32 - spiky hair -->
+          <rect x="0" y="0" width="32" height="32" fill="#f0e8dc"/>
+          <!-- spiky hair -->
+          <rect x="8" y="0" width="3" height="4" fill="#1A0800"/>
+          <rect x="13" y="0" width="2" height="3" fill="#1A0800"/>
+          <rect x="19" y="0" width="3" height="4" fill="#1A0800"/>
+          <rect x="8" y="3" width="16" height="3" fill="#1A0800"/>
+          <rect x="6" y="4" width="20" height="3" fill="#1A0800"/>
+          <!-- hair highlight -->
+          <rect x="10" y="1" width="3" height="2" fill="#4A2010"/>
+          <rect x="20" y="1" width="3" height="2" fill="#4A2010"/>
+          <!-- hair sides -->
+          <rect x="5" y="6" width="2" height="9" fill="#1A0800"/>
+          <rect x="25" y="6" width="2" height="9" fill="#1A0800"/>
+          <!-- face -->
+          <rect x="7" y="6" width="18" height="15" fill="#EFC090"/>
+          <rect x="9" y="6" width="5" height="2" fill="#F5D0A0"/>
+          <!-- ears -->
+          <rect x="5" y="11" width="2" height="4" fill="#D0A070"/>
+          <rect x="25" y="11" width="2" height="4" fill="#D0A070"/>
+          <!-- eyebrows - thick, youthful -->
+          <rect x="9" y="10" width="5" height="2" fill="#2A1808"/>
+          <rect x="18" y="10" width="5" height="2" fill="#2A1808"/>
+          <!-- eyes -->
+          <rect x="9" y="12" width="5" height="3" fill="#fff"/>
+          <rect x="18" y="12" width="5" height="3" fill="#fff"/>
+          <rect x="10" y="12" width="3" height="3" fill="#1A0800"/>
+          <rect x="19" y="12" width="3" height="3" fill="#1A0800"/>
+          <rect x="11" y="12" width="2" height="3" fill="#3A5A20"/>
+          <rect x="20" y="12" width="2" height="3" fill="#3A5A20"/>
+          <rect x="12" y="12" width="1" height="1" fill="#aaffaa"/>
+          <rect x="21" y="12" width="1" height="1" fill="#aaffaa"/>
+          <!-- nose -->
+          <rect x="15" y="15" width="2" height="2" fill="#C88060"/>
+          <rect x="14" y="16" width="1" height="1" fill="#C88060"/>
+          <rect x="17" y="16" width="1" height="1" fill="#C88060"/>
+          <!-- smile -->
+          <rect x="11" y="18" width="2" height="1" fill="#C07060"/>
+          <rect x="13" y="19" width="6" height="1" fill="#C07060"/>
+          <rect x="19" y="18" width="2" height="1" fill="#C07060"/>
+          <!-- chin -->
+          <rect x="7" y="20" width="18" height="1" fill="#EFC090"/>
+          <!-- neck -->
+          <rect x="12" y="21" width="8" height="2" fill="#D0A070"/>
+          <!-- shirt - green -->
+          <rect x="7" y="23" width="18" height="9" fill="#1A6030"/>
+          <rect x="13" y="23" width="6" height="4" fill="#0A3010"/>
+        </svg>
+      </div>
+      <span class="face-label">Young Male</span>
+    </div>
+
+    <div class="face-card">
+      <div class="hires-face">
+        <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+          <!-- young female - happy expression -->
+          <rect x="0" y="0" width="32" height="32" fill="#f0e8dc"/>
+          <!-- twin tails hair -->
+          <rect x="7" y="0" width="18" height="4" fill="#1A0800"/>
+          <rect x="5" y="4" width="22" height="3" fill="#1A0800"/>
+          <rect x="5" y="6" width="2" height="8" fill="#1A0800"/>
+          <rect x="25" y="6" width="2" height="8" fill="#1A0800"/>
+          <!-- twin tail hangs -->
+          <rect x="3" y="14" width="4" height="10" fill="#1A0800"/>
+          <rect x="25" y="14" width="4" height="10" fill="#1A0800"/>
+          <!-- hair highlight -->
+          <rect x="11" y="1" width="4" height="3" fill="#3A2010"/>
+          <!-- face -->
+          <rect x="7" y="6" width="18" height="15" fill="#EFC090"/>
+          <rect x="10" y="6" width="5" height="2" fill="#F5D0A0"/>
+          <!-- ears -->
+          <rect x="5" y="10" width="2" height="4" fill="#D0A070"/>
+          <rect x="25" y="10" width="2" height="4" fill="#D0A070"/>
+          <!-- eyebrows -->
+          <rect x="9" y="9" width="5" height="1" fill="#2A1808"/>
+          <rect x="18" y="9" width="5" height="1" fill="#2A1808"/>
+          <!-- eyes - big cute -->
+          <rect x="9" y="10" width="6" height="4" fill="#fff"/>
+          <rect x="17" y="10" width="6" height="4" fill="#fff"/>
+          <rect x="9" y="10" width="6" height="1" fill="#1A0800"/>
+          <rect x="17" y="10" width="6" height="1" fill="#1A0800"/>
+          <rect x="10" y="11" width="4" height="3" fill="#1A0800"/>
+          <rect x="18" y="11" width="4" height="3" fill="#1A0800"/>
+          <!-- iris - purple/brown -->
+          <rect x="10" y="11" width="3" height="2" fill="#6030A0"/>
+          <rect x="18" y="11" width="3" height="2" fill="#6030A0"/>
+          <!-- shine dots -->
+          <rect x="11" y="11" width="1" height="1" fill="#fff"/>
+          <rect x="19" y="11" width="1" height="1" fill="#fff"/>
+          <rect x="13" y="13" width="1" height="1" fill="#fff"/>
+          <rect x="21" y="13" width="1" height="1" fill="#fff"/>
+          <!-- rosy cheeks -->
+          <rect x="7" y="15" width="5" height="2" fill="#F5B0B8"/>
+          <rect x="20" y="15" width="5" height="2" fill="#F5B0B8"/>
+          <!-- nose -->
+          <rect x="15" y="15" width="2" height="1" fill="#C88060"/>
+          <!-- happy mouth -->
+          <rect x="11" y="17" width="2" height="1" fill="#C05060"/>
+          <rect x="13" y="18" width="6" height="2" fill="#C05060"/>
+          <rect x="19" y="17" width="2" height="1" fill="#C05060"/>
+          <rect x="14" y="19" width="4" height="1" fill="#E08890"/>
+          <!-- chin -->
+          <rect x="8" y="20" width="16" height="1" fill="#EFC090"/>
+          <!-- neck + shirt -->
+          <rect x="12" y="21" width="8" height="2" fill="#D0A070"/>
+          <rect x="5" y="23" width="22" height="9" fill="#6030A0"/>
+          <rect x="13" y="23" width="6" height="3" fill="#402070"/>
+        </svg>
+      </div>
+      <span class="face-label">Young Female</span>
+    </div>
+
+  </div>
+
+  <div class="size-compare">
+    <span>Avatar size comparison:</span>
+    <svg viewBox="0 0 16 16" width="32" height="32" style="image-rendering:pixelated;border-radius:4px;background:#f0e8dc">
+      <rect x="4" y="0" width="8" height="1" fill="#8C8C8C"/>
+      <rect x="3" y="1" width="2" height="1" fill="#8C8C8C"/><rect x="5" y="1" width="6" height="1" fill="#EFC090"/><rect x="11" y="1" width="3" height="1" fill="#8C8C8C"/>
+      <rect x="2" y="2" width="1" height="1" fill="#8C8C8C"/><rect x="3" y="2" width="10" height="1" fill="#EFC090"/><rect x="13" y="2" width="1" height="1" fill="#8C8C8C"/>
+      <rect x="2" y="5" width="1" height="1" fill="#8C8C8C"/><rect x="4" y="5" width="2" height="1" fill="#1A0800"/><rect x="10" y="5" width="2" height="1" fill="#1A0800"/><rect x="13" y="5" width="1" height="1" fill="#8C8C8C"/>
+      <rect x="2" y="9" width="1" height="1" fill="#8C8C8C"/><rect x="7" y="9" width="2" height="1" fill="#8B4040"/><rect x="13" y="9" width="1" height="1" fill="#8C8C8C"/>
+      <rect x="4" y="13" width="8" height="3" fill="#2E4A6A"/>
+    </svg>
+    <span>Current 16px</span>
+    <svg viewBox="0 0 32 32" width="64" height="64" style="image-rendering:pixelated;border-radius:4px;background:#f0e8dc">
+      <rect x="5" y="4" width="22" height="1" fill="#8C8C8C"/>
+      <rect x="5" y="5" width="2" height="10" fill="#8C8C8C"/>
+      <rect x="25" y="5" width="2" height="10" fill="#8C8C8C"/>
+      <rect x="7" y="5" width="18" height="14" fill="#EFC090"/>
+      <rect x="9" y="9" width="5" height="1" fill="#707070"/>
+      <rect x="18" y="9" width="5" height="1" fill="#707070"/>
+      <rect x="9" y="11" width="5" height="3" fill="#fff"/>
+      <rect x="18" y="11" width="5" height="3" fill="#fff"/>
+      <rect x="11" y="11" width="2" height="3" fill="#2A1808"/>
+      <rect x="20" y="11" width="2" height="3" fill="#2A1808"/>
+      <rect x="11" y="17" width="10" height="1" fill="#C07060"/>
+      <rect x="12" y="18" width="8" height="1" fill="#E8A080"/>
+      <rect x="8" y="23" width="16" height="9" fill="#2E4A6A"/>
+    </svg>
+    <span>Option 1: 32px</span>
+  </div>
+</div>
+
+<!-- OPTION 1B: 64x64 -->
+<div class="section">
+  <div class="section-header">
+    <span class="option-badge">Option 1B</span>
+    <span class="section-title">Pixel Art (64×64)</span>
+    <span class="section-desc">— quadruple resolution. Proper anti-aliased edges, distinct facial features, near-illustration quality while still pixel art.</span>
+  </div>
+  <div class="faces-row">
+
+    <div class="face-card">
+      <div class="ultra-face">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+          <rect width="64" height="64" fill="#f0e8dc"/>
+          <!-- mature male: grey hair, dignified -->
+          <!-- hair top with shading -->
+          <rect x="14" y="6" width="36" height="2" fill="#7A7A7A"/>
+          <rect x="12" y="8" width="40" height="2" fill="#8C8C8C"/>
+          <rect x="11" y="10" width="42" height="2" fill="#9A9A9A"/>
+          <rect x="10" y="12" width="44" height="2" fill="#9A9A9A"/>
+          <rect x="14" y="9" width="14" height="2" fill="#B4B4B4"/>
+          <rect x="36" y="9" width="10" height="2" fill="#B4B4B4"/>
+          <!-- hair sides -->
+          <rect x="10" y="14" width="3" height="18" fill="#8C8C8C"/>
+          <rect x="51" y="14" width="3" height="18" fill="#8C8C8C"/>
+          <rect x="9" y="14" width="1" height="18" fill="#6A6A6A"/>
+          <rect x="54" y="14" width="1" height="18" fill="#6A6A6A"/>
+          <!-- face shape rounded -->
+          <rect x="14" y="13" width="36" height="1" fill="#E8B888"/>
+          <rect x="13" y="14" width="38" height="26" fill="#EFC090"/>
+          <rect x="14" y="40" width="36" height="2" fill="#E8B888"/>
+          <rect x="16" y="42" width="32" height="2" fill="#D8A878"/>
+          <!-- forehead highlight -->
+          <rect x="18" y="14" width="14" height="3" fill="#F5D0A0"/>
+          <!-- ears -->
+          <rect x="11" y="22" width="3" height="8" fill="#D8A878"/>
+          <rect x="50" y="22" width="3" height="8" fill="#D8A878"/>
+          <rect x="12" y="24" width="1" height="4" fill="#C09060"/>
+          <rect x="51" y="24" width="1" height="4" fill="#C09060"/>
+          <!-- eyebrows grey -->
+          <rect x="17" y="20" width="10" height="1" fill="#5A5A5A"/>
+          <rect x="17" y="21" width="10" height="1" fill="#707070"/>
+          <rect x="36" y="20" width="10" height="1" fill="#5A5A5A"/>
+          <rect x="36" y="21" width="10" height="1" fill="#707070"/>
+          <!-- eyes - sclera -->
+          <rect x="18" y="23" width="9" height="5" fill="#fff"/>
+          <rect x="36" y="23" width="9" height="5" fill="#fff"/>
+          <rect x="18" y="23" width="9" height="1" fill="#1A0800"/>
+          <rect x="36" y="23" width="9" height="1" fill="#1A0800"/>
+          <!-- iris -->
+          <rect x="20" y="24" width="4" height="4" fill="#3A5A6A"/>
+          <rect x="38" y="24" width="4" height="4" fill="#3A5A6A"/>
+          <!-- pupil -->
+          <rect x="21" y="25" width="2" height="2" fill="#1A0800"/>
+          <rect x="39" y="25" width="2" height="2" fill="#1A0800"/>
+          <!-- shine -->
+          <rect x="21" y="24" width="1" height="1" fill="#fff"/>
+          <rect x="39" y="24" width="1" height="1" fill="#fff"/>
+          <!-- crow's feet -->
+          <rect x="14" y="25" width="2" height="1" fill="#C09060"/>
+          <rect x="48" y="25" width="2" height="1" fill="#C09060"/>
+          <rect x="13" y="26" width="3" height="1" fill="#C09060"/>
+          <rect x="48" y="26" width="3" height="1" fill="#C09060"/>
+          <!-- nose -->
+          <rect x="30" y="29" width="2" height="1" fill="#D8A878"/>
+          <rect x="29" y="30" width="1" height="3" fill="#D8A878"/>
+          <rect x="32" y="30" width="1" height="3" fill="#D8A878"/>
+          <rect x="30" y="33" width="3" height="1" fill="#C09060"/>
+          <rect x="29" y="34" width="2" height="1" fill="#C09060"/>
+          <rect x="33" y="34" width="2" height="1" fill="#C09060"/>
+          <!-- nostril shadow -->
+          <rect x="30" y="34" width="1" height="1" fill="#A07050"/>
+          <rect x="33" y="34" width="1" height="1" fill="#A07050"/>
+          <!-- mouth -->
+          <rect x="22" y="36" width="20" height="1" fill="#A06050"/>
+          <rect x="23" y="37" width="18" height="1" fill="#C07060"/>
+          <rect x="24" y="38" width="16" height="1" fill="#E08070"/>
+          <!-- chin shadow -->
+          <rect x="26" y="42" width="12" height="1" fill="#C09060"/>
+          <!-- neck -->
+          <rect x="22" y="44" width="20" height="4" fill="#C89060"/>
+          <rect x="22" y="44" width="20" height="1" fill="#A07040"/>
+          <!-- shirt/jacket dark blue -->
+          <rect x="6" y="48" width="52" height="16" fill="#2E4A6A"/>
+          <rect x="6" y="48" width="52" height="2" fill="#1A2A40"/>
+          <!-- collar -->
+          <rect x="22" y="48" width="20" height="6" fill="#1A2A40"/>
+          <rect x="28" y="48" width="8" height="10" fill="#fff"/>
+          <rect x="30" y="48" width="4" height="10" fill="#3A5A7A"/>
+          <!-- tie knot -->
+          <rect x="30" y="48" width="4" height="3" fill="#8A2030"/>
+        </svg>
+      </div>
+      <span class="face-label">Mature Male</span>
+    </div>
+
+    <div class="face-card">
+      <div class="ultra-face">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+          <rect width="64" height="64" fill="#f0e8dc"/>
+          <!-- adult female: long dark hair -->
+          <!-- hair behind shoulders -->
+          <rect x="6" y="22" width="4" height="42" fill="#1A0800"/>
+          <rect x="54" y="22" width="4" height="42" fill="#1A0800"/>
+          <rect x="5" y="30" width="1" height="34" fill="#0A0400"/>
+          <rect x="58" y="30" width="1" height="34" fill="#0A0400"/>
+          <!-- hair top -->
+          <rect x="12" y="4" width="40" height="2" fill="#1A0800"/>
+          <rect x="10" y="6" width="44" height="3" fill="#1A0800"/>
+          <rect x="9" y="9" width="46" height="3" fill="#1A0800"/>
+          <rect x="9" y="12" width="3" height="14" fill="#1A0800"/>
+          <rect x="52" y="12" width="3" height="14" fill="#1A0800"/>
+          <!-- hair highlights -->
+          <rect x="14" y="6" width="6" height="3" fill="#3A2010"/>
+          <rect x="22" y="5" width="4" height="3" fill="#3A2010"/>
+          <rect x="36" y="6" width="6" height="3" fill="#3A2010"/>
+          <!-- side bangs -->
+          <rect x="12" y="12" width="6" height="6" fill="#1A0800"/>
+          <rect x="46" y="12" width="6" height="6" fill="#1A0800"/>
+          <rect x="13" y="13" width="3" height="2" fill="#3A2010"/>
+          <!-- face -->
+          <rect x="14" y="11" width="36" height="2" fill="#E8B888"/>
+          <rect x="13" y="13" width="38" height="26" fill="#EFC090"/>
+          <rect x="14" y="39" width="36" height="2" fill="#E8B888"/>
+          <rect x="16" y="41" width="32" height="3" fill="#D8A878"/>
+          <!-- forehead highlight -->
+          <rect x="18" y="13" width="14" height="3" fill="#F5D5A8"/>
+          <!-- ears + earrings -->
+          <rect x="11" y="22" width="3" height="6" fill="#D8A878"/>
+          <rect x="50" y="22" width="3" height="6" fill="#D8A878"/>
+          <rect x="11" y="28" width="3" height="2" fill="#FFD700"/>
+          <rect x="50" y="28" width="3" height="2" fill="#FFD700"/>
+          <!-- thin elegant brows -->
+          <rect x="17" y="19" width="10" height="1" fill="#1A0800"/>
+          <rect x="36" y="19" width="10" height="1" fill="#1A0800"/>
+          <rect x="18" y="20" width="8" height="1" fill="#3A2010"/>
+          <rect x="37" y="20" width="8" height="1" fill="#3A2010"/>
+          <!-- big anime-ish eyes -->
+          <rect x="17" y="22" width="10" height="6" fill="#fff"/>
+          <rect x="36" y="22" width="10" height="6" fill="#fff"/>
+          <!-- top lashes -->
+          <rect x="17" y="22" width="10" height="2" fill="#1A0800"/>
+          <rect x="36" y="22" width="10" height="2" fill="#1A0800"/>
+          <!-- iris -->
+          <rect x="19" y="23" width="6" height="5" fill="#5A3A20"/>
+          <rect x="38" y="23" width="6" height="5" fill="#5A3A20"/>
+          <!-- pupil -->
+          <rect x="21" y="24" width="3" height="3" fill="#1A0800"/>
+          <rect x="40" y="24" width="3" height="3" fill="#1A0800"/>
+          <!-- shine -->
+          <rect x="22" y="24" width="2" height="2" fill="#fff"/>
+          <rect x="41" y="24" width="2" height="2" fill="#fff"/>
+          <!-- bottom lash hint -->
+          <rect x="17" y="28" width="10" height="1" fill="#3A2010"/>
+          <rect x="36" y="28" width="10" height="1" fill="#3A2010"/>
+          <!-- nose - delicate -->
+          <rect x="31" y="30" width="2" height="3" fill="#D8A878"/>
+          <rect x="30" y="32" width="1" height="2" fill="#D8A878"/>
+          <rect x="33" y="32" width="1" height="2" fill="#D8A878"/>
+          <rect x="30" y="34" width="4" height="1" fill="#C09060"/>
+          <!-- rosy cheeks -->
+          <rect x="14" y="31" width="6" height="3" fill="#F5A0B0" opacity="0.5"/>
+          <rect x="44" y="31" width="6" height="3" fill="#F5A0B0" opacity="0.5"/>
+          <!-- lips -->
+          <rect x="24" y="36" width="16" height="1" fill="#A04050"/>
+          <rect x="22" y="37" width="20" height="2" fill="#C05060"/>
+          <rect x="23" y="38" width="18" height="1" fill="#D87080"/>
+          <rect x="24" y="39" width="16" height="1" fill="#A04050"/>
+          <rect x="26" y="38" width="3" height="1" fill="#E89098"/>
+          <!-- shirt - magenta -->
+          <rect x="2" y="44" width="60" height="20" fill="#8A2050"/>
+          <rect x="2" y="44" width="60" height="2" fill="#6A1030"/>
+          <!-- collar/neckline -->
+          <rect x="20" y="44" width="24" height="6" fill="#6A1030"/>
+          <rect x="22" y="46" width="20" height="4" fill="#8A2050"/>
+        </svg>
+      </div>
+      <span class="face-label">Adult Female</span>
+    </div>
+
+    <div class="face-card">
+      <div class="ultra-face">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+          <rect width="64" height="64" fill="#f0e8dc"/>
+          <!-- young male: spiky hair, friendly -->
+          <!-- spike tips -->
+          <rect x="14" y="2" width="3" height="4" fill="#1A0800"/>
+          <rect x="20" y="0" width="3" height="6" fill="#1A0800"/>
+          <rect x="27" y="2" width="3" height="4" fill="#1A0800"/>
+          <rect x="34" y="0" width="3" height="6" fill="#1A0800"/>
+          <rect x="41" y="2" width="3" height="4" fill="#1A0800"/>
+          <rect x="47" y="0" width="3" height="6" fill="#1A0800"/>
+          <!-- hair main -->
+          <rect x="11" y="6" width="42" height="3" fill="#1A0800"/>
+          <rect x="9" y="9" width="46" height="3" fill="#1A0800"/>
+          <rect x="9" y="12" width="3" height="10" fill="#1A0800"/>
+          <rect x="52" y="12" width="3" height="10" fill="#1A0800"/>
+          <!-- hair highlights -->
+          <rect x="14" y="7" width="6" height="3" fill="#3A2010"/>
+          <rect x="28" y="7" width="6" height="3" fill="#4A2010"/>
+          <rect x="42" y="7" width="6" height="3" fill="#3A2010"/>
+          <!-- bangs -->
+          <rect x="14" y="12" width="6" height="4" fill="#1A0800"/>
+          <rect x="44" y="12" width="6" height="4" fill="#1A0800"/>
+          <rect x="22" y="12" width="20" height="2" fill="#1A0800"/>
+          <!-- face -->
+          <rect x="14" y="11" width="36" height="2" fill="#E8B888"/>
+          <rect x="13" y="13" width="38" height="27" fill="#EFC090"/>
+          <rect x="14" y="40" width="36" height="2" fill="#E8B888"/>
+          <rect x="16" y="42" width="32" height="3" fill="#D8A878"/>
+          <rect x="20" y="44" width="24" height="2" fill="#C89060"/>
+          <!-- forehead -->
+          <rect x="20" y="14" width="12" height="3" fill="#F5D5A8"/>
+          <!-- ears -->
+          <rect x="11" y="22" width="3" height="7" fill="#D8A878"/>
+          <rect x="50" y="22" width="3" height="7" fill="#D8A878"/>
+          <!-- thick eyebrows -->
+          <rect x="17" y="19" width="10" height="2" fill="#1A0800"/>
+          <rect x="36" y="19" width="10" height="2" fill="#1A0800"/>
+          <rect x="18" y="21" width="8" height="1" fill="#0A0400"/>
+          <rect x="37" y="21" width="8" height="1" fill="#0A0400"/>
+          <!-- eyes -->
+          <rect x="18" y="23" width="9" height="5" fill="#fff"/>
+          <rect x="36" y="23" width="9" height="5" fill="#fff"/>
+          <rect x="18" y="23" width="9" height="1" fill="#1A0800"/>
+          <rect x="36" y="23" width="9" height="1" fill="#1A0800"/>
+          <!-- iris green -->
+          <rect x="20" y="24" width="4" height="4" fill="#3A7A30"/>
+          <rect x="38" y="24" width="4" height="4" fill="#3A7A30"/>
+          <rect x="21" y="25" width="2" height="2" fill="#1A0800"/>
+          <rect x="39" y="25" width="2" height="2" fill="#1A0800"/>
+          <rect x="22" y="24" width="1" height="1" fill="#aaffaa"/>
+          <rect x="40" y="24" width="1" height="1" fill="#aaffaa"/>
+          <!-- nose -->
+          <rect x="30" y="29" width="3" height="1" fill="#D8A878"/>
+          <rect x="29" y="30" width="1" height="4" fill="#D8A878"/>
+          <rect x="33" y="30" width="1" height="4" fill="#D8A878"/>
+          <rect x="29" y="34" width="5" height="1" fill="#C09060"/>
+          <rect x="30" y="35" width="3" height="1" fill="#A07050"/>
+          <!-- big grin -->
+          <rect x="22" y="37" width="2" height="2" fill="#A06050"/>
+          <rect x="40" y="37" width="2" height="2" fill="#A06050"/>
+          <rect x="23" y="38" width="18" height="2" fill="#A06050"/>
+          <rect x="24" y="39" width="16" height="1" fill="#E08080"/>
+          <rect x="25" y="38" width="14" height="1" fill="#fff"/>
+          <!-- shirt - green tee -->
+          <rect x="2" y="46" width="60" height="18" fill="#1A6030"/>
+          <rect x="2" y="46" width="60" height="2" fill="#0A3010"/>
+          <rect x="22" y="46" width="20" height="4" fill="#0A3010"/>
+        </svg>
+      </div>
+      <span class="face-label">Young Male</span>
+    </div>
+
+    <div class="face-card">
+      <div class="ultra-face">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+          <rect width="64" height="64" fill="#f0e8dc"/>
+          <!-- young female: pigtails, big eyes -->
+          <!-- pigtails hanging -->
+          <rect x="2" y="22" width="8" height="30" fill="#1A0800"/>
+          <rect x="54" y="22" width="8" height="30" fill="#1A0800"/>
+          <rect x="0" y="22" width="2" height="30" fill="#0A0400"/>
+          <rect x="62" y="22" width="2" height="30" fill="#0A0400"/>
+          <rect x="3" y="22" width="3" height="6" fill="#3A2010"/>
+          <rect x="58" y="22" width="3" height="6" fill="#3A2010"/>
+          <!-- ribbon ties -->
+          <rect x="2" y="20" width="8" height="3" fill="#FF6090"/>
+          <rect x="54" y="20" width="8" height="3" fill="#FF6090"/>
+          <rect x="3" y="20" width="2" height="1" fill="#FFB0C0"/>
+          <rect x="55" y="20" width="2" height="1" fill="#FFB0C0"/>
+          <!-- hair top -->
+          <rect x="12" y="4" width="40" height="2" fill="#1A0800"/>
+          <rect x="10" y="6" width="44" height="3" fill="#1A0800"/>
+          <rect x="9" y="9" width="46" height="3" fill="#1A0800"/>
+          <rect x="9" y="12" width="3" height="10" fill="#1A0800"/>
+          <rect x="52" y="12" width="3" height="10" fill="#1A0800"/>
+          <!-- hair shine -->
+          <rect x="16" y="5" width="6" height="2" fill="#3A2010"/>
+          <rect x="30" y="5" width="4" height="2" fill="#3A2010"/>
+          <!-- bangs with parting -->
+          <rect x="12" y="12" width="8" height="5" fill="#1A0800"/>
+          <rect x="44" y="12" width="8" height="5" fill="#1A0800"/>
+          <rect x="20" y="12" width="24" height="2" fill="#1A0800"/>
+          <rect x="29" y="12" width="6" height="3" fill="#3A2010"/>
+          <!-- face -->
+          <rect x="14" y="11" width="36" height="2" fill="#E8B888"/>
+          <rect x="13" y="13" width="38" height="26" fill="#EFC090"/>
+          <rect x="14" y="39" width="36" height="2" fill="#E8B888"/>
+          <rect x="16" y="41" width="32" height="3" fill="#D8A878"/>
+          <!-- forehead -->
+          <rect x="20" y="14" width="14" height="3" fill="#F5D5A8"/>
+          <!-- ears -->
+          <rect x="11" y="22" width="3" height="6" fill="#D8A878"/>
+          <rect x="50" y="22" width="3" height="6" fill="#D8A878"/>
+          <!-- soft eyebrows -->
+          <rect x="17" y="19" width="10" height="1" fill="#1A0800"/>
+          <rect x="36" y="19" width="10" height="1" fill="#1A0800"/>
+          <!-- huge cute eyes -->
+          <rect x="17" y="21" width="10" height="8" fill="#fff"/>
+          <rect x="36" y="21" width="10" height="8" fill="#fff"/>
+          <rect x="17" y="21" width="10" height="2" fill="#1A0800"/>
+          <rect x="36" y="21" width="10" height="2" fill="#1A0800"/>
+          <!-- iris purple -->
+          <rect x="18" y="22" width="8" height="6" fill="#6030A0"/>
+          <rect x="37" y="22" width="8" height="6" fill="#6030A0"/>
+          <rect x="19" y="23" width="6" height="5" fill="#1A0800"/>
+          <rect x="38" y="23" width="6" height="5" fill="#1A0800"/>
+          <!-- big shines -->
+          <rect x="20" y="23" width="3" height="2" fill="#fff"/>
+          <rect x="39" y="23" width="3" height="2" fill="#fff"/>
+          <rect x="23" y="26" width="2" height="1" fill="#fff" opacity="0.7"/>
+          <rect x="42" y="26" width="2" height="1" fill="#fff" opacity="0.7"/>
+          <!-- bottom lashes -->
+          <rect x="17" y="29" width="10" height="1" fill="#1A0800"/>
+          <rect x="36" y="29" width="10" height="1" fill="#1A0800"/>
+          <!-- pink cheeks -->
+          <rect x="13" y="31" width="7" height="4" fill="#F5A0B0" opacity="0.6"/>
+          <rect x="44" y="31" width="7" height="4" fill="#F5A0B0" opacity="0.6"/>
+          <!-- tiny nose -->
+          <rect x="31" y="32" width="2" height="2" fill="#D8A878"/>
+          <rect x="30" y="34" width="4" height="1" fill="#C09060"/>
+          <!-- happy mouth -->
+          <rect x="24" y="36" width="2" height="1" fill="#A04050"/>
+          <rect x="38" y="36" width="2" height="1" fill="#A04050"/>
+          <rect x="25" y="37" width="14" height="2" fill="#A04050"/>
+          <rect x="26" y="38" width="12" height="1" fill="#fff"/>
+          <rect x="27" y="38" width="10" height="1" fill="#E08090"/>
+          <!-- shirt purple -->
+          <rect x="2" y="44" width="60" height="20" fill="#6030A0"/>
+          <rect x="2" y="44" width="60" height="2" fill="#402070"/>
+          <rect x="22" y="44" width="20" height="5" fill="#402070"/>
+        </svg>
+      </div>
+      <span class="face-label">Young Female</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- OPTION 2: SVG VECTOR -->
+<div class="section">
+  <div class="section-header">
+    <span class="option-badge">Option 2</span>
+    <span class="section-title">SVG Vector Portraits</span>
+    <span class="section-desc">— smooth curves, scalable at any size, distinct character styles</span>
+  </div>
+  <div class="faces-row">
+
+    <div class="face-card">
+      <div class="vector-face">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="skinGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#F5D5A5"/>
+              <stop offset="100%" stop-color="#D8A870"/>
+            </linearGradient>
+            <linearGradient id="greyHairGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#B4B4B4"/>
+              <stop offset="100%" stop-color="#7A7A7A"/>
+            </linearGradient>
+          </defs>
+          <rect width="100" height="100" fill="#e8f4f8" rx="8"/>
+          <!-- shirt -->
+          <ellipse cx="50" cy="98" rx="32" ry="20" fill="#2E4A6A"/>
+          <rect x="18" y="78" width="64" height="22" fill="#2E4A6A"/>
+          <!-- collar -->
+          <polygon points="50,75 42,85 50,80 58,85" fill="#1A2A40"/>
+          <!-- neck -->
+          <rect x="44" y="68" width="12" height="12" rx="4" fill="#D8A870"/>
+          <!-- face -->
+          <ellipse cx="50" cy="48" rx="22" ry="26" fill="url(#skinGrad)"/>
+          <!-- ears -->
+          <ellipse cx="28" cy="48" rx="4" ry="6" fill="#D8A870"/>
+          <ellipse cx="72" cy="48" rx="4" ry="6" fill="#D8A870"/>
+          <!-- grey hair - receding -->
+          <path d="M28,30 Q35,18 50,16 Q65,18 72,30 Q68,22 50,20 Q32,22 28,30 Z" fill="url(#greyHairGrad)"/>
+          <path d="M28,30 Q26,38 27,44 Q28,28 50,24 Q72,28 73,44 Q74,38 72,30 Z" fill="url(#greyHairGrad)"/>
+          <!-- eyebrows - grey -->
+          <path d="M36,36 Q41,33 46,35" stroke="#888" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path d="M54,35 Q59,33 64,36" stroke="#888" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <!-- eyes -->
+          <ellipse cx="41" cy="42" rx="6" ry="5" fill="white"/>
+          <ellipse cx="59" cy="42" rx="6" ry="5" fill="white"/>
+          <circle cx="42" cy="42" r="3.5" fill="#2A1808"/>
+          <circle cx="60" cy="42" r="3.5" fill="#2A1808"/>
+          <circle cx="43" cy="41" r="1" fill="white"/>
+          <circle cx="61" cy="41" r="1" fill="white"/>
+          <!-- wrinkles -->
+          <path d="M33,40 Q35,38 37,40" stroke="#C09060" stroke-width="0.8" fill="none"/>
+          <path d="M63,40 Q65,38 67,40" stroke="#C09060" stroke-width="0.8" fill="none"/>
+          <!-- nose -->
+          <path d="M48,46 Q50,54 52,46" stroke="#C09060" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <path d="M45,54 Q48,57 52,57 Q55,57 55,54" stroke="#C09060" stroke-width="1.2" fill="none"/>
+          <!-- mouth - subtle smile -->
+          <path d="M40,62 Q50,68 60,62" stroke="#A06050" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <!-- grey stubble suggestion -->
+          <path d="M34,58 Q36,56 38,58" stroke="#aaa" stroke-width="0.8" fill="none"/>
+          <path d="M62,58 Q64,56 66,58" stroke="#aaa" stroke-width="0.8" fill="none"/>
+        </svg>
+      </div>
+      <span class="face-label">Mature Male</span>
+    </div>
+
+    <div class="face-card">
+      <div class="vector-face">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="skinGradF" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#F5D5A5"/>
+              <stop offset="100%" stop-color="#D8A870"/>
+            </linearGradient>
+            <linearGradient id="darkHairGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#3A2010"/>
+              <stop offset="100%" stop-color="#1A0800"/>
+            </linearGradient>
+          </defs>
+          <rect width="100" height="100" fill="#fce8f0" rx="8"/>
+          <!-- shirt -->
+          <rect x="10" y="78" width="80" height="22" fill="#8A2050"/>
+          <polygon points="50,75 40,88 50,82 60,88" fill="#6A1030"/>
+          <!-- neck -->
+          <rect x="44" y="66" width="12" height="14" rx="4" fill="#D8A870"/>
+          <!-- hair long - behind -->
+          <path d="M28,30 Q24,55 26,90 Q35,95 28,80 Q26,60 28,30 Z" fill="url(#darkHairGrad)"/>
+          <path d="M72,30 Q76,55 74,90 Q65,95 72,80 Q74,60 72,30 Z" fill="url(#darkHairGrad)"/>
+          <!-- face -->
+          <ellipse cx="50" cy="46" rx="22" ry="24" fill="url(#skinGradF)"/>
+          <!-- ears + earrings -->
+          <ellipse cx="28" cy="46" rx="4" ry="5" fill="#D8A870"/>
+          <ellipse cx="72" cy="46" rx="4" ry="5" fill="#D8A870"/>
+          <circle cx="28" cy="52" r="2" fill="#FFD700"/>
+          <circle cx="72" cy="52" r="2" fill="#FFD700"/>
+          <!-- hair top -->
+          <path d="M28,28 Q35,14 50,12 Q65,14 72,28 Q68,18 50,16 Q32,18 28,28 Z" fill="url(#darkHairGrad)"/>
+          <path d="M28,28 Q26,36 27,42 Q28,24 50,20 Q72,24 73,42 Q74,36 72,28 Z" fill="url(#darkHairGrad)"/>
+          <!-- eyebrows -->
+          <path d="M35,32 Q41,29 47,31" stroke="#1A0800" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <path d="M53,31 Q59,29 65,32" stroke="#1A0800" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <!-- eyes - larger, lashes -->
+          <ellipse cx="41" cy="39" rx="7" ry="6" fill="white"/>
+          <ellipse cx="59" cy="39" rx="7" ry="6" fill="white"/>
+          <ellipse cx="41" cy="39" rx="7" ry="6" fill="none" stroke="#1A0800" stroke-width="1.5"/>
+          <ellipse cx="59" cy="39" rx="7" ry="6" fill="none" stroke="#1A0800" stroke-width="1.5"/>
+          <circle cx="41" cy="39" r="4" fill="#5A3A20"/>
+          <circle cx="59" cy="39" r="4" fill="#5A3A20"/>
+          <circle cx="42" cy="38" r="1.5" fill="white"/>
+          <circle cx="60" cy="38" r="1.5" fill="white"/>
+          <!-- nose -->
+          <path d="M49,44 Q50,50 51,44" stroke="#C09060" stroke-width="1.2" fill="none"/>
+          <path d="M46,51 Q50,54 54,51" stroke="#C09060" stroke-width="1.2" fill="none"/>
+          <!-- rosy cheeks -->
+          <ellipse cx="33" cy="50" rx="6" ry="4" fill="#F5A0A0" opacity="0.4"/>
+          <ellipse cx="67" cy="50" rx="6" ry="4" fill="#F5A0A0" opacity="0.4"/>
+          <!-- lips -->
+          <path d="M40,59 Q50,55 60,59" stroke="#C05060" stroke-width="1" fill="none"/>
+          <path d="M38,60 Q44,64 50,63 Q56,64 62,60 Q56,66 50,65 Q44,66 38,60 Z" fill="#D06070"/>
+        </svg>
+      </div>
+      <span class="face-label">Adult Female</span>
+    </div>
+
+    <div class="face-card">
+      <div class="vector-face">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="skinYM" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#F5D5A5"/>
+              <stop offset="100%" stop-color="#D8A870"/>
+            </linearGradient>
+          </defs>
+          <rect width="100" height="100" fill="#e8f5ee" rx="8"/>
+          <rect x="12" y="78" width="76" height="22" fill="#1A6030"/>
+          <polygon points="50,75 42,86 50,81 58,86" fill="#0A3010"/>
+          <rect x="44" y="66" width="12" height="14" rx="4" fill="#D8A870"/>
+          <ellipse cx="50" cy="46" rx="22" ry="24" fill="url(#skinYM)"/>
+          <ellipse cx="28" cy="46" rx="4" ry="5" fill="#D8A870"/>
+          <ellipse cx="72" cy="46" rx="4" ry="5" fill="#D8A870"/>
+          <!-- spiky hair -->
+          <path d="M28,32 Q32,10 38,6 Q40,18 36,24 Z" fill="#1A0800"/>
+          <path d="M36,24 Q42,4 48,2 Q50,16 46,22 Z" fill="#1A0800"/>
+          <path d="M46,22 Q50,2 54,2 Q56,16 54,22 Z" fill="#2A1808"/>
+          <path d="M54,22 Q58,4 64,6 Q62,18 60,24 Z" fill="#1A0800"/>
+          <path d="M60,24 Q68,10 72,32 Q66,20 60,24 Z" fill="#1A0800"/>
+          <path d="M28,32 Q28,24 35,24 Q55,20 65,24 Q72,24 72,32 Q68,20 50,18 Q32,20 28,32 Z" fill="#1A0800"/>
+          <!-- eyebrows - thick -->
+          <path d="M35,33 Q41,30 47,32" stroke="#1A0800" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <path d="M53,32 Q59,30 65,33" stroke="#1A0800" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <!-- eyes -->
+          <ellipse cx="41" cy="40" rx="6" ry="5.5" fill="white"/>
+          <ellipse cx="59" cy="40" rx="6" ry="5.5" fill="white"/>
+          <circle cx="41" cy="40" r="4" fill="#1A0800"/>
+          <circle cx="59" cy="40" r="4" fill="#1A0800"/>
+          <circle cx="41" cy="40" r="2.5" fill="#3A5A20"/>
+          <circle cx="59" cy="40" r="2.5" fill="#3A5A20"/>
+          <circle cx="42" cy="39" r="1" fill="white"/>
+          <circle cx="60" cy="39" r="1" fill="white"/>
+          <!-- nose -->
+          <circle cx="47" cy="50" r="1.5" fill="#C09060"/>
+          <circle cx="53" cy="50" r="1.5" fill="#C09060"/>
+          <path d="M44,52 Q50,56 56,52" stroke="#C09060" stroke-width="1.2" fill="none"/>
+          <!-- grin -->
+          <path d="M38,60 Q50,70 62,60" stroke="#A06050" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path d="M42,62 Q50,68 58,62 Q50,66 42,62 Z" fill="#E0A090"/>
+        </svg>
+      </div>
+      <span class="face-label">Young Male</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- OPTION 3: ILLUSTRATED (anime-adjacent) -->
+<div class="section">
+  <div class="section-header">
+    <span class="option-badge">Option 3</span>
+    <span class="section-title">Illustrated / Anime-Adjacent Portraits</span>
+    <span class="section-desc">— visual-novel style, expressive, thematic for a Japanese learning app</span>
+  </div>
+  <div class="faces-row">
+
+    <div class="face-card">
+      <div class="illustrated-face">
+        <svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="bgGrad1" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#dae8f5"/>
+              <stop offset="100%" stop-color="#b8d0e8"/>
+            </linearGradient>
+            <linearGradient id="skinAN1" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#FFDDAA"/>
+              <stop offset="100%" stop-color="#E8C090"/>
+            </linearGradient>
+          </defs>
+          <rect width="100" height="120" fill="url(#bgGrad1)" rx="8"/>
+          <!-- body/suit -->
+          <path d="M10,120 L10,95 Q20,85 35,82 L50,78 L65,82 Q80,85 90,95 L90,120 Z" fill="#2E4A6A"/>
+          <path d="M43,78 L50,90 L57,78 Q54,95 50,95 Q46,95 43,78 Z" fill="#fff" opacity="0.9"/>
+          <!-- neck -->
+          <rect x="43" y="68" width="14" height="14" rx="6" fill="#E8C090"/>
+          <!-- face shape - slightly angular for maturity -->
+          <path d="M26,55 Q24,35 50,28 Q76,35 74,55 Q72,70 50,75 Q28,70 26,55 Z" fill="url(#skinAN1)"/>
+          <!-- ears -->
+          <ellipse cx="25" cy="50" rx="5" ry="7" fill="#E8C090"/>
+          <ellipse cx="75" cy="50" rx="5" ry="7" fill="#E8C090"/>
+          <!-- hair - grey, swept back -->
+          <path d="M26,45 Q22,25 50,18 Q78,25 74,45 Q70,28 50,24 Q30,28 26,45 Z" fill="#9A9A9A"/>
+          <path d="M22,45 Q20,30 26,25 Q22,38 24,50 Z" fill="#8A8A8A"/>
+          <path d="M78,45 Q80,30 74,25 Q78,38 76,50 Z" fill="#8A8A8A"/>
+          <!-- hair detail -->
+          <path d="M30,24 Q35,20 50,18 Q40,22 30,24 Z" fill="#BBBBBB"/>
+          <!-- eyebrows - strong, grey -->
+          <path d="M33,38 Q41,34 47,36" stroke="#707070" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <path d="M53,36 Q59,34 67,38" stroke="#707070" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <!-- eyes - anime style with outline -->
+          <path d="M33,44 Q40,40 47,44 Q40,50 33,44 Z" fill="white"/>
+          <path d="M53,44 Q60,40 67,44 Q60,50 53,44 Z" fill="white"/>
+          <ellipse cx="40" cy="45" rx="5" ry="4.5" fill="#3A5A80"/>
+          <ellipse cx="60" cy="45" rx="5" ry="4.5" fill="#3A5A80"/>
+          <circle cx="40" cy="45" r="3" fill="#1A2A40"/>
+          <circle cx="60" cy="45" r="3" fill="#1A2A40"/>
+          <circle cx="42" cy="43" r="1.2" fill="white"/>
+          <circle cx="62" cy="43" r="1.2" fill="white"/>
+          <!-- eyelid line -->
+          <path d="M33,44 Q40,40 47,44" stroke="#1A0800" stroke-width="1.5" fill="none"/>
+          <path d="M53,44 Q60,40 67,44" stroke="#1A0800" stroke-width="1.5" fill="none"/>
+          <!-- nose - simple elegant -->
+          <path d="M49,52 L51,52" stroke="#C09060" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M46,55 Q50,58 54,55" stroke="#C09060" stroke-width="1" fill="none"/>
+          <!-- calm smile -->
+          <path d="M40,63 Q50,69 60,63" stroke="#B07050" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <span class="face-label">Mature Male</span>
+    </div>
+
+    <div class="face-card">
+      <div class="illustrated-face">
+        <svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="bgGrad2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#f5e0ec"/>
+              <stop offset="100%" stop-color="#e0c0d5"/>
+            </linearGradient>
+            <linearGradient id="skinAN2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#FFDDAA"/>
+              <stop offset="100%" stop-color="#E8C090"/>
+            </linearGradient>
+          </defs>
+          <rect width="100" height="120" fill="url(#bgGrad2)" rx="8"/>
+          <!-- blouse -->
+          <path d="M5,120 L5,95 Q18,82 35,80 L50,76 L65,80 Q82,82 95,95 L95,120 Z" fill="#8A2050"/>
+          <path d="M42,76 L50,90 L58,76" stroke="#6A1030" stroke-width="2" fill="none"/>
+          <!-- neck -->
+          <rect x="43" y="66" width="14" height="14" rx="6" fill="#E8C090"/>
+          <!-- long hair behind -->
+          <path d="M20,50 Q16,80 20,115 Q30,118 25,95 Q22,70 26,45 Z" fill="#1A0800"/>
+          <path d="M80,50 Q84,80 80,115 Q70,118 75,95 Q78,70 74,45 Z" fill="#1A0800"/>
+          <!-- face -->
+          <path d="M26,52 Q24,32 50,25 Q76,32 74,52 Q72,68 50,73 Q28,68 26,52 Z" fill="url(#skinAN2)"/>
+          <!-- ears + earrings -->
+          <ellipse cx="25" cy="48" rx="5" ry="7" fill="#E8C090"/>
+          <ellipse cx="75" cy="48" rx="5" ry="7" fill="#E8C090"/>
+          <circle cx="25" cy="56" r="3" fill="#FFD700" stroke="#E8A000" stroke-width="0.5"/>
+          <circle cx="75" cy="56" r="3" fill="#FFD700" stroke="#E8A000" stroke-width="0.5"/>
+          <!-- hair top -->
+          <path d="M26,42 Q28,18 50,14 Q72,18 74,42 Q70,22 50,20 Q30,22 26,42 Z" fill="#1A0800"/>
+          <path d="M30,20 Q40,14 50,14 Q42,17 30,20 Z" fill="#3A2010"/>
+          <path d="M22,44 Q20,28 26,22 Q22,36 24,50 Z" fill="#1A0800"/>
+          <path d="M78,44 Q80,28 74,22 Q78,36 76,50 Z" fill="#1A0800"/>
+          <!-- eyebrows - elegant arch -->
+          <path d="M33,32 Q40,27 48,30" stroke="#1A0800" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path d="M52,30 Q60,27 67,32" stroke="#1A0800" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <!-- eyes - large anime female -->
+          <path d="M31,40 Q40,34 49,40 Q40,50 31,40 Z" fill="white"/>
+          <path d="M51,40 Q60,34 69,40 Q60,50 51,40 Z" fill="white"/>
+          <ellipse cx="40" cy="42" rx="6.5" ry="6" fill="#5A3A20"/>
+          <ellipse cx="60" cy="42" rx="6.5" ry="6" fill="#5A3A20"/>
+          <circle cx="40" cy="42" r="4" fill="#1A0800"/>
+          <circle cx="60" cy="42" r="4" fill="#1A0800"/>
+          <circle cx="42" cy="40" r="1.5" fill="white"/>
+          <circle cx="62" cy="40" r="1.5" fill="white"/>
+          <circle cx="44" cy="45" r="0.8" fill="white" opacity="0.6"/>
+          <circle cx="64" cy="45" r="0.8" fill="white" opacity="0.6"/>
+          <!-- lash lines -->
+          <path d="M31,40 Q40,34 49,40" stroke="#1A0800" stroke-width="2" fill="none"/>
+          <path d="M51,40 Q60,34 69,40" stroke="#1A0800" stroke-width="2" fill="none"/>
+          <path d="M31,40 Q35,46 40,48" stroke="#1A0800" stroke-width="1.5" fill="none"/>
+          <path d="M69,40 Q65,46 60,48" stroke="#1A0800" stroke-width="1.5" fill="none"/>
+          <!-- nose -->
+          <path d="M48,50 Q50,54 52,50" stroke="#C09060" stroke-width="1" fill="none"/>
+          <!-- cheeks -->
+          <ellipse cx="32" cy="53" rx="7" ry="4" fill="#F5A0B0" opacity="0.5"/>
+          <ellipse cx="68" cy="53" rx="7" ry="4" fill="#F5A0B0" opacity="0.5"/>
+          <!-- lips -->
+          <path d="M38,61 Q44,57 50,58 Q56,57 62,61" stroke="#C05060" stroke-width="1" fill="none"/>
+          <path d="M36,62 Q43,68 50,67 Q57,68 64,62 Q57,66 50,65 Q43,66 36,62 Z" fill="#D06070"/>
+          <path d="M42,62 Q50,60 58,62" stroke="#E09090" stroke-width="0.5" fill="none"/>
+        </svg>
+      </div>
+      <span class="face-label">Adult Female</span>
+    </div>
+
+    <div class="face-card">
+      <div class="illustrated-face">
+        <svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="bgGrad3" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#e0f0e8"/>
+              <stop offset="100%" stop-color="#c0d8c8"/>
+            </linearGradient>
+            <linearGradient id="skinAN3" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#FFDDAA"/>
+              <stop offset="100%" stop-color="#E8C090"/>
+            </linearGradient>
+          </defs>
+          <rect width="100" height="120" fill="url(#bgGrad3)" rx="8"/>
+          <!-- hoodie -->
+          <path d="M8,120 L8,92 Q20,80 36,78 L50,74 L64,78 Q80,80 92,92 L92,120 Z" fill="#1A6030"/>
+          <path d="M36,78 Q40,88 50,88 Q60,88 64,78 Q56,96 50,95 Q44,96 36,78 Z" fill="#0A3010"/>
+          <!-- hood -->
+          <path d="M20,75 Q18,60 30,55 Q26,65 28,75 Z" fill="#1A6030"/>
+          <path d="M80,75 Q82,60 70,55 Q74,65 72,75 Z" fill="#1A6030"/>
+          <!-- neck -->
+          <rect x="43" y="66" width="14" height="12" rx="5" fill="#E8C090"/>
+          <!-- face - youthful round -->
+          <path d="M27,52 Q26,30 50,24 Q74,30 73,52 Q71,70 50,74 Q29,70 27,52 Z" fill="url(#skinAN3)"/>
+          <ellipse cx="26" cy="50" rx="5" ry="7" fill="#E8C090"/>
+          <ellipse cx="74" cy="50" rx="5" ry="7" fill="#E8C090"/>
+          <!-- messy spiky hair -->
+          <path d="M27,42 Q28,16 50,10 Q72,16 73,42 Q68,22 50,18 Q32,22 27,42 Z" fill="#1A0800"/>
+          <path d="M28,20 Q32,8 40,6 Q36,16 32,22 Z" fill="#1A0800"/>
+          <path d="M72,20 Q68,8 60,6 Q64,16 68,22 Z" fill="#1A0800"/>
+          <path d="M50,10 Q46,4 48,10 Z" fill="#2A1808"/>
+          <path d="M50,10 Q54,4 52,10 Z" fill="#1A0800"/>
+          <path d="M22,44 Q20,28 27,22 Q22,36 24,52 Z" fill="#1A0800"/>
+          <path d="M78,44 Q80,28 73,22 Q78,36 76,52 Z" fill="#1A0800"/>
+          <!-- energetic eyebrows -->
+          <path d="M33,34 Q41,30 47,33" stroke="#1A0800" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <path d="M53,33 Q59,30 67,34" stroke="#1A0800" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <!-- bright eyes -->
+          <path d="M32,42 Q40,36 48,42 Q40,50 32,42 Z" fill="white"/>
+          <path d="M52,42 Q60,36 68,42 Q60,50 52,42 Z" fill="white"/>
+          <ellipse cx="40" cy="43" rx="6" ry="5.5" fill="#3A7A30"/>
+          <ellipse cx="60" cy="43" rx="6" ry="5.5" fill="#3A7A30"/>
+          <circle cx="40" cy="43" r="3.5" fill="#1A0800"/>
+          <circle cx="60" cy="43" r="3.5" fill="#1A0800"/>
+          <circle cx="42" cy="41" r="1.3" fill="white"/>
+          <circle cx="62" cy="41" r="1.3" fill="white"/>
+          <path d="M32,42 Q40,36 48,42" stroke="#1A0800" stroke-width="2" fill="none"/>
+          <path d="M52,42 Q60,36 68,42" stroke="#1A0800" stroke-width="2" fill="none"/>
+          <!-- freckles -->
+          <circle cx="35" cy="53" r="1" fill="#C09060" opacity="0.5"/>
+          <circle cx="38" cy="55" r="1" fill="#C09060" opacity="0.5"/>
+          <circle cx="62" cy="53" r="1" fill="#C09060" opacity="0.5"/>
+          <circle cx="65" cy="55" r="1" fill="#C09060" opacity="0.5"/>
+          <!-- nose -->
+          <path d="M46,52 Q50,56 54,52" stroke="#C09060" stroke-width="1.2" fill="none"/>
+          <!-- big grin -->
+          <path d="M36,62 Q50,74 64,62" stroke="#B07050" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path d="M38,64 Q50,72 62,64 Q50,70 38,64 Z" fill="#E0A090"/>
+          <!-- teeth peek -->
+          <path d="M40,64 Q50,68 60,64 Q56,66 50,66 Q44,66 40,64 Z" fill="white"/>
+        </svg>
+      </div>
+      <span class="face-label">Young Male</span>
+    </div>
+
+    <div class="face-card">
+      <div class="illustrated-face">
+        <svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="bgGrad4" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#e8e0f5"/>
+              <stop offset="100%" stop-color="#c8b8e8"/>
+            </linearGradient>
+            <linearGradient id="skinAN4" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#FFDDAA"/>
+              <stop offset="100%" stop-color="#E8C090"/>
+            </linearGradient>
+          </defs>
+          <rect width="100" height="120" fill="url(#bgGrad4)" rx="8"/>
+          <!-- shirt -->
+          <path d="M8,120 L8,92 Q20,80 36,78 L50,74 L64,78 Q80,80 92,92 L92,120 Z" fill="#6030A0"/>
+          <path d="M42,74 L50,86 L58,74 Q54,90 50,90 Q46,90 42,74 Z" fill="#402070"/>
+          <!-- pigtail ribbons -->
+          <rect x="18" y="30" width="6" height="4" rx="2" fill="#FF6090"/>
+          <rect x="76" y="30" width="6" height="4" rx="2" fill="#FF6090"/>
+          <!-- pigtails hanging -->
+          <path d="M18,34 Q12,55 15,80 Q18,90 21,80 Q24,55 21,34 Z" fill="#1A0800"/>
+          <path d="M76,34 Q82,55 85,80 Q82,90 79,80 Q76,55 79,34 Z" fill="#1A0800"/>
+          <!-- neck -->
+          <rect x="43" y="66" width="14" height="12" rx="5" fill="#E8C090"/>
+          <!-- face - small cute -->
+          <path d="M28,50 Q27,28 50,22 Q73,28 72,50 Q70,66 50,70 Q30,66 28,50 Z" fill="url(#skinAN4)"/>
+          <ellipse cx="27" cy="48" rx="5" ry="6" fill="#E8C090"/>
+          <ellipse cx="73" cy="48" rx="5" ry="6" fill="#E8C090"/>
+          <!-- hair top with parting -->
+          <path d="M28,44 Q28,16 50,10 Q72,16 72,44 Q68,20 50,18 Q32,20 28,44 Z" fill="#1A0800"/>
+          <path d="M46,10 Q50,6 54,10 Q52,14 50,12 Q48,14 46,10 Z" fill="#3A2010"/>
+          <path d="M22,46 Q20,28 28,22 Q22,38 24,52 Z" fill="#1A0800"/>
+          <path d="M78,46 Q80,28 72,22 Q78,38 76,52 Z" fill="#1A0800"/>
+          <!-- eyebrows - gentle -->
+          <path d="M34,32 Q41,28 47,31" stroke="#1A0800" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path d="M53,31 Q59,28 66,32" stroke="#1A0800" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <!-- big sparkly eyes -->
+          <path d="M31,39 Q40,32 49,39 Q40,50 31,39 Z" fill="white"/>
+          <path d="M51,39 Q60,32 69,39 Q60,50 51,39 Z" fill="white"/>
+          <ellipse cx="40" cy="41" rx="7" ry="6.5" fill="#6030A0"/>
+          <ellipse cx="60" cy="41" rx="7" ry="6.5" fill="#6030A0"/>
+          <circle cx="40" cy="41" r="4.5" fill="#1A0800"/>
+          <circle cx="60" cy="41" r="4.5" fill="#1A0800"/>
+          <circle cx="42" cy="39" r="1.8" fill="white"/>
+          <circle cx="62" cy="39" r="1.8" fill="white"/>
+          <circle cx="45" cy="44" r="1" fill="white" opacity="0.6"/>
+          <circle cx="65" cy="44" r="1" fill="white" opacity="0.6"/>
+          <!-- star shine extra -->
+          <circle cx="38" cy="43" r="0.6" fill="white" opacity="0.4"/>
+          <circle cx="58" cy="43" r="0.6" fill="white" opacity="0.4"/>
+          <!-- lashes top -->
+          <path d="M31,39 Q40,32 49,39" stroke="#1A0800" stroke-width="2" fill="none"/>
+          <path d="M51,39 Q60,32 69,39" stroke="#1A0800" stroke-width="2" fill="none"/>
+          <!-- bottom lashes -->
+          <path d="M32,44 Q36,50 41,48" stroke="#1A0800" stroke-width="1" fill="none"/>
+          <path d="M68,44 Q64,50 59,48" stroke="#1A0800" stroke-width="1" fill="none"/>
+          <!-- rosy cheeks -->
+          <ellipse cx="31" cy="52" rx="8" ry="5" fill="#F5A0B0" opacity="0.5"/>
+          <ellipse cx="69" cy="52" rx="8" ry="5" fill="#F5A0B0" opacity="0.5"/>
+          <!-- nose - tiny dot -->
+          <circle cx="50" cy="54" r="1.5" fill="#C09060"/>
+          <!-- smile -->
+          <path d="M38,61 Q50,70 62,61" stroke="#C05060" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path d="M40,63 Q50,70 60,63 Q50,68 40,63 Z" fill="#E0A0A8"/>
+        </svg>
+      </div>
+      <span class="face-label">Young Female</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- OPTION 4: DICEBEAR-STYLE -->
+<div class="section">
+  <div class="section-header">
+    <span class="option-badge">Option 4</span>
+    <span class="section-title">Procedural Avatar Library (DiceBear-style)</span>
+    <span class="section-desc">— "Adventurer" style shown; generated from a character seed, no manual design</span>
+  </div>
+  <div class="faces-row">
+
+    <div class="face-card">
+      <div class="dicebear-face">
+        <!-- Approximating DiceBear "adventurer" style manually -->
+        <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="40" cy="40" r="40" fill="#b6e3f4"/>
+          <!-- body -->
+          <ellipse cx="40" cy="75" rx="20" ry="12" fill="#2E4A6A"/>
+          <!-- head -->
+          <circle cx="40" cy="36" r="22" fill="#F8D5A5"/>
+          <!-- grey hair - flat style -->
+          <path d="M18,32 Q20,12 40,10 Q60,12 62,32 Q58,16 40,14 Q22,16 18,32 Z" fill="#9A9A9A"/>
+          <rect x="18" y="28" width="4" height="8" rx="2" fill="#9A9A9A"/>
+          <rect x="58" y="28" width="4" height="8" rx="2" fill="#9A9A9A"/>
+          <!-- eyebrows -->
+          <rect x="27" y="28" width="9" height="2" rx="1" fill="#707070"/>
+          <rect x="44" y="28" width="9" height="2" rx="1" fill="#707070"/>
+          <!-- eyes - flat circles -->
+          <circle cx="31" cy="34" r="4.5" fill="white"/>
+          <circle cx="49" cy="34" r="4.5" fill="white"/>
+          <circle cx="31" cy="34" r="3" fill="#2A4A6A"/>
+          <circle cx="49" cy="34" r="3" fill="#2A4A6A"/>
+          <circle cx="32" cy="33" r="1" fill="white"/>
+          <circle cx="50" cy="33" r="1" fill="white"/>
+          <!-- nose -->
+          <path d="M39,40 Q40,43 41,40" stroke="#D0A070" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <!-- mouth -->
+          <path d="M33,48 Q40,54 47,48" stroke="#A06050" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <span class="face-label">Mature Male</span>
+    </div>
+
+    <div class="face-card">
+      <div class="dicebear-face">
+        <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="40" cy="40" r="40" fill="#ffd6e7"/>
+          <ellipse cx="40" cy="75" rx="20" ry="12" fill="#8A2050"/>
+          <circle cx="40" cy="36" r="22" fill="#F8D5A5"/>
+          <!-- long hair -->
+          <path d="M18,32 Q16,55 18,72 Q22,75 20,60 Q18,42 20,32 Z" fill="#1A0800"/>
+          <path d="M62,32 Q64,55 62,72 Q58,75 60,60 Q62,42 60,32 Z" fill="#1A0800"/>
+          <path d="M18,32 Q20,12 40,10 Q60,12 62,32 Q58,16 40,14 Q22,16 18,32 Z" fill="#1A0800"/>
+          <!-- eyebrows - arched -->
+          <path d="M27,28 Q31,25 36,27" stroke="#1A0800" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path d="M44,27 Q49,25 53,28" stroke="#1A0800" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <!-- eyes -->
+          <circle cx="31" cy="34" r="5" fill="white"/>
+          <circle cx="49" cy="34" r="5" fill="white"/>
+          <circle cx="31" cy="34" r="3.5" fill="#5A3A20"/>
+          <circle cx="49" cy="34" r="3.5" fill="#5A3A20"/>
+          <circle cx="32" cy="33" r="1.2" fill="white"/>
+          <circle cx="50" cy="33" r="1.2" fill="white"/>
+          <!-- lashes flat -->
+          <rect x="26" y="29" width="10" height="1.5" rx="0.75" fill="#1A0800"/>
+          <rect x="44" y="29" width="10" height="1.5" rx="0.75" fill="#1A0800"/>
+          <!-- cheeks -->
+          <circle cx="22" cy="40" r="5" fill="#F5A0B0" opacity="0.4"/>
+          <circle cx="58" cy="40" r="5" fill="#F5A0B0" opacity="0.4"/>
+          <!-- nose -->
+          <path d="M39,40 Q40,43 41,40" stroke="#D0A070" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <!-- smile -->
+          <path d="M32,47 Q40,54 48,47" stroke="#C05060" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <span class="face-label">Adult Female</span>
+    </div>
+
+    <div class="face-card">
+      <div class="dicebear-face">
+        <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="40" cy="40" r="40" fill="#c8f0d8"/>
+          <ellipse cx="40" cy="75" rx="20" ry="12" fill="#1A6030"/>
+          <circle cx="40" cy="36" r="22" fill="#F8D5A5"/>
+          <!-- spiky hair flat style -->
+          <path d="M24,26 L20,14 L26,24 L24,12 L30,22 L32,10 L36,22 L40,8 L44,22 L48,10 L50,22 L56,12 L54,24 L60,14 L56,26 Q52,14 40,12 Q28,14 24,26 Z" fill="#1A0800"/>
+          <!-- eyebrows thick -->
+          <rect x="26" y="27" width="10" height="2.5" rx="1.25" fill="#1A0800"/>
+          <rect x="44" y="27" width="10" height="2.5" rx="1.25" fill="#1A0800"/>
+          <!-- eyes -->
+          <circle cx="31" cy="34" r="5" fill="white"/>
+          <circle cx="49" cy="34" r="5" fill="white"/>
+          <circle cx="31" cy="34" r="3.5" fill="#3A7A30"/>
+          <circle cx="49" cy="34" r="3.5" fill="#3A7A30"/>
+          <circle cx="32" cy="33" r="1.2" fill="white"/>
+          <circle cx="50" cy="33" r="1.2" fill="white"/>
+          <!-- freckle dots -->
+          <circle cx="25" cy="40" r="1.2" fill="#C09060" opacity="0.6"/>
+          <circle cx="28" cy="42" r="1" fill="#C09060" opacity="0.6"/>
+          <circle cx="52" cy="40" r="1.2" fill="#C09060" opacity="0.6"/>
+          <circle cx="55" cy="42" r="1" fill="#C09060" opacity="0.6"/>
+          <!-- nose -->
+          <path d="M38,40 Q40,44 42,40" stroke="#D0A070" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <!-- big grin -->
+          <path d="M28,47 Q40,58 52,47 Q40,54 28,47 Z" fill="#E0A090"/>
+          <path d="M28,47 Q40,58 52,47" stroke="#A06050" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <!-- teeth -->
+          <path d="M32,49 Q40,55 48,49 Q40,52 32,49 Z" fill="white"/>
+        </svg>
+      </div>
+      <span class="face-label">Young Male</span>
+    </div>
+
+    <div class="face-card">
+      <div class="dicebear-face">
+        <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="40" cy="40" r="40" fill="#e8d8f8"/>
+          <ellipse cx="40" cy="75" rx="20" ry="12" fill="#6030A0"/>
+          <circle cx="40" cy="36" r="22" fill="#F8D5A5"/>
+          <!-- twin tails -->
+          <path d="M14,30 Q8,50 12,68 Q16,72 15,55 Q14,40 18,30 Z" fill="#1A0800"/>
+          <path d="M66,30 Q72,50 68,68 Q64,72 65,55 Q66,40 62,30 Z" fill="#1A0800"/>
+          <!-- hair top -->
+          <path d="M18,32 Q20,12 40,10 Q60,12 62,32 Q58,16 40,14 Q22,16 18,32 Z" fill="#1A0800"/>
+          <!-- pigtail ties -->
+          <rect x="15" y="28" width="7" height="4" rx="2" fill="#FF6090"/>
+          <rect x="58" y="28" width="7" height="4" rx="2" fill="#FF6090"/>
+          <!-- eyebrows -->
+          <path d="M27,27 Q31,24 36,26" stroke="#1A0800" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path d="M44,26 Q49,24 53,27" stroke="#1A0800" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <!-- big eyes -->
+          <circle cx="31" cy="34" r="6" fill="white"/>
+          <circle cx="49" cy="34" r="6" fill="white"/>
+          <circle cx="31" cy="34" r="4.5" fill="#6030A0"/>
+          <circle cx="49" cy="34" r="4.5" fill="#6030A0"/>
+          <circle cx="31" cy="34" r="3" fill="#1A0800"/>
+          <circle cx="49" cy="34" r="3" fill="#1A0800"/>
+          <circle cx="32" cy="32" r="1.5" fill="white"/>
+          <circle cx="50" cy="32" r="1.5" fill="white"/>
+          <circle cx="34" cy="36" r="0.8" fill="white" opacity="0.6"/>
+          <circle cx="52" cy="36" r="0.8" fill="white" opacity="0.6"/>
+          <!-- cheeks -->
+          <circle cx="22" cy="40" r="5" fill="#F5A0B0" opacity="0.5"/>
+          <circle cx="58" cy="40" r="5" fill="#F5A0B0" opacity="0.5"/>
+          <!-- nose -->
+          <circle cx="40" cy="42" r="1.5" fill="#D0A070"/>
+          <!-- happy mouth -->
+          <path d="M32,47 Q40,55 48,47" stroke="#C05060" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path d="M34,49 Q40,54 46,49 Q40,52 34,49 Z" fill="#E090A0"/>
+        </svg>
+      </div>
+      <span class="face-label">Young Female</span>
+    </div>
+
+  </div>
+</div>
+
+</div>
+
+</body>
+</html>
