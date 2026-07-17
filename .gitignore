@@ -4,3 +4,7 @@ node_modules/
 *.key
 renshuu2 api key
 serve.js
+.env
+
+# Local Netlify folder
+.netlify

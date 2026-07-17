@@ -874,10 +874,10 @@ pre.code {
   z-index: 1;
 }
 .rpg-scene-label {
-  position: absolute; top: 8px; left: 10px;
+  position: absolute; top: 8px; left: 10px; right: 10px;
   font-family: 'Nunito Sans', sans-serif; font-size: 11px; font-weight: 700; color: #d0c890;
   text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
-  z-index: 2; letter-spacing: 1px;
+  z-index: 2; letter-spacing: 1px; line-height: 1.4;
 }
 .rpg-dialogue-wrap { background: #0a0a16; border-top: 2px solid #3a3a5a; }
 .rpg-head {
@@ -891,6 +891,23 @@ pre.code {
   font-family: 'Nunito Sans', sans-serif; letter-spacing: 0.5px;
 }
 .rpg-head .btn:hover { background: #2a2a3a; color: #c0b080; }
+.kebab-wrap { position: relative; display: inline-flex; }
+.kebab-menu {
+  position: absolute; top: calc(100% + 4px); right: 0; z-index: 60;
+  background: #12121e; border: 1px solid #2a2a3a; border-radius: 8px;
+  padding: 4px; min-width: 160px; display: flex; flex-direction: column; gap: 2px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+}
+.kebab-menu[hidden] { display: none; }
+.kebab-item {
+  display: flex; align-items: center; gap: 9px;
+  background: none; border: none; color: #c0b080;
+  font-family: 'Nunito Sans', sans-serif; font-size: 12px; font-weight: 600;
+  padding: 8px 10px; border-radius: 6px; cursor: pointer; text-align: left; white-space: nowrap;
+}
+.kebab-item:hover { background: #2a2a3a; }
+.kebab-item svg { flex-shrink: 0; }
+.kebab-item.is-fav { color: #e8c060; }
 .rpg-dialogue {
   max-height: 300px; overflow-y: auto; scroll-behavior: smooth; padding: 12px 14px;
 }
@@ -1558,15 +1575,13 @@ pre.code {
     <input type="checkbox" id="vocabReinforce" checked onchange="localStorage.setItem('renshuu_vocab_reinforce',this.checked?'1':'0')" style="accent-color:var(--accent)" />
     <span>Reinforce unused words <span style="font-size:9px;color:var(--muted)">(nudge AI to use vocab it missed)</span></span>
   </label>
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--fg);margin-top:6px">
-    <input type="checkbox" id="vocabConstrain" checked onchange="localStorage.setItem('renshuu_vocab_constrain',this.checked?'1':'0')" style="accent-color:var(--accent)" />
-    <span>Stick to known words <span style="font-size:9px;color:var(--muted)">(limit AI to your Anki deck)</span></span>
-  </label>
-  <div class="label" style="margin-top:12px">Roleplay Style</div>
-  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11px;color:var(--text)">
-    <input type="checkbox" id="sierraToggle" onchange="S.sierraMode=this.checked;localStorage.setItem('renshuu_sierra_mode',this.checked);if(S.mode==='roleplay')renderRoleplay()" />
-    Sierra RPG mode <span style="font-size:9px;color:var(--muted)">(pixel art scenes)</span>
-  </label>
+  <div class="label" style="margin-top:12px">Known Words</div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:9px;color:var(--muted)">Strict</span>
+    <input type="range" id="vocabLevel" min="0" max="3" value="1" step="1" style="flex:1;accent-color:var(--accent)" oninput="setVocabLevel(this.value)" />
+    <span style="font-size:9px;color:var(--muted)">Relaxed</span>
+  </div>
+  <div id="vocabLevelDesc" style="font-size:9px;color:var(--muted);margin-top:4px;line-height:1.4">Strongly prefer your known words; keep new words minimal.</div>
 </div>
 
 <!-- RPG World Overlay -->
@@ -1705,9 +1720,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('speedVal').textContent = speechSpeed + '%';
   const vocabReinforce = localStorage.getItem('renshuu_vocab_reinforce');
   if (vocabReinforce === '0') document.getElementById('vocabReinforce').checked = false;
-  const vocabConstrain = localStorage.getItem('renshuu_vocab_constrain');
-  if (vocabConstrain === '0') document.getElementById('vocabConstrain').checked = false;
-  document.getElementById('sierraToggle').checked = S.sierraMode;
+  const vLvlSlider = document.getElementById('vocabLevel');
+  if (vLvlSlider) { const vLvl = getVocabLevel(); vLvlSlider.value = String(vLvl); setVocabLevel(vLvl); }
   // Migrate old favorites format (array of IDs → array of objects)
   if (S.favorites.length && typeof S.favorites[0] === 'string') {
     S.favorites = S.favorites.map(id => SCENARIO_POOL.find(s => s.id === id)).filter(Boolean);
@@ -1797,6 +1811,7 @@ document.addEventListener('click', e => {
   const apBtn = e.target.closest('.ap-btn[data-ap]');
   if (apBtn && _currentAudio && _currentMsgId === parseInt(apBtn.dataset.ap, 10)) {
     if (_currentAudio.paused) {
+      _bdStopMs = null;
       _currentAudio.play();
       apBtn.innerHTML = IC.pause;
       apBtn.classList.add('playing');
@@ -1814,6 +1829,7 @@ document.addEventListener('click', e => {
   if (apTrack && _currentAudio && _currentMsgId === parseInt(apTrack.dataset.apTrack, 10)) {
     const rect = apTrack.getBoundingClientRect();
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    _bdStopMs = null;
     _currentAudio.currentTime = pct * _currentAudio.duration;
     updatePlayer(_currentMsgId);
     return;
@@ -1827,6 +1843,7 @@ document.addEventListener('click', e => {
       if (wm) {
         const wb = _wordBounds.find(b => b.plainOffset < wm.end && b.plainOffset + b.plainLen > wm.start);
         if (wb) {
+          _bdStopMs = null;
           _currentAudio.currentTime = wb.ms / 1000;
           updatePlayer(_currentMsgId);
           // Also show furigana on the clicked word
@@ -1907,6 +1924,7 @@ const IC = {
   star:     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
   reset:    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>',
   back:     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>',
+  kebab:    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg>',
   send:     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>',
   map:      '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/></svg>',
   x:        '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
@@ -2015,7 +2033,7 @@ const S = {
   convo: [],
   sysPrompt: '',
   sessionWords: [],
-  sierraMode: localStorage.getItem('renshuu_sierra_mode') !== 'false',
+  sierraMode: true,
   // English roleplay (reverse mode)
   engScenario: null,
   engScenarios: [],
@@ -2548,6 +2566,8 @@ let _currentMsgId = null;
 let _apRAF = null;
 let _wordBounds = null;
 let _wordMap = null;
+// When set (ms), the shared player auto-pauses at this point — used to play a single breakdown sentence.
+let _bdStopMs = null;
 
 function cancelSpeech() {
   if (window.speechSynthesis) speechSynthesis.cancel();
@@ -2562,6 +2582,7 @@ function cancelSpeech() {
   _wordBounds = null;
   _wordMap = null;
   _currentMsgId = null;
+  _bdStopMs = null;
 }
 
 function fmtTime(s) {
@@ -2573,6 +2594,14 @@ function fmtTime(s) {
 function updatePlayer(msgId) {
   const player = document.getElementById('ap-' + msgId);
   if (!player || !_currentAudio) return;
+  // Stop at the end of a single breakdown sentence when a stop-point is set.
+  if (_bdStopMs != null && _currentAudio.currentTime * 1000 >= _bdStopMs) {
+    _currentAudio.pause();
+    _bdStopMs = null;
+    document.querySelectorAll('.speak-btn.speaking').forEach(b => b.classList.remove('speaking'));
+    const apBtn = document.querySelector('.ap-btn[data-ap="' + msgId + '"]');
+    if (apBtn) { apBtn.innerHTML = IC.play; apBtn.classList.remove('playing'); }
+  }
   const fill = player.querySelector('.ap-fill');
   const time = player.querySelector('.ap-time');
   const pct = _currentAudio.duration ? (_currentAudio.currentTime / _currentAudio.duration) * 100 : 0;
@@ -2842,21 +2871,32 @@ window.bdSpeak = function(mi, si) {
   const sentence = msg.bdState.sentences[si];
   const btn = document.querySelector(`.bd-speak-btn[data-mi="${mi}"][data-si="${si}"]`);
 
-  // If the full message audio is already loaded, scrub to the start of this sentence
+  // If the full message audio is already loaded, play just this sentence from the full track
   if (_currentMsgId === mi && _currentAudio && _wordBounds?.length) {
     const plain = stripMarkers(msg.content);
     const sentenceOffset = plain.indexOf(sentence);
     if (sentenceOffset !== -1) {
-      // Find the first word boundary at or after this character offset
-      const wb = _wordBounds.find(b => b.plainOffset >= sentenceOffset) || _wordBounds[0];
-      if (wb) {
-        _currentAudio.currentTime = wb.ms / 1000;
-        if (_currentAudio.paused) {
-          _currentAudio.play();
-          const apBtn = document.querySelector(`.ap-btn[data-ap="${mi}"]`);
-          if (apBtn) { apBtn.innerHTML = IC.pause; apBtn.classList.add('playing'); }
-          btn?.classList.add('speaking');
+      // First word boundary at or after this sentence's start
+      const startWb = _wordBounds.find(b => b.plainOffset >= sentenceOffset) || _wordBounds[0];
+      // End of this sentence = start of the next sentence's audio (or the end of the track)
+      let stopMs = null;
+      const nextSentence = msg.bdState.sentences[si + 1];
+      if (nextSentence) {
+        const nextOffset = plain.indexOf(nextSentence, sentenceOffset + sentence.length);
+        if (nextOffset !== -1) {
+          const endWb = _wordBounds.find(b => b.plainOffset >= nextOffset);
+          if (endWb) stopMs = endWb.ms;
         }
+      }
+      if (startWb) {
+        _bdStopMs = stopMs;
+        _currentAudio.currentTime = startWb.ms / 1000;
+        document.querySelectorAll('.speak-btn.speaking').forEach(b => b.classList.remove('speaking'));
+        btn?.classList.add('speaking');
+        const p = _currentAudio.play();
+        if (p?.catch) p.catch(() => {});
+        const apBtn = document.querySelector(`.ap-btn[data-ap="${mi}"]`);
+        if (apBtn) { apBtn.innerHTML = IC.pause; apBtn.classList.add('playing'); }
         updatePlayer(mi);
         return;
       }
@@ -6042,25 +6082,24 @@ function renderRoleplay() {
       <div class="rpg-frame">
         <div class="rpg-scene">
           ${renderScene(S.scenario)}
-          <div class="rpg-scene-label">${S.scenario.jp} — ${S.scenario.en}</div>
+          <div class="rpg-scene-label">${escHtml(S.scenario.char)}</div>
         </div>
         <div class="rpg-dialogue-wrap">
           <div class="rpg-head">
             <button class="btn" onclick="backToScenarios()">${IC.back} Back</button>
-            <div class="label" style="flex:1;text-align:center">${escHtml(S.scenario.char)}</div>
-            <button class="btn rpg-ff-btn" id="roleplFfBtn" onclick="roleplFastForward()" title="Skip ahead in time">${IC.ff}</button>
-            <button class="btn" onclick="resetChat()" title="Reset conversation">${IC.reset}</button>
+            <div class="label" style="flex:1;text-align:center"></div>
+            ${roleplayMenuHTML()}
           </div>
           <div class="rpg-dialogue" id="chatWin">${renderMessages()}</div>
           <div class="rpg-input-area">
             <textarea class="rpg-input" id="chatIn" rows="1"
               placeholder="日本語か romaji で…"
+              oninput="autoGrowInput(this)"
               onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"
             ></textarea>
             ${micButtonHTML('chatIn')}
             <button class="rpg-send" id="sendBtn" onclick="sendMsg()">${IC.send}</button>
           </div>
-          <div class="rpg-tip">Enter to send · Shift+Enter for new line · romaji auto-converted</div>
         </div>
         <div class="rpg-bd-drawer" id="rpBdDrawer">
           <div class="rpg-bd-drawer-head">
@@ -6075,13 +6114,13 @@ function renderRoleplay() {
         <div class="chat-head">
           <button class="btn" onclick="backToScenarios()">${IC.back} Back</button>
           <div class="label">${S.scenario.jp} — ${S.scenario.en}</div>
-          <button class="btn" id="roleplFfBtn" onclick="roleplFastForward()" title="Skip ahead in time">${IC.ff}</button>
-          <button class="btn" onclick="resetChat()" title="Reset conversation">${IC.reset}</button>
+          ${roleplayMenuHTML()}
         </div>
         <div class="chat-window" id="chatWin">${renderMessages()}</div>
         <div class="chat-foot">
           <textarea class="chat-input" id="chatIn" rows="1"
             placeholder="日本語か romaji で…"
+            oninput="autoGrowInput(this)"
             onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"
           ></textarea>
           ${micButtonHTML('chatIn')}
@@ -6144,7 +6183,7 @@ function renderMessages() {
     if (S.sierraMode) {
       const portraitHtml = msg.role === 'assistant' && S.scenario
         ? `<div class="rpg-portrait-frame">${renderPortrait(S.scenario)}</div>` : '';
-      const charName = S.scenario ? escHtml(S.scenario.char.split(',')[0]) : '';
+      const charName = S.scenario ? escHtml(S.scenario.char.split('—')[0].split(',')[0].replace(/\s*\([^)]*\)\s*/g, '').trim() || S.scenario.char) : '';
       const nameHtml = msg.role === 'assistant'
         ? `<div class="rpg-name">${charName}</div>`
         : `<div class="rpg-name">You</div>`;
@@ -6210,7 +6249,18 @@ function formatCorrection(s) {
   return escHtml(s || '')
     .replace(/(\d+)\.\s/g, '<br><strong>$1.</strong> ')
     .replace(/→/g, '<strong>→</strong>')
-    .replace(/✓\s*([^\n<]*)/g, '<br><span class="correction-fix">✓ $1</span>')
+    .replace(/✓\s*([^\n<]*)/g, (_m, fix) => {
+      const romaji = fix.trim();
+      // Show the kana alongside the romaji when the fix is pure romaji.
+      let kana = '';
+      try {
+        if (typeof wanakana !== 'undefined' && romaji && !/[\u3040-\u30ff\u4e00-\u9fff]/.test(romaji)) {
+          kana = wanakana.toHiragana(romaji, { passRomaji: false });
+        }
+      } catch (_) {}
+      const inner = kana && kana !== romaji ? `${kana}（${romaji}）` : romaji;
+      return `<br><span class="correction-fix">✓ ${inner}</span>`;
+    })
     .replace(/^<br>/, '');
 }
 
@@ -6219,9 +6269,6 @@ function pickScenario(id) {
   // On desktop, always use sierra split view and collapse sidebar
   if (window.innerWidth >= 768) {
     S.sierraMode = true;
-    const tog = document.getElementById('sierraToggle');
-    if (tog) tog.checked = true;
-    localStorage.setItem('renshuu_sierra_mode', 'true');
     const layout = document.getElementById('layout');
     if (!layout.classList.contains('sidebar-collapsed')) {
       layout.classList.add('sidebar-collapsed');
@@ -6252,21 +6299,53 @@ function resetChat() {
   startChat();
 }
 
+const VOCAB_LEVELS = [
+  { name: 'Strict', desc: 'Use only words from your Anki deck.' },
+  { name: 'Mostly known', desc: 'Strongly prefer your known words; keep new words minimal.' },
+  { name: 'Balanced', desc: 'Known words as a base, with some new words introduced naturally.' },
+  { name: 'Relaxed', desc: 'Let the conversation flow naturally, using known words as a base.' },
+];
+
+// Directive injected into the roleplay system prompt for each vocab level.
+const VOCAB_DIRECTIVES = [
+  `STRICT CONSTRAINT: Use ONLY words from this known vocabulary list. Do NOT introduce words the student hasn't studied, except unavoidable particles and the scenario's own proper nouns. If you can't express something with known words, rephrase it using simpler known words.`,
+  `Strongly prefer words from this known vocabulary list. Minimise using words the student hasn't studied yet — keep unknown words to only essential particles, greetings, and words required by the scenario context. If you must use an unknown word, keep it simple and high-frequency.`,
+  `Use this known vocabulary as your base, but naturally introduce a few new words each turn to gently expand the student's range. Keep new words simple and high-frequency, and make their meaning clear from context.`,
+  `Use this known vocabulary as a foundation, but let the conversation flow naturally — freely use new words wherever a native speaker naturally would, while keeping the overall level appropriate (around N4–N3) and comprehensible.`,
+];
+
+function getVocabLevel() {
+  const raw = localStorage.getItem('renshuu_vocab_level');
+  if (raw !== null) return Math.max(0, Math.min(3, parseInt(raw, 10) || 0));
+  // Migrate from the old "Stick to known words" checkbox: off → relaxed, on → mostly.
+  return localStorage.getItem('renshuu_vocab_constrain') === '0' ? 3 : 1;
+}
+
+function setVocabLevel(v) {
+  const lvl = Math.max(0, Math.min(3, parseInt(v, 10) || 0));
+  localStorage.setItem('renshuu_vocab_level', String(lvl));
+  const info = VOCAB_LEVELS[lvl];
+  const nameEl = document.getElementById('vocabLevelVal');
+  const descEl = document.getElementById('vocabLevelDesc');
+  if (nameEl) nameEl.textContent = info.name;
+  if (descEl) descEl.textContent = info.desc;
+}
+
 function buildSysPrompt(sc) {
   const words = pickWords(12);
   S.sessionWords = words;
   const youngList = words.filter(w => w.tier === 'y').map(w => `${w.jp}（${w.en}）`).join('、');
   const allList  = words.map(w => `${w.jp} = ${w.en}`).join(', ');
   S.usedWords = new Set();
-  // Build compact known-words list from entire Anki deck (when setting enabled)
-  const constrainOn = localStorage.getItem('renshuu_vocab_constrain') !== '0';
-  const allKnown = constrainOn ? [...S.cards.new, ...S.cards.young, ...S.cards.mature].map(c => c.jp) : [];
+  // Build compact known-words list from entire Anki deck, scaled by the vocab-level slider.
+  const vocabLevel = getVocabLevel();
+  const allKnown = [...S.cards.new, ...S.cards.young, ...S.cards.mature].map(c => c.jp);
   const knownList = allKnown.length ? allKnown.join('、') : '';
   S.sysPrompt = `You are playing the role of ${sc.char}. Scenario: ${sc.en}. ${sc.ctx}
 
 VOCABULARY TO USE NATURALLY: ${allList}
 PRIORITY — embed these YOUNG words (studied but not yet mastered) whenever natural: ${youngList || '(none this session)'}
-${knownList ? `\nSTUDENT'S KNOWN VOCABULARY (their full Anki deck): ${knownList}\nIMPORTANT: Strongly prefer words from this known vocabulary list. Minimise using words the student hasn't studied yet — keep unknown words to only essential particles, greetings, and words required by the scenario context. If you must use an unknown word, keep it simple and high-frequency.\n` : ''}
+${knownList ? `\nSTUDENT'S KNOWN VOCABULARY (their full Anki deck): ${knownList}\nIMPORTANT: ${VOCAB_DIRECTIVES[vocabLevel]}\n` : ''}
 Rules:
 1. Respond in Japanese only. STRICT LIMIT: 1–3 sentences. Most replies should be 1–2 sentences — like a real conversation, not a monologue. One-word or one-phrase reactions (え？本当？ / そうだね / いいね！) are great. NEVER write 4+ sentences. This is a back-and-forth dialogue, not a speech.
 2. Weave in vocab from the list, especially the priority young words.
@@ -6341,6 +6420,35 @@ function roleplFastForward() {
   });
 }
 
+// Kebab overflow menu for the roleplay header (fast-forward, favourite, reset).
+function roleplayMenuHTML() {
+  const isFav = S.scenario && S.favorites.some(f => f.id === S.scenario.id);
+  return `<div class="kebab-wrap">
+      <button class="btn" onclick="toggleRoleplayMenu(event)" title="More" aria-label="More options">${IC.kebab}</button>
+      <div class="kebab-menu" hidden>
+        <button class="kebab-item" onclick="closeRoleplayMenu();roleplFastForward()">${IC.ff} Fast forward</button>
+        <button class="kebab-item${isFav ? ' is-fav' : ''}" onclick="closeRoleplayMenu();toggleFavorite(S.scenario.id)">${IC.star} ${isFav ? 'Remove favourite' : 'Favourite'}</button>
+        <button class="kebab-item" onclick="closeRoleplayMenu();resetChat()">${IC.reset} Reset</button>
+      </div>
+    </div>`;
+}
+
+function toggleRoleplayMenu(e) {
+  e.stopPropagation();
+  const menu = e.currentTarget.closest('.kebab-wrap')?.querySelector('.kebab-menu');
+  if (!menu) return;
+  const willOpen = menu.hasAttribute('hidden');
+  closeRoleplayMenu();
+  if (willOpen) {
+    menu.removeAttribute('hidden');
+    setTimeout(() => document.addEventListener('click', closeRoleplayMenu, { once: true }), 0);
+  }
+}
+
+function closeRoleplayMenu() {
+  document.querySelectorAll('.kebab-menu:not([hidden])').forEach(m => m.setAttribute('hidden', ''));
+}
+
 async function startChat() {
   const chatWin = document.getElementById('chatWin');
   if (!chatWin) return;
@@ -6383,6 +6491,7 @@ async function sendMsg() {
   }
 
   inp.value = '';
+  inp.style.height = 'auto';
   if (sendBtn) sendBtn.disabled = true;
 
   S.convo.push({ role: 'user', content: text, display: escHtml(text), _id: msgId() });
@@ -6446,6 +6555,13 @@ async function sendMsg() {
 function scrollChat() {
   const w = document.getElementById('chatWin');
   if (w) setTimeout(() => w.scrollTop = w.scrollHeight, 60);
+}
+
+// Grow a chat textarea to fit its content (up to a max), then scroll internally.
+function autoGrowInput(el) {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 140) + 'px';
 }
 
 // ── ENGLISH ROLEPLAY MODE (英語ロールプレイ — 逆バージョン) ──────────────────
@@ -6745,6 +6861,7 @@ function renderEngRoleplay() {
           <div class="rpg-input-area">
             <textarea class="rpg-input" id="chatIn" rows="1"
               placeholder="英語で入力… (日本語でもOK)"
+              oninput="autoGrowInput(this)"
               onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendEngMsg()}"
             ></textarea>
             <button class="rpg-send" id="sendBtn" onclick="sendEngMsg()">${IC.send}</button>
@@ -6762,6 +6879,7 @@ function renderEngRoleplay() {
         <div class="chat-foot">
           <textarea class="chat-input" id="chatIn" rows="1"
             placeholder="英語で入力… (日本語でもOK)"
+            oninput="autoGrowInput(this)"
             onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendEngMsg()}"
           ></textarea>
           <button class="send-btn" id="sendBtn" onclick="sendEngMsg()">${IC.send}</button>
@@ -6917,6 +7035,7 @@ async function sendEngMsg() {
   if (!raw) return;
 
   inp.value = '';
+  inp.style.height = 'auto';
   if (sendBtn) sendBtn.disabled = true;
 
   S.engConvo.push({ role: 'user', content: raw, display: escHtml(raw), _id: msgId() });
