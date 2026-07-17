@@ -1,0 +1,7028 @@
+// ── Init ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadMistakeData(); // refresh mistake log + weak-point profile from the gist
+  const speechSpeed = localStorage.getItem('renshuu_speech_speed') || '100';
+  document.getElementById('speechSpeed').value = speechSpeed;
+  document.getElementById('speedVal').textContent = speechSpeed + '%';
+  const vocabReinforce = localStorage.getItem('renshuu_vocab_reinforce');
+  if (vocabReinforce === '0') document.getElementById('vocabReinforce').checked = false;
+  const vLvlSlider = document.getElementById('vocabLevel');
+  if (vLvlSlider) { const vLvl = getVocabLevel(); vLvlSlider.value = String(vLvl); setVocabLevel(vLvl); }
+  // Migrate old favorites format (array of IDs → array of objects)
+  if (S.favorites.length && typeof S.favorites[0] === 'string') {
+    S.favorites = S.favorites.map(id => SCENARIO_POOL.find(s => s.id === id)).filter(Boolean);
+    localStorage.setItem('renshuu_favorites', JSON.stringify(S.favorites));
+  }
+  // Restore generated scenarios from session, or generate fresh
+  const savedSc = sessionStorage.getItem('renshuu_scenarios');
+  if (savedSc) {
+    try {
+      const parsed = JSON.parse(savedSc);
+      if (Array.isArray(parsed) && parsed.length && typeof parsed[0] === 'object' && parsed[0].jp) {
+        S.scenarios = parsed;
+      } else {
+        sessionStorage.removeItem('renshuu_scenarios');
+      }
+    } catch (_) { sessionStorage.removeItem('renshuu_scenarios'); }
+  }
+  if (!S.scenarios.length) {
+    generateScenarios().then(() => { if (S.mode === 'roleplay') renderRoleplay(); });
+    // Use fallback until generation completes
+    S.scenarios = fallbackScenarios();
+  }
+  // English roleplay scenarios
+  const savedEngSc = sessionStorage.getItem('renshuu_eng_scenarios');
+  if (savedEngSc) {
+    try {
+      const parsed = JSON.parse(savedEngSc);
+      if (Array.isArray(parsed) && parsed.length && typeof parsed[0] === 'object' && parsed[0].jp) {
+        S.engScenarios = parsed;
+      } else { sessionStorage.removeItem('renshuu_eng_scenarios'); }
+    } catch (_) { sessionStorage.removeItem('renshuu_eng_scenarios'); }
+  }
+  if (!S.engScenarios.length) {
+    generateEngScenarios().then(() => { if (S.mode === 'eng_roleplay') renderEngRoleplay(); });
+    S.engScenarios = engFallbackScenarios();
+  }
+  loadCards();
+});
+
+document.addEventListener('click', e => {
+  // Close settings panel when clicking outside it
+  if (!e.target.closest('#settingsBtn') && !e.target.closest('#settingsPanel')) {
+    const sp = document.getElementById('settingsPanel');
+    if (sp && sp.style.display !== 'none') sp.style.display = 'none';
+  }
+
+  // Close mobile sidebar when clicking main content, or after tab/focus clicks
+  if (!e.target.closest('aside') && !e.target.closest('#menuBtn')) {
+    closeMenu();
+  }
+
+  // Close any open "New batch" custom-theme popover when clicking outside it
+  if (!e.target.closest('.split-btn')) {
+    document.querySelectorAll('.split-menu').forEach(m => m.setAttribute('hidden', ''));
+  }
+
+  // Drill submit button
+  const btn = e.target.closest('.drill-submit[data-di]');
+  if (btn) { checkDrill(parseInt(btn.dataset.di, 10)); return; }
+
+  // Compose submit button
+  const cBtn = e.target.closest('.compose-submit[data-ci]');
+  if (cBtn) { submitCompose(parseInt(cBtn.dataset.ci, 10)); return; }
+
+  // Drill speak button
+  const drillSpeak = e.target.closest('.drill-speak[data-sentence]');
+  if (drillSpeak) { speakJapanese(drillSpeak.dataset.sentence, drillSpeak); return; }
+
+  // Speak message aloud
+  const speakBtn = e.target.closest('.speak-btn[data-mi]');
+  if (speakBtn) {
+    const mi = parseInt(speakBtn.dataset.mi, 10);
+    if (S.mode === 'eng_roleplay') {
+      const msg = S.engConvo[mi];
+      if (msg) speakEnglish(msg.content, speakBtn, mi);
+    } else {
+      // Check RPG dialogue convo first, then regular convo
+      const rpgDs = window._rpg?.inDialogue && window._rpg?.dialogueState;
+      const convo = rpgDs ? rpgDs.convo : S.convo;
+      const msg = convo[mi];
+      if (msg) speakJapanese(msg.content, speakBtn, mi);
+    }
+    return;
+  }
+
+  // Audio player play/pause
+  const apBtn = e.target.closest('.ap-btn[data-ap]');
+  if (apBtn && _currentAudio && _currentMsgId === parseInt(apBtn.dataset.ap, 10)) {
+    if (_currentAudio.paused) {
+      _bdStopMs = null;
+      _currentAudio.play();
+      apBtn.innerHTML = IC.pause;
+      apBtn.classList.add('playing');
+      updatePlayer(_currentMsgId);
+    } else {
+      _currentAudio.pause();
+      apBtn.innerHTML = IC.play;
+      apBtn.classList.remove('playing');
+    }
+    return;
+  }
+
+  // Audio player scrub
+  const apTrack = e.target.closest('.ap-track[data-ap-track]');
+  if (apTrack && _currentAudio && _currentMsgId === parseInt(apTrack.dataset.apTrack, 10)) {
+    const rect = apTrack.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    _bdStopMs = null;
+    _currentAudio.currentTime = pct * _currentAudio.duration;
+    updatePlayer(_currentMsgId);
+    return;
+  }
+
+  // Click word to scrub audio — works when audio is loaded (playing or paused)
+  if (_currentAudio && _wordMap?.length && _wordBounds?.length) {
+    const wordEl = e.target.closest('.wt, [data-rt]');
+    if (wordEl) {
+      const wm = _wordMap.find(m => m.el === wordEl);
+      if (wm) {
+        const wb = _wordBounds.find(b => b.plainOffset < wm.end && b.plainOffset + b.plainLen > wm.start);
+        if (wb) {
+          _bdStopMs = null;
+          _currentAudio.currentTime = wb.ms / 1000;
+          updatePlayer(_currentMsgId);
+          // Also show furigana on the clicked word
+          document.querySelectorAll('[data-rt].active').forEach(x => x.classList.remove('active'));
+          if (wordEl.hasAttribute('data-en')) wordEl.classList.add('active');
+          return;
+        }
+      }
+    }
+  }
+
+  // Next sentence in breakdown
+  const prevBtn = e.target.closest('.bd-prev-btn[data-mi]');
+  if (prevBtn && !prevBtn.disabled) {
+    breakdownPrev(parseInt(prevBtn.dataset.mi, 10));
+    return;
+  }
+
+  const nextBtn = e.target.closest('.bd-next-btn[data-mi]');
+  if (nextBtn && !nextBtn.disabled) {
+    breakdownNext(parseInt(nextBtn.dataset.mi, 10));
+    return;
+  }
+
+  // Break down message
+  const bdBtn = e.target.closest('.breakdown-btn[data-mi]');
+  if (bdBtn) {
+    const mi = parseInt(bdBtn.dataset.mi, 10);
+    if (S.mode === 'eng_roleplay') {
+      const msg = S.engConvo[mi];
+      if (msg) breakdownEngMessage(msg, bdBtn, mi);
+    } else {
+      // Check RPG dialogue convo first, then regular convo
+      const rpgDs = window._rpg?.inDialogue && window._rpg?.dialogueState;
+      const convo = rpgDs ? rpgDs.convo : S.convo;
+      const msg = convo[mi];
+      if (msg) breakdownMessage(msg, bdBtn, mi);
+    }
+    return;
+  }
+
+  // Furigana click-to-reveal
+  const el = e.target.closest('[data-rt][data-en]');
+  const wasActive = el?.classList.contains('active');
+  document.querySelectorAll('[data-rt].active').forEach(x => x.classList.remove('active'));
+  if (el && !wasActive) el.classList.add('active');
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  // Custom-theme input in the "New batch" split menu: Enter generates.
+  const themeInp = e.target.closest('.batch-theme-input');
+  if (themeInp) {
+    e.preventDefault();
+    applyComposeThemeFromMenu(themeInp.parentElement.querySelector('.btn'));
+    return;
+  }
+  // Compose textarea: Enter submits; Shift+Enter inserts a newline.
+  const cInp = e.target.closest('.compose-input[data-ci]');
+  if (cInp) {
+    if (!e.shiftKey) {
+      e.preventDefault();
+      submitCompose(parseInt(cInp.dataset.ci, 10));
+    }
+    return;
+  }
+  const inp = e.target.closest('.answer-input[data-di]');
+  if (!inp) return;
+  e.preventDefault();
+  checkDrill(parseInt(inp.dataset.di, 10));
+});
+
+// ── Icons (inline SVGs for use in template literals) ─────────────────────────
+const IC = {
+  volume:   '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>',
+  book:     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>',
+  ff:       '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 19 22 12 13 5 13 19"/><polygon points="2 19 11 12 2 5 2 19"/></svg>',
+  star:     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+  reset:    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>',
+  back:     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>',
+  kebab:    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg>',
+  send:     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>',
+  map:      '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/></svg>',
+  x:        '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
+  play:     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>',
+  pause:    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg>',
+  loader:   '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin-icon"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>',
+  chevL:    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
+  chevLL:   '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>',
+  chevRR:   '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 17 5-5-5-5"/><path d="m13 17 5-5-5-5"/></svg>',
+  refresh:  '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>',
+  bulb:     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>',
+  chevD:    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+  mic:      '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>',
+};
+
+// Lightweight transient toast (uses the .renshuu-toast styles)
+function showToast(msg, isErr) {
+  let t = document.querySelector('.renshuu-toast');
+  if (!t) { t = document.createElement('div'); t.className = 'renshuu-toast'; document.body.appendChild(t); }
+  t.textContent = msg;
+  t.classList.toggle('err', !!isErr);
+  requestAnimationFrame(() => t.classList.add('show'));
+  clearTimeout(t._hide);
+  t._hide = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// ── Speech-to-text (modular) ──────────────────────────────────────────────────
+// Web Speech API dictation that targets any <input>/<textarea>. Drop a mic
+// button next to a field with micButtonHTML(targetId); it transcribes speech
+// into that field. Reused by Compose and Roleplay.
+const Mic = (() => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const supported = !!SR;
+  let active = null; // { rec, btn, target, base }
+
+  function cleanup() {
+    if (active && active.btn) active.btn.classList.remove('recording');
+    active = null;
+  }
+
+  function stop() {
+    if (active && active.rec) { try { active.rec.stop(); } catch (_) {} }
+  }
+
+  function start(btn, target, lang) {
+    const rec = new SR();
+    rec.lang = lang || 'ja-JP';
+    rec.interimResults = true;
+    rec.continuous = true;
+    // Append to whatever is already in the field, on a fresh line if non-empty.
+    const existing = target.value || '';
+    const base = existing && !/\s$/.test(existing) ? existing + ' ' : existing;
+    active = { rec, btn, target, base };
+    btn.classList.add('recording');
+
+    rec.onresult = (e) => {
+      if (!target.isConnected) { stop(); return; }
+      let txt = '';
+      for (let i = 0; i < e.results.length; i++) txt += e.results[i][0].transcript;
+      target.value = active.base + txt;
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    rec.onend = () => { cleanup(); try { target.focus(); } catch (_) {} };
+    rec.onerror = (ev) => {
+      cleanup();
+      if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+        showToast('Microphone blocked — allow mic access for this site', true);
+      } else if (ev.error !== 'aborted' && ev.error !== 'no-speech') {
+        showToast('Speech input error: ' + ev.error, true);
+      }
+    };
+    try { rec.start(); } catch (_) { cleanup(); }
+  }
+
+  function toggle(btn) {
+    if (!supported) { showToast('Speech input isn’t supported in this browser', true); return; }
+    const target = document.getElementById(btn.dataset.micTarget);
+    if (!target) return;
+    if (active && active.btn === btn) { stop(); return; }
+    if (active) stop();
+    start(btn, target, btn.dataset.micLang);
+  }
+
+  return { supported, toggle, stop };
+})();
+
+// Inline handler target (function declarations are reachable from onclick="")
+function micToggle(btn) { Mic.toggle(btn); }
+
+// Returns a mic button bound to the given field id, or '' when unsupported.
+function micButtonHTML(targetId, lang = 'ja-JP') {
+  if (!Mic.supported) return '';
+  return `<button type="button" class="mic-btn" data-mic-target="${targetId}" data-mic-lang="${lang}" onclick="micToggle(this)" title="Speak — click to start/stop dictation" aria-label="Dictate by voice">${IC.mic}</button>`;
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+const S = {
+  mode: 'drill',
+  focus: new Set(['n', 'y', 'm']),
+  cards: { new: [], young: [], mature: [] },
+  drills: [],
+  compose: { theme: '', themeJp: '', prompts: [], pendingTheme: '' },
+  scenario: null,
+  scenarios: [],
+  favorites: JSON.parse(localStorage.getItem('renshuu_favorites') || '[]'),
+  convo: [],
+  sysPrompt: '',
+  sessionWords: [],
+  sierraMode: true,
+  // English roleplay (reverse mode)
+  engScenario: null,
+  engScenarios: [],
+  engFavorites: JSON.parse(localStorage.getItem('renshuu_eng_favorites') || '[]'),
+  engConvo: [],
+  engSysPrompt: '',
+  // Mistake log + AI-distilled weak-point profile (the "teacher's notes")
+  mistakes: JSON.parse(localStorage.getItem('renshuu_mistakes') || '[]'),
+  weakPoints: JSON.parse(localStorage.getItem('renshuu_weakpoints') || 'null'),
+  analyzing: false,
+};
+
+
+// ── AnkiConnect ───────────────────────────────────────────────────────────────
+// Deck that one-click "mined" vocab (from roleplay breakdowns) is added to.
+const MINED_DECK = 'Renshuu Mined';
+
+async function anki(action, params = {}) {
+  const r = await fetch('http://localhost:8765', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, version: 6, params }),
+  });
+  const j = await r.json();
+  if (j.error) throw new Error(j.error);
+  return j.result;
+}
+
+function stripHtml(s) {
+  const d = document.createElement('div');
+  d.innerHTML = s || '';
+  return d.textContent.trim();
+}
+
+function parseCard(info) {
+  const f = info.fields;
+  const keys = Object.keys(f);
+  const JP = ['Expression','Front','Word','Japanese','表現','語句','単語'];
+  const EN = ['Meaning','Back','Definition','English','意味','訳'];
+  const RD = ['Reading','Kana','Furigana','読み','読み方'];
+  const jk = JP.find(k => f[k]?.value) || keys[0];
+  const ek = EN.find(k => f[k]?.value) || keys[Math.min(1, keys.length - 1)];
+  const rk = RD.find(k => f[k]?.value);
+  return {
+    id: info.cardId,
+    jp: stripHtml(f[jk]?.value),
+    en: stripHtml(f[ek]?.value),
+    rd: rk ? stripHtml(f[rk]?.value) : '',
+  };
+}
+
+async function fetchBatch(ids) {
+  if (!ids.length) return [];
+  const out = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const batch = await anki('cardsInfo', { cards: ids.slice(i, i + 50) });
+    out.push(...batch.map(parseCard).filter(c => c.jp));
+  }
+  return out;
+}
+
+async function loadCards() {
+  const btn = document.getElementById('loadBtn');
+  btn.disabled = true; btn.textContent = 'Loading…';
+  setDot('', 'connecting…');
+
+  try {
+    // Populate deck dropdown (preserve current selection if any)
+    const deckSel = document.getElementById('deckFilter');
+    const savedDeck = deckSel.value;
+    try {
+      const names = await anki('deckNames');
+      names.sort((a, b) => a.localeCompare(b));
+      deckSel.innerHTML = '<option value="">All decks</option>' +
+        names.map(n => `<option value="${escHtml(n)}"${n === savedDeck ? ' selected' : ''}>${escHtml(n)}</option>`).join('');
+      localStorage.setItem('renshuu_decks', JSON.stringify(names));
+    } catch (_) {
+      const cd = localStorage.getItem('renshuu_decks');
+      if (cd) {
+        const names = JSON.parse(cd);
+        deckSel.innerHTML = '<option value="">All decks</option>' +
+          names.map(n => `<option value="${escHtml(n)}"${n === savedDeck ? ' selected' : ''}>${escHtml(n)}</option>`).join('');
+      }
+    }
+
+    const df = document.getElementById('deckFilter').value.trim();
+    const pfx = df ? `deck:"${df}" ` : '';
+
+    const [nIds, lIds, yIds, mIds] = await Promise.all([
+      anki('findCards', { query: `${pfx}is:new` }),
+      anki('findCards', { query: `${pfx}is:learn` }),
+      anki('findCards', { query: `${pfx}is:review prop:ivl<21` }),
+      anki('findCards', { query: `${pfx}is:review prop:ivl>=21` }),
+    ]);
+
+    const youngAll = [...new Set([...lIds, ...yIds])];
+
+    const [nc, yc, mc] = await Promise.all([
+      fetchBatch(nIds),
+      fetchBatch(youngAll),
+      fetchBatch(mIds),
+    ]);
+
+    S.cards = { new: nc, young: yc, mature: mc };
+    document.getElementById('cntNew').textContent = nc.length;
+    document.getElementById('cntYoung').textContent = yc.length;
+    document.getElementById('cntMature').textContent = mc.length;
+
+    const cachePayload = JSON.stringify({ cards: S.cards, timestamp: Date.now() });
+    localStorage.setItem('renshuu_cards', cachePayload);
+    gistPush(S.cards); // fire-and-forget — sync to gist in background
+
+    document.getElementById('corsNotice').style.display = 'none';
+    setDot('on', 'anki connected');
+    renderMode();
+  } catch (e) {
+    // Try gist first, then local cache
+    const loadFromData = ({ cards, timestamp }) => {
+      S.cards = cards;
+      document.getElementById('cntNew').textContent = cards.new.length;
+      document.getElementById('cntYoung').textContent = cards.young.length;
+      document.getElementById('cntMature').textContent = cards.mature.length;
+      document.getElementById('corsNotice').style.display = 'none';
+      const mins = Math.round((Date.now() - timestamp) / 60000);
+      const age = mins < 60 ? `${mins}m ago` : mins < 1440 ? `${Math.round(mins / 60)}h ago` : `${Math.round(mins / 1440)}d ago`;
+      setDot('', `cached · synced ${age}`);
+      renderMode();
+    };
+    try {
+      const gistData = await gistFetch();
+      if (gistData?.cards) {
+        localStorage.setItem('renshuu_cards', JSON.stringify(gistData));
+        // Restore favorites from gist if present
+        if (gistData.favorites?.length) {
+          S.favorites = gistData.favorites;
+          localStorage.setItem('renshuu_favorites', JSON.stringify(S.favorites));
+        }
+        loadFromData(gistData);
+        btn.disabled = false; btn.textContent = 'Reload from Anki';
+        return;
+      }
+    } catch (_) {}
+    const cached = localStorage.getItem('renshuu_cards');
+    if (cached) {
+      try {
+        loadFromData(JSON.parse(cached));
+        btn.disabled = false; btn.textContent = 'Reload from Anki';
+        return;
+      } catch (_) {}
+    }
+    setDot('err', 'error');
+    showBanner(e.message.includes('fetch')
+      ? 'Cannot reach AnkiConnect. Is Anki running? Check CORS config.'
+      : e.message);
+  }
+
+  btn.disabled = false; btn.textContent = 'Reload from Anki';
+}
+
+function setDot(cls, txt) {
+  document.getElementById('dot').className = `dot ${cls}`;
+  document.getElementById('statusText').textContent = txt;
+}
+
+function showBanner(msg) {
+  const el = document.getElementById('corsNotice');
+  el.style.display = 'block';
+  el.innerHTML = `<strong>Error:</strong> ${msg}`;
+}
+
+// ── Gist sync ─────────────────────────────────────────────────────────────────
+const GIST_FILE = 'renshuu-cards.json';
+const GIST_DESC = 'renshuu-cards';
+
+async function gistGetId() {
+  let id = localStorage.getItem('renshuu_gist_id');
+  if (id) return id;
+  const list = await fetch('/.netlify/functions/gist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'list' }),
+  }).then(r => r.json());
+  if (!Array.isArray(list)) return null;
+  const found = list.find(g => g.description === GIST_DESC && g.files?.[GIST_FILE]);
+  if (found) { localStorage.setItem('renshuu_gist_id', found.id); return found.id; }
+  return null;
+}
+
+// Debounced gist push for favorites changes
+let _gistPushTimer = null;
+function gistPushAll() {
+  clearTimeout(_gistPushTimer);
+  _gistPushTimer = setTimeout(() => gistPush(S.cards), 2000);
+}
+
+async function gistPush(cards) {
+  const content = JSON.stringify({ cards, favorites: S.favorites, timestamp: Date.now() });
+  let id = await gistGetId();
+  if (id) {
+    await fetch('/.netlify/functions/gist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update', id, file: GIST_FILE, content }),
+    });
+  } else {
+    const r = await fetch('/.netlify/functions/gist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'create', description: GIST_DESC, file: GIST_FILE, content }),
+    }).then(r => r.json());
+    if (r.id) localStorage.setItem('renshuu_gist_id', r.id);
+  }
+}
+
+async function gistFetch() {
+  const id = await gistGetId();
+  if (!id) return null;
+  const gist = await fetch('/.netlify/functions/gist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'get', id }),
+  }).then(r => r.json());
+  const raw = gist.files?.[GIST_FILE]?.content;
+  return raw ? JSON.parse(raw) : null;
+}
+
+// Generic per-file gist read/write (reuses the same gist as the cards file).
+// Writes only when a gist already exists — otherwise we rely on localStorage
+// until the cards sync creates the gist, to avoid fragmenting into many gists.
+async function gistPushFile(file, obj) {
+  const id = await gistGetId();
+  if (!id) return;
+  await fetch('/.netlify/functions/gist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'update', id, file, content: JSON.stringify(obj) }),
+  });
+}
+async function gistFetchFile(file) {
+  const id = await gistGetId();
+  if (!id) return null;
+  const gist = await fetch('/.netlify/functions/gist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'get', id }),
+  }).then(r => r.json());
+  const raw = gist.files?.[file]?.content;
+  return raw ? JSON.parse(raw) : null;
+}
+
+// ── Mistake log + weak-point analysis ─────────────────────────────────────────
+const MISTAKES_FILE = 'renshuu-mistakes.json';
+const WEAK_FILE = 'renshuu-weakpoints.json';
+const MAX_MISTAKES = 200;       // rolling cap — keeps gist storage small
+const ANALYZE_THRESHOLD = 20;   // new mistakes needed before a re-analysis runs
+const ANALYZE_FIRST_RUN = 60;   // mistakes to seed the very first profile
+
+function clip(s, n) { s = String(s || '').trim(); return s.length > n ? s.slice(0, n) : s; }
+
+let _mistakePushTimer = null;
+function scheduleMistakePush() {
+  clearTimeout(_mistakePushTimer);
+  _mistakePushTimer = setTimeout(() => gistPushFile(MISTAKES_FILE, S.mistakes), 4000);
+}
+
+// Record one corrected mistake. wrote = what the student wrote, fix = corrected
+// form. Cheap, deduped against no-op corrections; bounded; debounced to gist.
+function logMistake({ src, wrote, fix, note, idea, constraint }) {
+  wrote = clip(wrote, 200); fix = clip(fix, 200);
+  if (!wrote || !fix) return;
+  const norm = s => s.replace(/[\s。、！？.,!?]/g, '');
+  if (norm(wrote) === norm(fix)) return; // nothing actually changed
+  const e = { t: Math.floor(Date.now() / 1000), src, wrote, fix };
+  if (note) e.note = clip(note, 240);
+  if (idea) e.idea = clip(idea, 160);
+  if (constraint) e.cn = clip(constraint, 60);
+  S.mistakes.push(e);
+  if (S.mistakes.length > MAX_MISTAKES) S.mistakes = S.mistakes.slice(-MAX_MISTAKES);
+  localStorage.setItem('renshuu_mistakes', JSON.stringify(S.mistakes));
+  scheduleMistakePush();
+  if (newMistakeCount() >= ANALYZE_THRESHOLD) analyzeWeakPoints();
+  else renderFocusSidebar();
+}
+
+// Pull the log + profile from the gist on startup (authoritative across devices).
+async function loadMistakeData() {
+  try {
+    const [m, w] = await Promise.all([gistFetchFile(MISTAKES_FILE), gistFetchFile(WEAK_FILE)]);
+    if (Array.isArray(m)) {
+      S.mistakes = m.slice(-MAX_MISTAKES);
+      localStorage.setItem('renshuu_mistakes', JSON.stringify(S.mistakes));
+    }
+    if (w && w.weakPoints) {
+      S.weakPoints = w;
+      localStorage.setItem('renshuu_weakpoints', JSON.stringify(w));
+    }
+  } catch (_) {}
+  renderFocusSidebar();
+}
+
+function newMistakeCount() {
+  const through = S.weakPoints?.analyzedThrough || 0;
+  return S.mistakes.filter(m => m.t > through).length;
+}
+
+// Incrementally update the weak-point profile. Feeds the existing profile +
+// only the NEW mistakes to Claude, so cost stays flat as history grows.
+async function analyzeWeakPoints(force = false) {
+  if (S.analyzing) return S.weakPoints;
+  if (S.mistakes.length === 0) return S.weakPoints;
+  const profile = S.weakPoints;
+  const through = profile?.analyzedThrough || 0;
+  const fresh = S.mistakes.filter(m => m.t > through);
+  if (!force && fresh.length < ANALYZE_THRESHOLD) return profile;
+
+  // First run analyses a recent window; later runs only the new mistakes.
+  const toAnalyze = profile ? fresh : S.mistakes.slice(-ANALYZE_FIRST_RUN);
+  if (toAnalyze.length === 0) return profile;
+
+  S.analyzing = true;
+  try {
+    const lines = toAnalyze.map(m => {
+      const where = m.src === 'r' ? 'roleplay' : 'compose';
+      const ctx = m.idea ? ` | task: ${m.idea}` : '';
+      const cn = m.cn ? ` | required pattern: ${m.cn}` : '';
+      const nt = m.note ? ` | tutor note: ${m.note}` : '';
+      return `(${where}) wrote: "${m.wrote}" → fix: "${m.fix}"${ctx}${cn}${nt}`;
+    }).join('\n');
+
+    const prior = profile ? JSON.stringify({ weakPoints: profile.weakPoints, summary: profile.summary }) : 'none yet';
+
+    const sys = `You are an expert Japanese teacher keeping private longitudinal notes on ONE student's recurring errors, exactly as a professional tutor would between lessons.
+You receive the CURRENT error profile (may be empty) and a batch of NEW mistakes. Each mistake shows what the student wrote and the corrected form (sometimes with the task and a tutor note).
+Your job: diagnose the UNDERLYING competence gaps, not surface slips. For each mistake, mentally diff wrote→fix and ask "what rule does the student not yet control?" Then maintain the profile:
+- The NEW MISTAKES below are the student's MOST RECENT work. Weight recency heavily: a gap they are getting wrong RIGHT NOW matters far more than one they struggled with long ago. The profile must track what they're struggling with *now*, weighted against their past.
+- Reinforce existing weak points when these recent mistakes show the same gap (raise severity, set trend "persistent"). When an existing gap does NOT appear in this recent batch, DECAY it — lower its severity and set trend "improving" — and let long-dormant gaps drift down the list.
+- Add genuinely new weak points (trend "new") only when there is real evidence.
+- Be specific and diagnostic: "に vs で — marks location of existence vs action" NOT "particles"; "transitive/intransitive pairs (なる vs する, 開く vs 開ける)" NOT "verbs".
+- Order so the student's CURRENT struggles come first: rank by recent activity, using severity as the tiebreaker. Keep up to 15 weak points so smaller and emerging gaps stay tracked, but the top of the list must reflect what they're getting wrong now.
+Return STRICT JSON only, no prose, no fences:
+{
+  "weakPoints": [
+    { "id": "kebab-case-stable-id", "label": "short specific name", "category": "particles|conjugation|transitivity|word-choice|word-order|politeness|tense-aspect|counters|other", "diagnosis": "one sentence: the rule the student is missing and how to fix it", "examples": ["wrote → fix"], "severity": 1, "trend": "new|persistent|improving" }
+  ],
+  "summary": "2-3 sentences: the student's overall pattern and what to drill next, in plain encouraging language."
+}`;
+
+    const msg = `CURRENT PROFILE:\n${prior}\n\nNEW MISTAKES (${toAnalyze.length}):\n${lines}`;
+    const raw = await claude([{ role: 'user', content: msg }], sys, 2500);
+    const parsed = parseLooseJSON(raw);
+    const maxT = toAnalyze.reduce((a, m) => Math.max(a, m.t), through);
+    // Recency-weighted ordering: actively-recurring gaps ("new"/"persistent")
+    // outrank ones that are fading ("improving"), with severity as the lever
+    // within each. Keeps "what I'm struggling with now" at the top.
+    const recencyWeight = t => (t === 'improving' ? 0.45 : t === 'new' ? 1.2 : 1);
+    const score = w => (w.severity || 1) * recencyWeight(w.trend);
+    const weakPoints = (Array.isArray(parsed.weakPoints) ? parsed.weakPoints : [])
+      .slice()
+      .sort((a, b) => score(b) - score(a))
+      .slice(0, 15);
+    S.weakPoints = {
+      updated: Math.floor(Date.now() / 1000),
+      analyzedThrough: maxT,
+      mistakeCount: S.mistakes.length,
+      weakPoints,
+      summary: parsed.summary || '',
+    };
+    localStorage.setItem('renshuu_weakpoints', JSON.stringify(S.weakPoints));
+    gistPushFile(WEAK_FILE, S.weakPoints);
+  } catch (e) {
+    showToast('Weak-point analysis failed: ' + e.message, true);
+  } finally {
+    S.analyzing = false;
+  }
+  renderFocusSidebar();
+  return S.weakPoints;
+}
+
+// ── Util ──────────────────────────────────────────────────────────────────────
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// ── Romaji helpers (fallback if wanakana CDN is unavailable) ──────────────────
+const _H2R2 = {
+  'きゃ':'kya','きゅ':'kyu','きょ':'kyo','しゃ':'sha','しゅ':'shu','しょ':'sho',
+  'ちゃ':'cha','ちゅ':'chu','ちょ':'cho','にゃ':'nya','にゅ':'nyu','にょ':'nyo',
+  'ひゃ':'hya','ひゅ':'hyu','ひょ':'hyo','みゃ':'mya','みゅ':'myu','みょ':'myo',
+  'りゃ':'rya','りゅ':'ryu','りょ':'ryo','ぎゃ':'gya','ぎゅ':'gyu','ぎょ':'gyo',
+  'じゃ':'ja','じゅ':'ju','じょ':'jo','びゃ':'bya','びゅ':'byu','びょ':'byo',
+  'ぴゃ':'pya','ぴゅ':'pyu','ぴょ':'pyo',
+};
+const _H2R1 = {
+  'あ':'a','い':'i','う':'u','え':'e','お':'o',
+  'か':'ka','き':'ki','く':'ku','け':'ke','こ':'ko',
+  'が':'ga','ぎ':'gi','ぐ':'gu','げ':'ge','ご':'go',
+  'さ':'sa','し':'shi','す':'su','せ':'se','そ':'so',
+  'ざ':'za','じ':'ji','ず':'zu','ぜ':'ze','ぞ':'zo',
+  'た':'ta','ち':'chi','つ':'tsu','て':'te','と':'to',
+  'だ':'da','で':'de','ど':'do',
+  'な':'na','に':'ni','ぬ':'nu','ね':'ne','の':'no',
+  'は':'ha','ひ':'hi','ふ':'fu','へ':'he','ほ':'ho',
+  'ば':'ba','び':'bi','ぶ':'bu','べ':'be','ぼ':'bo',
+  'ぱ':'pa','ぴ':'pi','ぷ':'pu','ぺ':'pe','ぽ':'po',
+  'ま':'ma','み':'mi','む':'mu','め':'me','も':'mo',
+  'や':'ya','ゆ':'yu','よ':'yo',
+  'ら':'ra','り':'ri','る':'ru','れ':'re','ろ':'ro',
+  'わ':'wa','を':'wo','ん':'n','ー':'',
+};
+function hiraToRomaji(str) {
+  let out = '', i = 0;
+  while (i < str.length) {
+    const two = str.slice(i, i + 2);
+    if (_H2R2[two]) { out += _H2R2[two]; i += 2; continue; }
+    if (str[i] === 'っ') {
+      const nxt = _H2R1[str[i + 1]] || _H2R2[str.slice(i + 1, i + 3)] || '';
+      out += nxt ? nxt[0] : 'tt'; i++; continue;
+    }
+    out += _H2R1[str[i]] || str[i]; i++;
+  }
+  return out;
+}
+function readingToRomaji(hira) {
+  try { return wanakana.toRomaji(hira).toLowerCase(); } catch (_) {}
+  return hiraToRomaji(hira).toLowerCase();
+}
+function inputToHira(romaji) {
+  try { return wanakana.toHiragana(romaji, { passRomaji: false }); } catch (_) {}
+  return romaji; // can't convert without wanakana; romaji comparison covers it
+}
+
+// Levenshtein edit distance — used for fuzzy drill answer matching
+function levenshtein(a, b) {
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const row = [...Array(b.length + 1).keys()];
+  for (let i = 0; i < a.length; i++) {
+    let prev = i + 1;
+    for (let j = 0; j < b.length; j++) {
+      const next = a[i] === b[j] ? row[j] : 1 + Math.min(row[j], row[j + 1], prev);
+      row[j] = prev; prev = next;
+    }
+    row[b.length] = prev;
+  }
+  return row[b.length];
+}
+
+function toggleSettings() {
+  const p = document.getElementById('settingsPanel');
+  if (!p) return;
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+function submitSettings() {
+  toggleSettings();
+}
+
+function toggleMenu() {
+  document.querySelector('aside').classList.toggle('sidebar-open');
+}
+function closeMenu() {
+  document.querySelector('aside')?.classList.remove('sidebar-open');
+}
+function toggleSidebar() {
+  const layout = document.getElementById('layout');
+  const btn = document.getElementById('sidebarToggle');
+  layout.classList.toggle('sidebar-collapsed');
+  const collapsed = layout.classList.contains('sidebar-collapsed');
+  btn.innerHTML = collapsed ? IC.chevRR : IC.chevLL;
+  localStorage.setItem('renshuu_sidebar', collapsed ? '0' : '1');
+}
+// Restore sidebar state on load
+if (localStorage.getItem('renshuu_sidebar') === '0') {
+  document.getElementById('layout')?.classList.add('sidebar-collapsed');
+  const tb = document.getElementById('sidebarToggle');
+  if (tb) tb.innerHTML = IC.chevRR;
+}
+
+// Strip all HTML except <span data-rt="...">, preserving data-en and data-new
+function safeAnnotated(html) {
+  const div = document.createElement('div');
+  div.innerHTML = html || '';
+  div.querySelectorAll('*').forEach(el => {
+    if (el.tagName === 'SPAN' && (el.hasAttribute('data-rt') || el.hasAttribute('data-new'))) {
+      [...el.attributes].forEach(a => {
+        if (!['data-rt', 'data-en', 'data-new'].includes(a.name)) el.removeAttribute(a.name);
+      });
+    } else {
+      el.replaceWith(...el.childNodes);
+    }
+  });
+  return div.innerHTML;
+}
+
+// Convert [[word|reading|english]] or [[word|reading|english|0or1]] markers → spans.
+// The 4th pipe field (new flag) is optional.
+function buildAnnotated(body) {
+  return (body || '')
+    // 3-value: [[word|reading|english]] with optional |0/1 flag
+    .replace(
+      /\[\[([^\[\]|]+)\|([^\[\]|]+)\|([^\[\]|]+)(?:\|([01]))?\]\]/g,
+      (_, word, rt, en, isNew) => {
+        const newAttr = isNew === '1' ? ' data-new="1"' : '';
+        return `<span data-rt="${rt.trim()}" data-en="${en.trim()}"${newAttr}>${word.trim()}</span>`;
+      }
+    )
+    // 2-value: [[kanji|reading]] — no English
+    .replace(
+      /\[\[([^\[\]|]+)\|([^\[\]|]+)\]\]/g,
+      (_, word, rt) => `<span data-rt="${rt.trim()}">${word.trim()}</span>`
+    );
+}
+
+// Format *action* text as styled blocks (RPG mode only)
+function formatActions(html) {
+  return html.replace(/\*([^*]+)\*/g, '<span class="rpg-action">$1</span>');
+}
+
+// Strip [[word|reading|english]] markers and *action* markers, keeping just the surface text
+function stripMarkers(text) {
+  return (text || '')
+    .replace(/\[\[([^\[\]|]+)\|[^\[\]]+\]\]/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1');
+}
+
+// Cancel any in-progress speech
+let _azureSynth = null;
+let _currentAudio = null;
+let _currentMsgId = null;
+let _apRAF = null;
+let _wordBounds = null;
+let _wordMap = null;
+// When set (ms), the shared player auto-pauses at this point — used to play a single breakdown sentence.
+let _bdStopMs = null;
+
+function cancelSpeech() {
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  if (_azureSynth) { _azureSynth.close(); _azureSynth = null; }
+  if (_currentAudio) { _currentAudio.pause(); _currentAudio = null; }
+  if (_apRAF) { cancelAnimationFrame(_apRAF); _apRAF = null; }
+  document.querySelectorAll('.speak-btn.speaking').forEach(b => b.classList.remove('speaking'));
+  // Hide all players and reset
+  document.querySelectorAll('.audio-player').forEach(p => { p.style.display = 'none'; });
+  document.querySelectorAll('.ap-btn').forEach(b => { b.innerHTML = IC.play; b.classList.remove('playing'); });
+  document.querySelectorAll('.w-active').forEach(el => el.classList.remove('w-active'));
+  _wordBounds = null;
+  _wordMap = null;
+  _currentMsgId = null;
+  _bdStopMs = null;
+}
+
+function fmtTime(s) {
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return m + ':' + (sec < 10 ? '0' : '') + sec;
+}
+
+function updatePlayer(msgId) {
+  const player = document.getElementById('ap-' + msgId);
+  if (!player || !_currentAudio) return;
+  // Stop at the end of a single breakdown sentence when a stop-point is set.
+  if (_bdStopMs != null && _currentAudio.currentTime * 1000 >= _bdStopMs) {
+    _currentAudio.pause();
+    _bdStopMs = null;
+    document.querySelectorAll('.speak-btn.speaking').forEach(b => b.classList.remove('speaking'));
+    const apBtn = document.querySelector('.ap-btn[data-ap="' + msgId + '"]');
+    if (apBtn) { apBtn.innerHTML = IC.play; apBtn.classList.remove('playing'); }
+  }
+  const fill = player.querySelector('.ap-fill');
+  const time = player.querySelector('.ap-time');
+  const pct = _currentAudio.duration ? (_currentAudio.currentTime / _currentAudio.duration) * 100 : 0;
+  if (fill) fill.style.width = pct + '%';
+  if (time) time.textContent = fmtTime(_currentAudio.currentTime);
+  // Highlight current word
+  if (_wordBounds?.length && _wordMap?.length) {
+    const ms = _currentAudio.currentTime * 1000;
+    // Find current word boundary
+    let wb = null;
+    for (let i = _wordBounds.length - 1; i >= 0; i--) {
+      if (ms >= _wordBounds[i].ms) { wb = _wordBounds[i]; break; }
+    }
+    // Clear previous highlights
+    _wordMap.forEach(m => m.el.classList.remove('w-active'));
+    // Highlight matching nodes
+    if (wb) {
+      const wStart = wb.plainOffset;
+      const wEnd = wStart + wb.plainLen;
+      _wordMap.forEach(m => {
+        if (m.start < wEnd && m.end > wStart) m.el.classList.add('w-active');
+      });
+    }
+  }
+  if (!_currentAudio.paused && !_currentAudio.ended) {
+    _apRAF = requestAnimationFrame(() => updatePlayer(msgId));
+  }
+}
+
+// Build a map from DOM elements in the message body to character positions in the plain text
+function buildWordMap(msgBodyEl) {
+  const map = [];
+  let pos = 0;
+  function walk(node) {
+    if (node.nodeType === 3) { // text node
+      const len = node.textContent.length;
+      if (len > 0) {
+        // Wrap bare text node in a span so we can highlight it
+        const span = document.createElement('span');
+        span.className = 'wt';
+        node.parentNode.replaceChild(span, node);
+        span.appendChild(node);
+        map.push({ el: span, start: pos, end: pos + len });
+        pos += len;
+      }
+    } else if (node.nodeType === 1) {
+      if (node.hasAttribute('data-rt')) {
+        // Annotated kanji span — treat as atomic unit
+        const len = node.textContent.length;
+        map.push({ el: node, start: pos, end: pos + len });
+        pos += len;
+      } else if (!node.classList?.contains('wt')) {
+        // Container — walk children (take snapshot to avoid mutation issues)
+        Array.from(node.childNodes).forEach(walk);
+      }
+    }
+  }
+  Array.from(msgBodyEl.childNodes).forEach(walk);
+  return map;
+}
+
+async function speakJapanese(rawText, btn, msgIdx) {
+  // Normalize undefined → null so guards like (_currentMsgId !== msgIdx) work for drills
+  if (msgIdx == null) msgIdx = null;
+  // If this message already has audio loaded, just toggle play
+  if (msgIdx != null && _currentMsgId === msgIdx && _currentAudio) {
+    if (_currentAudio.paused) {
+      _currentAudio.play();
+      const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
+      if (apBtn) { apBtn.innerHTML = IC.pause; apBtn.classList.add('playing'); }
+      btn?.classList.add('speaking');
+      updatePlayer(msgIdx);
+    } else {
+      _currentAudio.pause();
+      const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
+      if (apBtn) { apBtn.innerHTML = IC.play; apBtn.classList.remove('playing'); }
+      btn?.classList.remove('speaking');
+    }
+    return;
+  }
+
+  cancelSpeech();
+  const text = stripMarkers(rawText);
+  if (!text.trim()) return;
+  _currentMsgId = msgIdx != null ? msgIdx : null;
+
+  // ── Azure Speech (premium) ──────────────────────────────────────────────
+  if (window.SpeechSDK) {
+    btn?.classList.add('speaking');
+    try {
+      const az = await fetch('/.netlify/functions/azure-token').then(r => r.json());
+      if (az.error) throw new Error(az.error);
+      const cfg = SpeechSDK.SpeechConfig.fromAuthorizationToken(az.token, az.region);
+      cfg.speechSynthesisLanguage = 'ja-JP';
+      // Pick voice: use scenario character voice if in roleplay, else default
+      const voiceName = S.scenario?.voice || 'ja-JP-NanamiNeural';
+      cfg.speechSynthesisVoiceName = voiceName;
+      // Build SSML with speed control
+      // Azure prosody rate: relative percentage. 0% = normal, -50% = half, +50% = 1.5x
+      const speed = parseInt(localStorage.getItem('renshuu_speech_speed') || '100', 10);
+      const offset = speed - 100;
+      const rate = (offset >= 0 ? '+' : '') + offset + '%';
+      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ja-JP">
+        <voice name="${voiceName}">
+          <prosody rate="${rate}">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</prosody>
+        </voice>
+      </speak>`;
+      const synth = new SpeechSDK.SpeechSynthesizer(cfg, null);
+      _azureSynth = synth;
+      // Collect word boundary events for karaoke highlighting
+      // Azure audioOffset is in 100ns ticks and already accounts for prosody rate
+      const wordBounds = [];
+      synth.wordBoundary = (s, e) => {
+        wordBounds.push({ ms: e.audioOffset / 10000, text: e.text, ssmlOffset: e.textOffset, len: e.wordLength });
+      };
+      synth.speakSsmlAsync(ssml,
+        result => {
+          if (_currentMsgId !== msgIdx) { synth.close(); return; }
+          if (result.reason === SpeechSDK.ResultReason.SynthesizingAudioCompleted && result.audioData) {
+            const blob = new Blob([result.audioData], { type: 'audio/wav' });
+            const audio = new Audio(URL.createObjectURL(blob));
+            _currentAudio = audio;
+            audio.onended = audio.onerror = () => {
+              btn?.classList.remove('speaking');
+              // Clear word highlights
+              if (_wordMap) _wordMap.forEach(m => m.el.classList.remove('w-active'));
+              if (msgIdx != null) {
+                const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
+                if (apBtn) { apBtn.innerHTML = IC.play; apBtn.classList.remove('playing'); }
+                updatePlayer(msgIdx);
+              } else {
+                _currentAudio = null;
+              }
+            };
+            // Build word map for karaoke highlighting
+            if (msgIdx != null && wordBounds.length) {
+              // Map word boundaries to plain text positions by sequential matching
+              let plainPos = 0;
+              wordBounds.forEach(wb => {
+                const wbText = wb.text.trim();
+                const idx = text.indexOf(wbText, plainPos);
+                if (idx !== -1) {
+                  wb.plainOffset = idx;
+                  wb.plainLen = wbText.length;
+                  plainPos = idx + wbText.length;
+                } else {
+                  // Try searching from start (Azure may reorder across punctuation)
+                  const fallback = text.indexOf(wbText);
+                  if (fallback !== -1) {
+                    wb.plainOffset = fallback;
+                    wb.plainLen = wbText.length;
+                  } else {
+                    wb.plainOffset = plainPos;
+                    wb.plainLen = wbText.length;
+                  }
+                }
+              });
+              _wordBounds = wordBounds;
+              // Build DOM word map from the message body
+              const msgBody = document.getElementById('ap-' + msgIdx)?.closest('.msg')?.querySelector('.msg-body');
+              if (msgBody) {
+                _wordMap = buildWordMap(msgBody);
+                // Verify: DOM text should match plain text. If not, log for debugging.
+                const domText = msgBody.textContent;
+                if (domText !== text) {
+                  console.warn('Word map mismatch — DOM text differs from plain text sent to Azure.',
+                    { domLen: domText.length, plainLen: text.length });
+                }
+              }
+            }
+            // Show player if msgIdx
+            if (msgIdx != null) {
+              const player = document.getElementById('ap-' + msgIdx);
+              if (player) player.style.display = 'flex';
+              const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
+              if (apBtn) { apBtn.innerHTML = IC.pause; apBtn.classList.add('playing'); }
+            }
+            audio.play();
+            if (msgIdx != null) updatePlayer(msgIdx);
+          } else {
+            btn?.classList.remove('speaking');
+          }
+          synth.close();
+          _azureSynth = null;
+        },
+        err => {
+          if (_currentMsgId !== msgIdx) { synth.close(); return; }
+          console.warn('Azure TTS failed, falling back to Web Speech:', err);
+          synth.close();
+          _azureSynth = null;
+          speakWebSpeech(text, btn);
+        }
+      );
+    } catch (e) {
+      console.warn('Azure TTS error, falling back to Web Speech:', e);
+      speakWebSpeech(text, btn);
+    }
+    return;
+  }
+
+  // ── Web Speech (fallback) ───────────────────────────────────────────────
+  speakWebSpeech(text, btn);
+}
+
+function speakWebSpeech(text, btn) {
+  if (!window.speechSynthesis) return;
+  const trySpeak = () => {
+    const voices = speechSynthesis.getVoices();
+    const jpVoice =
+      voices.find(v => v.lang === 'ja-JP' && v.localService && /kyoko|o-ren|otoya/i.test(v.name)) ||
+      voices.find(v => v.lang === 'ja-JP' && v.localService) ||
+      voices.find(v => v.lang === 'ja-JP') ||
+      voices.find(v => v.lang.startsWith('ja'));
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = 'ja-JP';
+    const speed = parseInt(localStorage.getItem('renshuu_speech_speed') || '100', 10);
+    utt.rate = (speed / 100) * 0.85; // scale from the base 0.85 rate
+    if (jpVoice) utt.voice = jpVoice;
+    btn?.classList.add('speaking');
+    utt.onend = utt.onerror = () => btn?.classList.remove('speaking');
+    speechSynthesis.speak(utt);
+  };
+  if (speechSynthesis.getVoices().length) trySpeak();
+  else { speechSynthesis.onvoiceschanged = () => { speechSynthesis.onvoiceschanged = null; trySpeak(); }; }
+}
+
+function splitSentences(text) {
+  const parts = text.split(/(?<=[。！？])/g).map(s => s.trim()).filter(s => s);
+  return parts.length > 0 ? parts : [text.trim()];
+}
+
+function splitEngSentences(text) {
+  // Split on sentence-ending punctuation (.!?) keeping the punctuation,
+  // but be tolerant of trailing quotes/parens.
+  const matches = text.match(/[^.!?]+[.!?]+["')\]”’]*\s*/g);
+  if (!matches) return [text.trim()].filter(Boolean);
+  return matches.map(s => s.trim()).filter(Boolean);
+}
+
+function parseNumberedTranslation(translationPart, expectedCount) {
+  if (!translationPart) return null;
+  // Match lines starting with "N. " or "N) " — handle markdown-stripped output too
+  const cleaned = translationPart.replace(/\*\*/g, '').replace(/^#{1,3}\s*/gm, '');
+  const lines = cleaned.split('\n').map(l => l.trim()).filter(Boolean);
+  const items = [];
+  for (const line of lines) {
+    const m = line.match(/^(\d+)[.)]\s*(.+)$/);
+    if (m) items.push(m[2].trim());
+  }
+  return items.length === expectedCount ? items : null;
+}
+
+function extractTranslationText(translationPart) {
+  return (translationPart || '')
+    .replace(/\*\*/g, '')
+    .replace(/^#{1,3}\s*/gm, '')
+    .replace(/^TRANSLATION:?\s*/im, '')
+    .trim();
+}
+
+// Speak a single sentence from the breakdown carousel
+window.bdSpeak = function(mi, si) {
+  const inRpg = window._rpg?.inDialogue && window._rpg?.dialogueState;
+  const convo = inRpg ? window._rpg.dialogueState.convo : S.convo;
+  const msg = convo[mi];
+  if (!msg?.bdState?.sentences?.[si]) return;
+  const sentence = msg.bdState.sentences[si];
+  const btn = document.querySelector(`.bd-speak-btn[data-mi="${mi}"][data-si="${si}"]`);
+
+  // If the full message audio is already loaded, play just this sentence from the full track
+  if (_currentMsgId === mi && _currentAudio && _wordBounds?.length) {
+    const plain = stripMarkers(msg.content);
+    const sentenceOffset = plain.indexOf(sentence);
+    if (sentenceOffset !== -1) {
+      // First word boundary at or after this sentence's start
+      const startWb = _wordBounds.find(b => b.plainOffset >= sentenceOffset) || _wordBounds[0];
+      // End of this sentence = start of the next sentence's audio (or the end of the track)
+      let stopMs = null;
+      const nextSentence = msg.bdState.sentences[si + 1];
+      if (nextSentence) {
+        const nextOffset = plain.indexOf(nextSentence, sentenceOffset + sentence.length);
+        if (nextOffset !== -1) {
+          const endWb = _wordBounds.find(b => b.plainOffset >= nextOffset);
+          if (endWb) stopMs = endWb.ms;
+        }
+      }
+      if (startWb) {
+        _bdStopMs = stopMs;
+        _currentAudio.currentTime = startWb.ms / 1000;
+        document.querySelectorAll('.speak-btn.speaking').forEach(b => b.classList.remove('speaking'));
+        btn?.classList.add('speaking');
+        const p = _currentAudio.play();
+        if (p?.catch) p.catch(() => {});
+        const apBtn = document.querySelector(`.ap-btn[data-ap="${mi}"]`);
+        if (apBtn) { apBtn.innerHTML = IC.pause; apBtn.classList.add('playing'); }
+        updatePlayer(mi);
+        return;
+      }
+    }
+  }
+
+  // Fallback: synthesise just this sentence
+  speakJapanese(sentence, btn, null);
+};
+
+function parseFirstBdReply(text) {
+  const m = text.search(/^(?:#{1,3}\s*)?SENTENCE\b/im);
+  if (m === -1) return { translationPart: text, sentencePart: '' };
+  return { translationPart: text.slice(0, m), sentencePart: text.slice(m) };
+}
+
+function renderBdState(state, mi) {
+  const total = state.sentences.length;
+  const cur = state.idx;
+
+  // Translation card — clickable sentences when count matches JP count
+  let translationInner;
+  if (!state.translationHtml) {
+    translationInner = '<span class="spin"></span>';
+  } else {
+    let engSentences = state.translationSentences;
+    if (!engSentences && state.translationText) {
+      const split = splitEngSentences(state.translationText);
+      if (split.length === total) engSentences = split;
+    }
+    if (engSentences && engSentences.length === total && total >= 1) {
+      const items = engSentences.map((s, i) =>
+        `<span class="bd-tr-sentence${i === cur ? ' bd-tr-sentence-active' : ''}" onclick="bdJumpTo(${mi}, ${i})" title="Jump to this sentence">${escHtml(s)}</span>`
+      ).join(' ');
+      translationInner = `<div class="bd-heading">Translation</div><div class="bd-translation">${items}</div>`;
+    } else {
+      translationInner = state.translationHtml;
+    }
+  }
+  const translationCard = `<div class="bd-card bd-card-translation">${translationInner}</div>`;
+
+  // Carousel: all loaded sentence cards, showing only current
+  const prevDisabled = cur === 0 ? 'disabled' : '';
+  const nextLoading = state.sentenceHtml[cur] === null;
+  const nextDisabled = (cur >= total - 1 && !nextLoading) ? 'disabled' : '';
+
+  let sentenceCards = '';
+  for (let i = 0; i <= cur; i++) {
+    const visible = i === cur;
+    const jpHeader = `<div class="bd-sentence-row">
+        <div class="bd-sentence">${escHtml(state.sentences[i])}</div>
+        <button class="bd-speak-btn speak-btn" data-mi="${mi}" data-si="${i}" onclick="bdSpeak(${mi},${i})" title="Listen to this sentence">${IC.volume}</button>
+      </div>`;
+    const body = state.sentenceHtml[i] != null
+      ? state.sentenceHtml[i]
+      : `<div style="padding:12px 0;text-align:center"><span class="spin"></span></div>`;
+
+    const qa = (state.questions?.[i] || []).map(qa => `
+      <div class="bd-qa">
+        <div class="bd-q">${escHtml(qa.q)}</div>
+        <div class="bd-a">${qa.a == null ? '<span class="spin"></span>' : qa.a}</div>
+      </div>`).join('');
+    const askForm = state.sentenceHtml[i] != null ? `
+      <form class="bd-ask-form" onsubmit="event.preventDefault(); bdAsk(this, ${mi}, ${i})">
+        <input class="bd-ask-input" placeholder="Ask about this sentence…" autocomplete="off" />
+        <button class="bd-ask-btn" type="submit">Ask</button>
+      </form>` : '';
+    const qaBlock = qa || askForm ? `<div class="bd-qa-thread">${qa}</div>${askForm}` : '';
+
+    sentenceCards += `<div class="bd-slide${visible ? ' bd-slide-active' : ''}">${jpHeader}${body}${qaBlock}</div>`;
+  }
+
+  // Dots
+  let dots = '';
+  for (let i = 0; i < total; i++) {
+    dots += `<span class="bd-dot${i === cur ? ' bd-dot-active' : ''}"></span>`;
+  }
+
+  const carousel = total > 0 ? `
+    <div class="bd-carousel">
+      <div class="bd-slides">${sentenceCards}</div>
+      ${total > 1 ? `
+      <div class="bd-carousel-nav">
+        <button class="bd-prev-btn bd-nav-btn" data-mi="${mi}" ${prevDisabled} title="Previous sentence">‹</button>
+        <span class="bd-dots">${dots}</span>
+        <button class="bd-next-btn bd-nav-btn" data-mi="${mi}" ${nextDisabled} title="Next sentence">${nextLoading ? '<span class="spin"></span>' : '›'}</button>
+      </div>` : ''}
+    </div>` : '';
+
+  return translationCard + carousel;
+}
+
+function repaintBreakdown(inRpg, mi) {
+  if (inRpg) {
+    rpgRenderChatMessages();
+    const ds = window._rpg?.dialogueState;
+    const msg = ds?.convo[mi];
+    const drawer = document.getElementById('rpgBdDrawer');
+    const body = document.getElementById('rpgBdDrawerBody');
+    const sceneView = document.getElementById('rpgSceneView');
+    if (msg?.breakdown && drawer && body) {
+      body.innerHTML = `<div class="msg-breakdown">${msg.breakdown}</div>`;
+      sceneView.classList.add('bd-open');
+    } else if (drawer) {
+      sceneView.classList.remove('bd-open');
+      body.innerHTML = '';
+    }
+  } else {
+    const chatWin = document.getElementById('chatWin');
+    if (chatWin) {
+      chatWin.innerHTML = renderMessages();
+      restoreAudioPlayer();
+    }
+    const stdDrawer = document.getElementById('rpBdDrawer');
+    const stdBody = document.getElementById('rpBdDrawerBody');
+    const rpgFrame = document.querySelector('.rpg-frame');
+    if (stdDrawer && stdBody && rpgFrame) {
+      const msg = S.convo[mi];
+      if (msg?.breakdown) {
+        stdBody.innerHTML = `<div class="msg-breakdown">${msg.breakdown}</div>`;
+        rpgFrame.classList.add('bd-open');
+      } else {
+        rpgFrame.classList.remove('bd-open');
+        stdBody.innerHTML = '';
+      }
+    }
+  }
+}
+
+function closeRpgBdDrawer() {
+  const sceneView = document.getElementById('rpgSceneView');
+  const body = document.getElementById('rpgBdDrawerBody');
+  if (sceneView) sceneView.classList.remove('bd-open');
+  if (body) body.innerHTML = '';
+}
+
+function closeStdBdDrawer() {
+  const frame = document.querySelector('.rpg-frame');
+  const body = document.getElementById('rpBdDrawerBody');
+  if (frame) frame.classList.remove('bd-open');
+  if (body) body.innerHTML = '';
+}
+
+const BD_SYS = 'You are a Japanese language teacher giving thorough, student-friendly grammar explanations. Never just label a grammar point — always explain how and why it works in the specific sentence.';
+
+async function breakdownMessage(msg, btn, mi) {
+  const inRpg = window._rpg?.inDialogue && window._rpg?.dialogueState;
+
+  if (msg.bdState) {
+    delete msg.bdState;
+    delete msg.breakdown;
+    if (inRpg) {
+      rpgRenderChatMessages();
+      closeRpgBdDrawer();
+    } else {
+      updateChat();
+      closeStdBdDrawer();
+    }
+    return;
+  }
+
+  btn.classList.add('active');
+  btn.innerHTML = IC.loader;
+
+  const plain = stripMarkers(msg.content);
+  const sentences = splitSentences(plain);
+  msg.bdState = { sentences, idx: 0, translationHtml: null, translationText: null, sentenceHtml: new Array(sentences.length).fill(null) };
+
+  try {
+    const numbered = sentences.map((s, i) => `${i + 1}. ${s}`).join('\n');
+    const reply = await claude([{ role: 'user', content:
+`Message: ${plain}
+
+The Japanese has been split into ${sentences.length} sentence(s):
+${numbered}
+
+Give the translation as ONE English sentence per Japanese sentence, in the same order, then break down only the first sentence for an N4–N3 learner.
+
+TRANSLATION:
+1. [English for sentence 1]${sentences.length > 1 ? '\n2. [English for sentence 2]' : ''}${sentences.length > 2 ? '\n3. [English for sentence 3]' : ''}${sentences.length > 3 ? '\n... (one numbered line per Japanese sentence)' : ''}
+
+SENTENCE: ${sentences[0]}
+MEANING: [English translation of this sentence]
+VOCAB:
+・[word] ([reading]) — [meaning]
+・[word] ([reading]) — [meaning]
+STRUCTURE: [How this sentence is built — its overall pattern and how the parts connect. Short paragraph.]
+GRAMMAR:
+・[element] — [explanation]
+・[element] — [explanation]`
+    }], BD_SYS, 800, 'claude-haiku-4-5-20251001');
+    const { translationPart, sentencePart } = parseFirstBdReply(reply);
+    const trSentences = parseNumberedTranslation(translationPart, sentences.length);
+    msg.bdState.translationSentences = trSentences;
+    msg.bdState.translationHtml = trSentences
+      ? `<div class="bd-heading">Translation</div><div class="bd-translation">${escHtml(trSentences.join(' '))}</div>`
+      : formatBreakdown(translationPart);
+    msg.bdState.translationText = trSentences ? trSentences.join(' ') : extractTranslationText(translationPart);
+    msg.bdState.sentenceHtml[0] = formatBreakdown(sentencePart);
+  } catch (err) {
+    msg.bdState.translationHtml = `<span style="color:var(--red)">Failed: ${escHtml(err.message)}</span>`;
+  }
+
+  msg.breakdown = renderBdState(msg.bdState, mi);
+  repaintBreakdown(inRpg, mi);
+}
+
+function breakdownPrev(mi) {
+  const inRpg = window._rpg?.inDialogue && window._rpg?.dialogueState;
+  const convo = inRpg ? window._rpg.dialogueState.convo : S.convo;
+  const msg = convo[mi];
+  if (!msg?.bdState || msg.bdState.idx <= 0) return;
+  msg.bdState.idx--;
+  msg.breakdown = renderBdState(msg.bdState, mi);
+  repaintBreakdown(inRpg, mi);
+}
+
+async function loadSentenceBreakdown(msg, si, mi, inRpg) {
+  const state = msg.bdState;
+  if (state.sentenceHtml[si] !== null) return;
+  try {
+    const plain = stripMarkers(msg.content);
+    const sentence = state.sentences[si];
+    const reply = await claude([{ role: 'user', content:
+`Full message context: ${plain}
+
+Break down only this sentence for an N4–N3 learner:
+
+SENTENCE: ${sentence}
+MEANING: [English translation]
+VOCAB:
+・[word] ([reading]) — [meaning]
+・[word] ([reading]) — [meaning]
+STRUCTURE: [How this sentence is built — short paragraph]
+GRAMMAR:
+・[element] — [explanation]
+・[element] — [explanation]`
+    }], BD_SYS, 800, 'claude-haiku-4-5-20251001');
+    state.sentenceHtml[si] = formatBreakdown(reply);
+  } catch (err) {
+    state.sentenceHtml[si] = `<span style="color:var(--red)">Failed: ${escHtml(err.message)}</span>`;
+  }
+  msg.breakdown = renderBdState(state, mi);
+  repaintBreakdown(inRpg, mi);
+}
+
+window.bdJumpTo = async function(mi, si) {
+  const inRpg = window._rpg?.inDialogue && window._rpg?.dialogueState;
+  const convo = inRpg ? window._rpg.dialogueState.convo : S.convo;
+  const msg = convo[mi];
+  if (!msg?.bdState) return;
+  const state = msg.bdState;
+  if (si < 0 || si >= state.sentences.length || si === state.idx) return;
+  state.idx = si;
+  msg.breakdown = renderBdState(state, mi);
+  repaintBreakdown(inRpg, mi);
+  if (state.sentenceHtml[si] === null) {
+    await loadSentenceBreakdown(msg, si, mi, inRpg);
+  }
+};
+
+async function breakdownNext(mi) {
+  const inRpg = window._rpg?.inDialogue && window._rpg?.dialogueState;
+  const convo = inRpg ? window._rpg.dialogueState.convo : S.convo;
+  const msg = convo[mi];
+  if (!msg?.bdState) return;
+
+  const state = msg.bdState;
+  if (state.idx >= state.sentences.length - 1) return;
+  state.idx++;
+
+  msg.breakdown = renderBdState(state, mi);
+  repaintBreakdown(inRpg, mi);
+
+  if (state.sentenceHtml[state.idx] === null) {
+    await loadSentenceBreakdown(msg, state.idx, mi, inRpg);
+  }
+}
+
+window.bdAsk = async function(form, mi, si) {
+  const inRpg = window._rpg?.inDialogue && window._rpg?.dialogueState;
+  const convo = inRpg ? window._rpg.dialogueState.convo : S.convo;
+  const msg = convo[mi];
+  if (!msg?.bdState) return;
+
+  const input = form.querySelector('.bd-ask-input');
+  const question = input.value.trim();
+  if (!question) return;
+
+  const state = msg.bdState;
+  if (!state.questions) state.questions = [];
+  if (!state.questions[si]) state.questions[si] = [];
+
+  const entry = { q: question, a: null };
+  state.questions[si].push(entry);
+  input.value = '';
+  msg.breakdown = renderBdState(state, mi);
+  repaintBreakdown(inRpg, mi);
+
+  try {
+    const fullMsg = stripMarkers(msg.content);
+    const sentence = state.sentences[si];
+    const history = state.questions[si].slice(0, -1)
+      .map(p => `Q: ${p.q}\nA: ${typeof p.a === 'string' ? p.a.replace(/<[^>]+>/g, '') : ''}`).join('\n\n');
+    const reply = await claude([{ role: 'user', content:
+`Full message: ${fullMsg}
+Specific sentence: ${sentence}
+${history ? `\nPrevious Q&A on this sentence:\n${history}\n` : ''}
+Student's question: ${question}
+
+Answer the student's question directly, focusing on this specific sentence and what they don't understand. Be concise and clear — usually 2-4 sentences. If you cite Japanese words, you may use [[word|reading|english]] markers, but only for the specific words you're explaining (don't mark up everything).`
+    }], BD_SYS, 600, 'claude-haiku-4-5-20251001');
+
+    entry.a = safeAnnotated(buildAnnotated(reply.trim()));
+  } catch (err) {
+    entry.a = `<span style="color:var(--red)">Failed: ${escHtml(err.message)}</span>`;
+  }
+
+  msg.breakdown = renderBdState(state, mi);
+  repaintBreakdown(inRpg, mi);
+};
+
+// Rebuild word map on zoom/resize so highlighting stays in sync
+window.addEventListener('resize', () => {
+  if (_currentMsgId == null || !_currentAudio || !_wordBounds?.length) return;
+  const msgBody = document.getElementById('ap-' + _currentMsgId)?.closest('.msg')?.querySelector('.msg-body');
+  if (msgBody) {
+    _wordMap = buildWordMap(msgBody);
+    updatePlayer(_currentMsgId);
+  }
+});
+
+// After any re-render, restore audio player visibility and word map if audio is active
+function restoreAudioPlayer() {
+  if (_currentMsgId == null || !_currentAudio) return;
+  const player = document.getElementById('ap-' + _currentMsgId);
+  if (player) {
+    player.style.display = 'flex';
+    const apBtn = player.querySelector('.ap-btn');
+    if (apBtn) {
+      apBtn.innerHTML = _currentAudio.paused ? IC.play : IC.pause;
+      if (!_currentAudio.paused) apBtn.classList.add('playing');
+    }
+  }
+  // Rebuild word map from new DOM
+  if (_wordBounds?.length) {
+    const msgBody = document.getElementById('ap-' + _currentMsgId)?.closest('.msg')?.querySelector('.msg-body');
+    if (msgBody) _wordMap = buildWordMap(msgBody);
+  }
+  if (!_currentAudio.paused) updatePlayer(_currentMsgId);
+}
+
+// Split a vocab/grammar string into individual "word (reading) — meaning" items
+function splitVocabItems(text) {
+  if (!text.trim()) return [];
+  // Split on ・ or • bullet markers only — regex fallback was over-splitting
+  // parenthetical content like "(temporal and locational adverbials)"
+  if (/[・•]/.test(text)) {
+    return text.split(/\s*[・•]\s*/).map(s => s.trim()).filter(Boolean);
+  }
+  return [text.trim()];
+}
+
+// Parse a breakdown vocab bullet ("word（reading）— meaning") into its parts so
+// it can be one-click added to Anki. Returns null if it isn't a vocab line.
+function parseVocabItem(raw) {
+  const s = (raw || '').replace(/^[・•\-\*\s]+/, '').trim();
+  // word（reading）— meaning
+  let m = s.match(/^(.+?)\s*[（(]\s*([^（）()]+?)\s*[）)]\s*[—–:\-]\s*(.+)$/);
+  if (m) return { jp: m[1].trim(), reading: m[2].trim(), meaning: m[3].trim() };
+  // word — meaning (no reading given)
+  m = s.match(/^(.+?)\s*[—–:]\s*(.+)$/);
+  if (m) return { jp: m[1].trim(), reading: '', meaning: m[2].trim() };
+  return null;
+}
+
+// A vocab bullet, with a one-click "add to Anki" button when it parses cleanly.
+function vocabBulletHTML(item) {
+  const v = parseVocabItem(item);
+  if (!v) return `<div class="bd-bullet">${escHtml(item)}</div>`;
+  return `<div class="bd-bullet bd-vocab">` +
+    `<span class="bd-vocab-text">${escHtml(item)}</span>` +
+    `<button class="bd-add" title="Add to Anki — ${escAttr(MINED_DECK)}"` +
+    ` data-jp="${escAttr(v.jp)}" data-reading="${escAttr(v.reading)}" data-meaning="${escAttr(v.meaning)}"` +
+    ` onclick="addVocabToAnki(this)">+ Anki</button>` +
+    `</div>`;
+}
+
+// Add one mined vocab word to the dedicated Anki deck via AnkiConnect.
+async function addVocabToAnki(btn) {
+  if (btn.disabled) return;
+  const jp = btn.dataset.jp || '';
+  const reading = btn.dataset.reading || '';
+  const meaning = btn.dataset.meaning || '';
+  const front = reading && reading !== jp ? `${jp}（${reading}）` : jp;
+  btn.disabled = true; btn.classList.add('busy'); btn.textContent = '…';
+  try {
+    await anki('createDeck', { deck: MINED_DECK }); // idempotent
+    await anki('addNote', { note: {
+      deckName: MINED_DECK,
+      modelName: 'Basic',
+      fields: { Front: front, Back: meaning },
+      options: { allowDuplicate: false, duplicateScope: 'deck' },
+      tags: ['renshuu', 'mined'],
+    } });
+    btn.classList.remove('busy'); btn.classList.add('added');
+    btn.textContent = '✓ Added';
+  } catch (e) {
+    btn.classList.remove('busy');
+    if (/duplicate/i.test(e.message || '')) {
+      btn.classList.add('added'); btn.textContent = '✓ In deck';
+    } else {
+      btn.disabled = false; btn.textContent = '+ Anki';
+      showToast('Could not add to Anki: ' + e.message, true);
+    }
+  }
+}
+
+function formatBreakdown(text) {
+  const clean = text.replace(/\*\*/g, '');
+  const lines = clean.split('\n');
+  const parts = [];
+  let sentenceCount = 0;
+  let inBulletSection = false;
+  // When SENTENCE: header has no inline content, the next line is the Japanese
+  let awaitingSentenceContent = false;
+  // Track current prose section so continuation lines know where to go
+  let lastSection = null;
+
+  function closeBullets() {
+    if (inBulletSection) { parts.push(`</div>`); inBulletSection = false; }
+  }
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || line === '---') { awaitingSentenceContent = false; continue; }
+    // Strip leading markdown heading markers
+    const stripped = line.replace(/^#{1,3}\s*/, '');
+
+    if (/^TRANSLATION\b/i.test(stripped)) {
+      closeBullets(); awaitingSentenceContent = false; lastSection = 'translation';
+      const content = stripped.replace(/^TRANSLATION:?\s*/i, '').trim();
+      parts.push(`<div class="bd-heading">Translation</div>`);
+      parts.push(`<div class="bd-translation">${content ? escHtml(content) : ''}</div>`);
+    } else if (/^BREAKDOWN\b/i.test(stripped)) {
+      closeBullets(); awaitingSentenceContent = false;
+    } else if (/^SENTENCE\b/i.test(stripped)) {
+      // Skip — the Japanese sentence is injected directly from state.sentences[i] in renderBdState
+      closeBullets();
+      lastSection = 'sentence';
+      const content = stripped.replace(/^SENTENCE:?\s*/i, '').trim();
+      // If content follows on the next line, skip that too
+      awaitingSentenceContent = !!content ? false : true;
+    } else if (/^MEANING\b/i.test(stripped)) {
+      closeBullets(); awaitingSentenceContent = false; lastSection = 'meaning';
+      parts.push(`<div class="bd-meaning">${escHtml(stripped.replace(/^MEANING:?\s*/i, ''))}</div>`);
+    } else if (/^VOCAB\b/i.test(stripped)) {
+      closeBullets(); awaitingSentenceContent = false; lastSection = 'vocab';
+      const content = stripped.replace(/^VOCAB:?\s*/i, '').trim();
+      parts.push(`<div class="bd-label">Vocab</div>`);
+      parts.push(`<div class="bd-bullets">`); inBulletSection = true;
+      if (content) splitVocabItems(content).forEach(item => parts.push(vocabBulletHTML(item)));
+    } else if (/^STRUCTURE\b/i.test(stripped)) {
+      closeBullets(); awaitingSentenceContent = false; lastSection = 'structure';
+      const content = stripped.replace(/^STRUCTURE:?\s*/i, '').trim();
+      parts.push(`<div class="bd-label">Structure</div>`);
+      if (content) parts.push(`<div class="bd-item">${escHtml(content)}</div>`);
+    } else if (/^GRAMMAR\b/i.test(stripped)) {
+      closeBullets(); awaitingSentenceContent = false; lastSection = 'grammar';
+      const content = stripped.replace(/^GRAMMAR:?\s*/i, '').trim();
+      parts.push(`<div class="bd-label">Grammar</div>`);
+      parts.push(`<div class="bd-bullets">`); inBulletSection = true;
+      if (content) splitVocabItems(content).forEach(item => parts.push(`<div class="bd-bullet">${escHtml(item)}</div>`));
+    } else {
+      // Continuation content — use stripped (# already removed)
+      const bulletText = stripped.replace(/^[・•\-\*]\s*/, '');
+      if (awaitingSentenceContent) {
+        // Skip — sentence text comes from state.sentences[i], not Claude's response
+        awaitingSentenceContent = false;
+      } else if (inBulletSection) {
+        const render = lastSection === 'vocab' ? vocabBulletHTML : (item => `<div class="bd-bullet">${escHtml(item)}</div>`);
+        splitVocabItems(bulletText).forEach(item => parts.push(render(item)));
+      } else {
+        // Prose continuation — append to last bd-item or start new one
+        const last = parts.length - 1;
+        if (last >= 0 && parts[last].startsWith('<div class="bd-item">')) {
+          parts[last] = parts[last].replace(/<\/div>$/, ` ${escHtml(bulletText)}</div>`);
+        } else {
+          parts.push(`<div class="bd-item">${escHtml(bulletText)}</div>`);
+        }
+      }
+    }
+  }
+  closeBullets();
+  return parts.join('');
+}
+
+let _msgCounter = Date.now();
+function msgId() { return 'm' + (++_msgCounter); }
+
+function shuffle(a) {
+  const b = [...a];
+  for (let i = b.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [b[i], b[j]] = [b[j], b[i]];
+  }
+  return b;
+}
+
+function pickWords(n = 10) {
+  const { new: nw, young: yw, mature: mw } = S.cards;
+  const f = S.focus;
+  // Build pool from all active tiers
+  const parts = [];
+  if (f.has('n')) parts.push(...shuffle(nw).map(c => ({ ...c, tier: 'n' })));
+  if (f.has('y')) parts.push(...shuffle(yw).map(c => ({ ...c, tier: 'y' })));
+  if (f.has('m')) parts.push(...shuffle(mw).map(c => ({ ...c, tier: 'm' })));
+  // If multiple tiers active, weight towards YOUNG words — vocab the student has
+  // studied but not yet mastered (the highest-value words to reinforce).
+  if (f.size > 1 && parts.length > n) {
+    const weighted = [];
+    if (f.has('y')) weighted.push(...shuffle(yw).slice(0, Math.ceil(n * 0.55)).map(c => ({ ...c, tier: 'y' })));
+    if (f.has('n')) weighted.push(...shuffle(nw).slice(0, Math.ceil(n * 0.35)).map(c => ({ ...c, tier: 'n' })));
+    if (f.has('m')) weighted.push(...shuffle(mw).slice(0, Math.ceil(n * 0.25)).map(c => ({ ...c, tier: 'm' })));
+    return shuffle(weighted).slice(0, n);
+  }
+  return shuffle(parts).slice(0, n);
+}
+
+function toggleFocus(tier) {
+  closeMenu();
+  const btn = document.getElementById(`focus-${tier}`);
+  if (S.focus.has(tier)) {
+    // Don't allow deselecting the last one
+    if (S.focus.size <= 1) return;
+    S.focus.delete(tier);
+    btn.classList.remove('active');
+  } else {
+    S.focus.add(tier);
+    btn.classList.add('active');
+  }
+  // Reset session so next gen uses new focus
+  S.drills = [];
+  S.convo = [];
+  if (total() > 0) renderMode();
+}
+
+function total() { return S.cards.new.length + S.cards.young.length + S.cards.mature.length; }
+
+// ── Mode ──────────────────────────────────────────────────────────────────────
+function toggleLangMode() {
+  const btn = document.getElementById('langToggle');
+  if (S.mode === 'eng_roleplay') {
+    // Switch back to Japanese learning mode
+    btn.textContent = '🇯🇵';
+    btn.title = '英語学習モードに切替';
+    S.mode = 'drill';
+    setPageTheme();
+    // Show sidebar and restore it
+    const layout = document.getElementById('layout');
+    layout.classList.remove('eng-mode');
+    if (localStorage.getItem('renshuu_sidebar') !== '0') {
+      layout.classList.remove('sidebar-collapsed');
+      const tb = document.getElementById('sidebarToggle');
+      if (tb) tb.innerHTML = IC.chevLL;
+    }
+    document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-drill').classList.add('active');
+    if (total() > 0) renderMode();
+  } else {
+    // Switch to English learning mode
+    btn.textContent = '🇬🇧';
+    btn.title = '日本語学習モードに切替';
+    S.mode = 'eng_roleplay';
+    setPageTheme();
+    // Hide sidebar and collapse for split view
+    const layout = document.getElementById('layout');
+    layout.classList.add('eng-mode');
+    if (!layout.classList.contains('sidebar-collapsed')) {
+      layout.classList.add('sidebar-collapsed');
+      const tb = document.getElementById('sidebarToggle');
+      if (tb) tb.innerHTML = IC.chevRR;
+    }
+    document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.remove('active'));
+    renderMode();
+  }
+}
+
+function switchMode(m) {
+  closeMenu();
+  S.mode = m;
+  setPageTheme();
+  document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.remove('active'));
+  document.getElementById(`tab-${m}`)?.classList.add('active');
+  document.querySelectorAll('[id^="hm-"]').forEach(t => t.classList.remove('active'));
+  document.getElementById(`hm-${m}`)?.classList.add('active');
+  if (m === 'eng_roleplay' || total() > 0) renderMode();
+}
+
+// Roleplay conversation view uses a full-page dark theme (not the scenario picker).
+function setPageTheme() {
+  const dark = (S.mode === 'roleplay' && S.scenario) || (S.mode === 'eng_roleplay' && S.engScenario);
+  document.body.classList.toggle('rp-dark', dark);
+}
+
+function renderMode() {
+  setPageTheme();
+  if (S.mode === 'drill') renderDrills();
+  else if (S.mode === 'compose') renderCompose();
+  else if (S.mode === 'roleplay') renderRoleplay();
+  else if (S.mode === 'eng_roleplay') renderEngRoleplay();
+}
+
+// ── Claude ────────────────────────────────────────────────────────────────────
+async function claude(messages, system = '', maxTokens = 1000, model = null) {
+  const body = { messages, system, max_tokens: maxTokens };
+  if (model) body.model = model;
+  const maxRetries = 3;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const r = await fetch('/.netlify/functions/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (r.status === 529 && attempt < maxRetries) {
+      await new Promise(ok => setTimeout(ok, 1000 * (attempt + 1)));
+      continue;
+    }
+    if (!r.ok) {
+      const text = await r.text().catch(() => '');
+      throw new Error(`API error ${r.status}${text && !text.startsWith('<') ? ': ' + text : ''}`);
+    }
+    // Success is a streamed SSE body — accumulate the text deltas and return
+    // the full string, so every caller keeps its plain-text contract.
+    if ((r.headers.get('content-type') || '').includes('text/event-stream')) {
+      return await readClaudeStream(r);
+    }
+    // Fallback for a non-streamed JSON response (shouldn't normally happen).
+    const d = await r.json();
+    if (d.error) throw new Error(d.error.message || JSON.stringify(d.error));
+    return d.content[0].text;
+  }
+}
+
+// Read an Anthropic SSE stream and return the concatenated assistant text.
+async function readClaudeStream(r) {
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '', text = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split('\n');
+    buf = lines.pop(); // keep the trailing, possibly-incomplete line
+    for (const line of lines) {
+      const s = line.trim();
+      if (!s.startsWith('data:')) continue;
+      const payload = s.slice(5).trim();
+      if (!payload || payload === '[DONE]') continue;
+      let evt;
+      try { evt = JSON.parse(payload); } catch { continue; }
+      if (evt.type === 'content_block_delta' && typeof evt.delta?.text === 'string') {
+        text += evt.delta.text;
+      } else if (evt.type === 'error') {
+        throw new Error(evt.error?.message || 'stream error');
+      }
+    }
+  }
+  return text;
+}
+
+// ── DRILL MODE ────────────────────────────────────────────────────────────────
+function renderDrills() {
+  const m = document.getElementById('mainContent');
+  m.innerHTML = `
+    <div class="row-between">
+      <div>
+        <div class="label">Vocabulary Drills</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:2px">Fill in the blank. Young words (若) prioritised.</div>
+      </div>
+      <button class="btn" onclick="genDrills()" id="genBtn">New set →</button>
+    </div>
+    <div id="drillZone"><div class="loading-row"><span class="spin"></span> generating from your vocab…</div></div>
+  `;
+  if (S.drills.length > 0) {
+    paintDrills();
+  } else {
+    genDrills();
+  }
+}
+
+async function genDrills() {
+  const zone = document.getElementById('drillZone');
+  const btn = document.getElementById('genBtn');
+  if (btn) btn.disabled = true;
+  zone.innerHTML = '<div class="loading-row"><span class="spin"></span> building sentences…</div>';
+
+  const words = pickWords(9);
+  S.sessionWords = words;
+
+  const wordBlock = words.map(w =>
+    `${w.jp}${w.rd ? `（${w.rd}）` : ''} = ${w.en} [${w.tier === 'n' ? 'NEW' : w.tier === 'y' ? 'young' : 'mature'}]`
+  ).join('\n');
+
+  const sys = `You are a Japanese language teacher creating fill-in-the-blank sentences.
+Return ONLY valid JSON, no markdown fences, no preamble.
+
+For "annotated_sentence": write the sentence using [[word|reading|english]] pipe markers for EVERY Japanese word — kanji compounds (with okurigana), katakana words, AND hiragana words/phrases (2+ chars). Use hiragana as the reading for katakana and hiragana-only words. Do NOT leave any content word unmarked.
+Example: [[日本語|にほんご|Japanese]]の[[勉強|べんきょう|study]]を[[コーヒー|こーひー|coffee]]で[[やっぱり|やっぱり|as expected]][[して|して|doing]]います。
+
+Schema:
+{
+  "drills": [
+    {
+      "sentence": "full Japanese sentence, plain text no markup",
+      "annotated_sentence": "same sentence with [[word|reading|english]] markers on every kanji segment",
+      "target": "exact word/phrase as it appears in sentence",
+      "reading": "hiragana reading",
+      "meaning": "English meaning",
+      "translation": "full English translation of sentence",
+      "hint": "brief usage note or grammar point (max 8 words)",
+      "tier": "n|y|m"
+    }
+  ]
+}
+Rules:
+- Generate exactly 5 drills
+- Each drill uses ONE word from the list as the target (to be blanked)
+- Prioritise YOUNG words (studied but not yet mastered) — use as many as possible
+- Sentences should be natural, N4-N3 level, 8-20 characters
+- 'target' must appear verbatim in 'sentence'
+- In annotated_sentence the target word must also be wrapped with a [[word|reading|english]] marker (it will be replaced by the blank in the UI)`;
+
+  try {
+    const raw = await claude(
+      [{ role: 'user', content: `Generate 5 drills from this vocab list. Prioritise [young] words:\n\n${wordBlock}` }],
+      sys
+    );
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const { drills } = JSON.parse(clean);
+    S.drills = drills.map((d, i) => ({ ...d, i, answered: false, correct: null, input: '' }));
+    paintDrills();
+  } catch (e) {
+    zone.innerHTML = `<div style="color:var(--red);font-size:12px">Error: ${e.message}</div>`;
+  }
+  if (btn) btn.disabled = false;
+}
+
+function paintDrills() {
+  const zone = document.getElementById('drillZone');
+  const answered = S.drills.filter(d => d.answered);
+  const correct  = answered.filter(d => d.correct && !d.partial).length;
+  const close    = answered.filter(d => d.partial).length;
+  const wrong    = answered.filter(d => !d.correct).length;
+  const total    = S.drills.length;
+
+  const scoreHTML = answered.length > 0 ? `
+    <div class="drill-score-row">
+      <span class="score-chip score-correct">✓ ${correct}</span>
+      <span class="score-chip score-close">△ ${close}</span>
+      <span class="score-chip score-wrong">✗ ${wrong}</span>
+      <span class="score-total">${answered.length} / ${total} answered</span>
+    </div>` : '';
+
+  const bottomBtn = `
+    <div style="text-align:center;margin-top:16px">
+      <button class="btn" onclick="genDrills()">New set →</button>
+    </div>`;
+
+  zone.innerHTML = S.drills.map(d => drillHTML(d)).join('') + scoreHTML + bottomBtn;
+}
+
+function drillHTML(d) {
+  const tierMap = { n: ['新 new', 'n'], y: ['若 young', 'y'], m: ['熟 mature', 'm'] };
+  const [tLabel, tClass] = tierMap[d.tier] || ['?', 'n'];
+
+  // Convert [[word|reading|english]] markers → spans, then sanitise
+  const annotated = safeAnnotated(buildAnnotated(d.annotated_sentence || d.sentence));
+  const esc = escapeRegex(d.target);
+  // Try multiple patterns: exact span match, span containing target, or plain text
+  const patterns = [
+    new RegExp(`<span[^>]*data-rt[^>]*>${esc}<\\/span>`),                    // exact span
+    new RegExp(`<span[^>]*data-rt="[^"]*"[^>]*>[^<]*${esc}[^<]*<\\/span>`), // span containing target
+    new RegExp(esc),                                                          // plain text
+  ];
+  const targetPat = patterns.find(p => p.test(annotated)) || patterns[2];
+
+  let displaySentence;
+  if (d.answered) {
+    const clr = d.correct ? 'var(--green)' : 'var(--red)';
+    displaySentence = annotated.replace(
+      targetPat,
+      `<span class="blank-span blank-revealed" style="color:${clr};border-bottom-color:${clr}" data-rt="${d.reading}">${d.target}</span>`
+    );
+  } else {
+    displaySentence = annotated.replace(
+      targetPat,
+      `<span class="blank-span">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>`
+    );
+  }
+
+  const cardClass = d.answered ? (d.partial ? ' partial-card' : d.correct ? ' correct-card' : ' wrong-card') : '';
+
+  return `
+    <div class="drill-card${cardClass}" id="dc-${d.i}">
+      <div class="drill-head">
+        <span class="tier-badge ${tClass}">${tLabel}</span>
+        <span class="num">${d.i + 1} / ${S.drills.length}</span>
+      </div>
+      <div class="jp-sentence">${displaySentence}</div>
+      <div style="margin:4px 0 2px"><button class="speak-btn drill-speak" data-sentence="${escHtml(stripMarkers(d.sentence))}" title="Listen">${IC.volume}</button></div>
+      <div class="hint-text">Fill in: ${d.meaning}${d.hint ? ` · ${d.hint}` : ''}</div>
+      <div class="answer-row">
+        <input
+          class="answer-input"
+          id="ai-${d.i}"
+          data-di="${d.i}"
+          placeholder="answer…"
+          value="${d.input}"
+          autocomplete="off"
+          ${d.answered ? 'disabled' : ''}
+        />
+        <button class="btn drill-submit" data-di="${d.i}" ${d.answered ? 'disabled' : ''}>${IC.send}</button>
+      </div>
+      ${d.answered ? `
+        <div class="feedback ${d.partial ? 'partial' : d.correct ? 'ok' : 'no'}" id="fb-${d.i}">
+          ${d.correct
+            ? d.partial
+              ? `△ &nbsp;Close! &nbsp;→&nbsp; ${d.target}（${d.reading}）`
+              : `✓ Correct`
+            : d.aiFeedback
+              ? `✗ &nbsp;${d.aiFeedback}`
+              : `<span class="spin"></span>`}
+          ${(!d.correct && d.aiFeedback) ? `<button class="btn retry-btn" onclick="retryDrill(${d.i})">Try again</button>` : ''}
+          <div class="tl">${d.translation}</div>
+        </div>` : ''}
+    </div>
+  `;
+}
+
+function checkDrill(i) {
+  const d = S.drills[i];
+  if (!d || d.answered) return;
+  const inputEl = document.getElementById(`ai-${i}`);
+  const ans = (inputEl ? inputEl.value : d.input).trim();
+  if (!ans) return;
+  d.input = ans;
+
+  const ansLow     = ans.toLowerCase();
+  const ansHira    = inputToHira(ans);
+  const rdRomaji   = readingToRomaji(d.reading);
+
+  const exact = (
+    ans    === d.target  ||
+    ans    === d.reading ||
+    ansLow === (d.meaning || '').toLowerCase() ||
+    ansHira === d.reading ||
+    (rdRomaji && ansLow === rdRomaji)
+  );
+  // Partial credit: one-character typo on any matching field (min 3 chars)
+  const close = (a, b) => a.length >= 3 && b.length >= 3 && levenshtein(a, b) === 1;
+  const almost = !exact && (
+    close(ans,    d.target)  ||
+    close(ansLow, d.reading) ||
+    close(ansHira, d.reading) ||
+    (rdRomaji && close(ansLow, rdRomaji))
+  );
+  d.correct  = exact || almost;
+  d.partial  = almost;
+  d.answered = true;
+  paintDrills();
+  speakJapanese(stripMarkers(d.sentence));
+  if (!d.correct) getWrongFeedback(i);
+}
+
+async function getWrongFeedback(i) {
+  const d = S.drills[i];
+  const sys = `You are a concise Japanese tutor giving feedback on fill-in-the-blank drill answers. Respond with ONLY a JSON object, no other text.
+If the student's answer is just a spelling/romaji typo of the correct answer, respond: {"correct":true,"feedback":"Just a typo — close enough!"}
+Otherwise explain in one short sentence what's wrong. Example: {"correct":false,"feedback":"おそく is the adverbial form; the adjective form おそい is needed here."}`;
+  const msg = `Sentence: ${d.sentence}
+Target: ${d.target}（${d.reading}）= ${d.meaning}
+Student answered: "${d.input}"`;
+  try {
+    const raw = await claude([{ role: 'user', content: msg }], sys, 150);
+    // Extract JSON even if Claude wraps it in backticks or adds surrounding text
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    const result = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
+    if (result.correct) {
+      d.correct = true;
+      d.partial = true;
+    }
+    d.aiFeedback = result.feedback;
+  } catch(e) {
+    d.aiFeedback = `Correct answer: ${d.target}（${d.reading}）`;
+  }
+  // Update just this card's feedback div
+  const fb = document.getElementById(`fb-${i}`);
+  if (fb) {
+    fb.className = `feedback ${d.partial ? 'partial' : d.correct ? 'ok' : 'no'}`;
+    const retryHtml = !d.correct ? `<button class="btn retry-btn" onclick="retryDrill(${i})">Try again</button>` : '';
+    fb.innerHTML = (d.correct
+      ? `△ &nbsp;${d.aiFeedback}`
+      : `✗ &nbsp;${d.aiFeedback}`) + retryHtml + `<div class="tl">${d.translation}</div>`;
+    const card = document.getElementById(`dc-${i}`);
+    if (card) {
+      card.className = `drill-card ${d.partial ? 'partial-card' : d.correct ? 'correct-card' : 'wrong-card'}`;
+    }
+  }
+}
+
+function retryDrill(i) {
+  const d = S.drills[i];
+  if (!d) return;
+  d.answered = false;
+  d.correct = false;
+  d.partial = false;
+  d.aiFeedback = null;
+  d.input = '';
+  paintDrills();
+  setTimeout(() => {
+    const inp = document.getElementById(`ai-${i}`);
+    if (inp) inp.focus();
+  }, 50);
+}
+
+// ── COMPOSE MODE ──────────────────────────────────────────────────────────────
+// Write full sentences expressing a given idea, then submit for AI review.
+function renderCompose() {
+  const m = document.getElementById('mainContent');
+  m.innerHTML = `
+    <div class="row-between">
+      <div>
+        <div class="label">Sentence Composition</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:2px">Write a sentence expressing each idea — your structure, your words. Romaji or kana. Submit for review.</div>
+      </div>
+      ${composeBatchSplit('genComposeBtn')}
+    </div>
+    <div id="composeZone"><div class="loading-row"><span class="spin"></span> building a batch from your vocab…</div></div>
+  `;
+  if (S.compose.prompts.length > 0) {
+    paintCompose();
+  } else {
+    genComposeBatch();
+  }
+}
+
+// "New batch" split button: main = auto theme, caret = custom-theme popover.
+function composeBatchSplit(mainId) {
+  const idAttr = mainId ? ` id="${mainId}"` : '';
+  return `<div class="split-btn">
+      <button class="btn split-main"${idAttr} onclick="genComposeBatch()">New batch →</button>
+      <button class="btn split-toggle" onclick="toggleBatchMenu(event, this)" aria-label="Use your own theme" title="Use your own theme">${IC.chevD}</button>
+      <div class="split-menu" hidden>
+        <button type="button" class="btn smart-batch-btn" onclick="smartBatch()">${IC.bulb} Smart batch — drill my weak points</button>
+        <div class="split-menu-hint">Targets the recurring mistakes the AI has spotted in your writing &amp; roleplay.</div>
+        <div class="split-menu-divider"></div>
+        <div class="split-menu-row">
+          <input class="compose-theme-input batch-theme-input" placeholder="your own theme — a subject or grammar point…" value="${escHtml(S.compose.pendingTheme || '')}">
+          <button class="btn" onclick="applyComposeThemeFromMenu(this)">Generate →</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function smartBatch() {
+  document.querySelectorAll('.split-menu').forEach(m => m.setAttribute('hidden', ''));
+  genComposeBatch('', true);
+}
+
+// Pick n distinct weak points to drill, weighted by severity so the worst gaps
+// come up more often but the batch still varies across the whole pool (so Smart
+// Batch doesn't fixate on the same top 3 every time).
+function sampleWeakPoints(pool, n) {
+  const rest = pool.slice();
+  const out = [];
+  while (out.length < n && rest.length) {
+    const weights = rest.map(w => Math.max(1, w.severity || 1));
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = Math.random() * total, idx = 0;
+    for (; idx < rest.length - 1; idx++) { r -= weights[idx]; if (r <= 0) break; }
+    out.push(rest.splice(idx, 1)[0]);
+  }
+  return out;
+}
+
+async function reanalyzeWeak() {
+  if (S.analyzing) return;
+  S._uiAnalyzing = true;
+  renderFocusSidebar();
+  await analyzeWeakPoints(true);
+  S._uiAnalyzing = false;
+  renderFocusSidebar();
+}
+
+function toggleFocusPanel() {
+  const collapsed = localStorage.getItem('renshuu_focus_collapsed') === '1';
+  localStorage.setItem('renshuu_focus_collapsed', collapsed ? '0' : '1');
+  renderFocusSidebar();
+}
+
+function toggleBatchMenu(e, btn) {
+  e.stopPropagation();
+  const menu = btn.parentElement.querySelector('.split-menu');
+  const willOpen = menu.hasAttribute('hidden');
+  document.querySelectorAll('.split-menu').forEach(m => m.setAttribute('hidden', ''));
+  if (willOpen) {
+    menu.removeAttribute('hidden');
+    const inp = menu.querySelector('input');
+    if (inp) setTimeout(() => inp.focus(), 0);
+  }
+}
+
+function applyComposeThemeFromMenu(btn) {
+  const inp = btn.parentElement.querySelector('input');
+  const v = inp ? inp.value.trim() : '';
+  S.compose.pendingTheme = v;
+  document.querySelectorAll('.split-menu').forEach(m => m.setAttribute('hidden', ''));
+  genComposeBatch(v);
+}
+
+// Tolerant JSON parse for Claude output: strips ```fences, isolates the
+// outermost {...} or [...], and removes trailing commas before } or ].
+function parseLooseJSON(raw) {
+  let s = String(raw).replace(/```json|```/g, '').trim();
+  const objStart = s.indexOf('{'), arrStart = s.indexOf('[');
+  const start = arrStart !== -1 && (objStart === -1 || arrStart < objStart) ? arrStart : objStart;
+  const end = Math.max(s.lastIndexOf('}'), s.lastIndexOf(']'));
+  if (start !== -1 && end !== -1 && end > start) s = s.slice(start, end + 1);
+  try { return JSON.parse(s); } catch (_) {}
+  // Fix trailing commas
+  const s2 = s.replace(/,(\s*[}\]])/g, '$1');
+  try { return JSON.parse(s2); } catch (_) {}
+  // Fix literal newlines/tabs inside string values (Claude sometimes emits these)
+  try {
+    const s3 = s2.replace(/"((?:[^"\\]|\\.)*)"/gs, (_, inner) =>
+      '"' + inner.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t') + '"'
+    );
+    return JSON.parse(s3);
+  } catch (_) {}
+  // Fix truncated JSON: find the last complete array element and close open brackets
+  try {
+    let braces = 0, brackets = 0, inStr = false, esc = false, lastGoodEnd = -1;
+    for (let i = 0; i < s2.length; i++) {
+      const c = s2[i];
+      if (esc) { esc = false; continue; }
+      if (c === '\\' && inStr) { esc = true; continue; }
+      if (c === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (c === '{') braces++;
+      else if (c === '}') { braces--; if (braces === 1 && brackets === 1) lastGoodEnd = i; }
+      else if (c === '[') brackets++;
+      else if (c === ']') brackets--;
+    }
+    if (lastGoodEnd > 0) {
+      let t = s2.slice(0, lastGoodEnd + 1).replace(/,\s*$/, '');
+      braces = 0; brackets = 0; inStr = false; esc = false;
+      for (const c of t) {
+        if (esc) { esc = false; continue; }
+        if (c === '\\' && inStr) { esc = true; continue; }
+        if (c === '"') { inStr = !inStr; continue; }
+        if (inStr) continue;
+        if (c === '{') braces++;
+        else if (c === '}') braces--;
+        else if (c === '[') brackets++;
+        else if (c === ']') brackets--;
+      }
+      while (brackets > 0) { t += ']'; brackets--; }
+      while (braces > 0) { t += '}'; braces--; }
+      return JSON.parse(t);
+    }
+  } catch (_) {}
+  throw new SyntaxError('Could not parse JSON response');
+}
+
+async function genComposeBatch(override = '', smart = false) {
+  const zone = document.getElementById('composeZone');
+  const btn = document.getElementById('genComposeBtn');
+  if (btn) btn.disabled = true;
+
+  // Smart batch: refresh the weak-point profile, then target the top gaps.
+  let focusDirective = '', focusLabels = [];
+  if (smart) {
+    if (zone) zone.innerHTML = '<div class="loading-row"><span class="spin"></span> analysing your weak points and building a targeted batch…</div>';
+    await analyzeWeakPoints();
+    // Draw a varied mix from the top ~15 gaps (weighted toward the worst) so
+    // every Smart Batch hits different weak points, not just the same top 3.
+    const pool = (S.weakPoints?.weakPoints || []).slice(0, 15);
+    const tops = sampleWeakPoints(pool, 5);
+    if (tops.length === 0) {
+      showToast('Not enough corrections logged yet — keep practising to unlock Smart Batches');
+      smart = false;
+    } else {
+      focusLabels = tops.map(w => w.label);
+      focusDirective = `\n\nTARGETED REMEDIATION MODE — this batch must drill the student's specific recurring weak points (from a tutor's longitudinal error profile). Design the 5 prompts so the student is forced to confront these gaps: strongly prefer CONSTRAINED prompts whose required pattern is exactly the structure they get wrong, and spread the prompts ACROSS the listed weak points (ideally a different one per prompt) rather than fixating on one. Still escalate difficulty #1→#5.\nWEAK POINTS TO TARGET:\n${tops.map((w, i) => `${i + 1}. ${w.label} [${w.category}] — ${w.diagnosis}`).join('\n')}`;
+    }
+  }
+  if (zone && !smart) zone.innerHTML = '<div class="loading-row"><span class="spin"></span> building a batch from your vocab…</div>';
+
+  const words = pickWords(16);
+  S.sessionWords = words;
+  const wordBlock = words.map(w =>
+    `${w.jp}${w.rd ? `（${w.rd}）` : ''} = ${w.en} [${w.tier === 'n' ? 'NEW' : w.tier === 'y' ? 'young' : 'mature'}]`
+  ).join('\n');
+
+  const sys = `You are a Japanese teacher designing a sentence-WRITING exercise (the student composes their own sentences from scratch).
+Return ONLY valid JSON, no markdown fences, no preamble.
+
+You are given the student's vocabulary list. Do two things:
+1. Choose ONE theme that ties a batch of 5 prompts together — either a SUBJECT (e.g. "daily routine", "talking about the weather") or a GRAMMAR concept (e.g. "～たい to express wants", "comparing two things with より"). Pick something the supplied vocab supports well.
+2. Write 5 prompts, STRICTLY ordered by gently escalating difficulty — prompt 1 is the easiest and each one is a little harder than the last. Keep them EASY overall: every prompt should be answerable in ONE short, everyday sentence. Use these levers to escalate mildly: a present/simple-tense single clause → past or negative → adding one extra detail (time, place, object) → a simple two-clause sentence (e.g. cause with から/ので). Roughly: #1 very short and concrete, #5 still a single everyday sentence — NOT multi-clause, abstract, or literary. When in doubt, make it simpler.
+Also VARY how constrained the prompts are so the student can't always route around weak grammar. Constrained prompts tend to be harder, so lean them toward the later positions:
+   - 2–3 OPEN prompts: describe the meaning/situation only, no "constraint" (omit the field or leave it ""). The student picks any structure.
+   - 2–3 CONSTRAINED prompts: set "constraint" to a specific grammar pattern the answer MUST use (e.g. "～てから (after doing X)", "～なければならない (must)", "より to compare", "～たほうがいい"). Still describe only the idea in "idea" — do not write the sentence for them. Tie constrained patterns to the theme, especially if the theme is a grammar concept.
+
+For each prompt, include 2–3 "hints": content words (nouns, verbs, adjectives) drawn ONLY from the supplied vocabulary list that would actually APPEAR in a natural answer sentence. These are optional suggestions, not requirements. Use the exact jp/reading/meaning from the list.
+- Do NOT hint interrogatives or framing words that belong to the English instruction but not the answer (e.g. if the idea is "say WHEN you arrive", do not hint いつ "when" — the answer states a time, it doesn't ask one).
+- A hint must be a word the student would plausibly type into their sentence; if it wouldn't, leave it out.
+
+Schema:
+{
+  "theme": "short English label for the theme",
+  "theme_jp": "short Japanese label for the theme",
+  "prompts": [
+    {
+      "idea": "English instruction, e.g. 'Tell a friend you want to go to the new café this weekend.'",
+      "constraint": "" or "the grammar pattern the answer must use, e.g. '～てから (after doing X)'",
+      "hints": [ { "jp": "週末", "reading": "しゅうまつ", "en": "weekend" } ]
+    }
+  ]
+}
+Rules:
+- Exactly 5 prompts, ordered easiest (#1) to hardest (#5) — this ordering is required, not optional.
+- Target N5–N4 (beginner) level; every idea must be expressible in one short, everyday sentence.
+- Hints must come from the supplied list (exact forms); 2–3 per prompt.
+- Vary the prompts so they don't all share the same grammar.`;
+
+  const themeLine = smart
+    ? `Focus the entire batch on the student's weak points listed below — ignore generic themes.`
+    : override
+      ? `Use this theme (a subject or grammar concept): "${override}".`
+      : `Choose a fitting theme yourself.`;
+
+  try {
+    const raw = await claude(
+      [{ role: 'user', content: `${themeLine}${focusDirective}\n\nStudent's vocabulary:\n\n${wordBlock}` }],
+      sys,
+      1200
+    );
+    const parsed = parseLooseJSON(raw);
+    S.compose.smart = smart;
+    S.compose.focusLabels = focusLabels;
+    S.compose.theme = smart ? (parsed.theme || 'Targeted practice') : (parsed.theme || (override || 'Free composition'));
+    S.compose.themeJp = parsed.theme_jp || '';
+    S.compose.pendingTheme = '';
+    S.compose.prompts = (parsed.prompts || []).slice(0, 5).map((p, i) => ({
+      i,
+      idea: p.idea || '',
+      constraint: (p.constraint || '').trim(),
+      hints: Array.isArray(p.hints) ? p.hints : [],
+      showHints: false,
+      input: '',
+      submitted: false,
+      loading: false,
+      review: null,
+    }));
+    paintCompose();
+  } catch (e) {
+    if (zone) zone.innerHTML = `<div style="color:var(--red);font-size:12px">Error: ${e.message}</div>`;
+  }
+  if (btn) btn.disabled = false;
+}
+
+// Preserve in-progress text from all textareas back into state before any repaint
+function syncComposeInputs() {
+  document.querySelectorAll('.compose-input[data-ci]').forEach(el => {
+    const p = S.compose.prompts[parseInt(el.dataset.ci, 10)];
+    if (p) p.input = el.value;
+  });
+}
+
+function paintCompose() {
+  const zone = document.getElementById('composeZone');
+  if (!zone) return;
+  const c = S.compose;
+  const done = c.prompts.filter(p => p.submitted);
+  const ok = done.filter(p => p.review && p.review.verdict === 'correct').length;
+  const minor = done.filter(p => p.review && p.review.verdict === 'minor').length;
+  const wrong = done.filter(p => p.review && p.review.verdict === 'wrong').length;
+
+  const themeBar = `
+    <div class="compose-theme-bar${c.smart ? ' smart' : ''}">
+      <span class="theme-prefix">${c.smart ? '✨ focus' : 'theme'}</span>
+      <span class="theme-name">${escHtml(c.theme)}</span>
+      ${c.themeJp ? `<span class="theme-jp">${escHtml(c.themeJp)}</span>` : ''}
+      ${c.smart && c.focusLabels?.length ? `<span class="theme-focus">${c.focusLabels.map(escHtml).join(' · ')}</span>` : ''}
+    </div>`;
+
+  const scoreHTML = done.length > 0 ? `
+    <div class="drill-score-row">
+      <span class="score-chip score-correct">✓ ${ok}</span>
+      <span class="score-chip score-close">△ ${minor}</span>
+      <span class="score-chip score-wrong">✗ ${wrong}</span>
+      <span class="score-total">${done.length} / ${c.prompts.length} reviewed</span>
+    </div>` : '';
+
+  const bottomBtn = `
+    <div style="text-align:center;margin-top:16px">
+      ${composeBatchSplit('')}
+    </div>`;
+
+  zone.innerHTML = themeBar + c.prompts.map(p => composeCardHTML(p)).join('') + scoreHTML + bottomBtn;
+}
+
+// "Teacher's notes" — the AI-distilled weak-point profile, shown above the batch.
+// Render the weak-point "Focus areas" panel into the sidebar.
+function renderFocusSidebar() {
+  const el = document.getElementById('focusSidebar');
+  if (el) el.innerHTML = focusPanelHTML();
+}
+
+function focusPanelHTML() {
+  const wp = S.weakPoints;
+  const busy = S.analyzing || S._uiAnalyzing;
+  const total = S.mistakes.length;
+  if (!wp || !wp.weakPoints || wp.weakPoints.length === 0) {
+    if (total === 0) return '';
+    return `<div class="focus-panel empty">
+      <span class="focus-title">${IC.bulb} Focus areas</span>
+      ${busy ? `<div class="focus-sub">analysing…</div>` : ''}
+    </div>`;
+  }
+  const collapsed = localStorage.getItem('renshuu_focus_collapsed') === '1';
+  const items = wp.weakPoints.slice(0, 5).map(w => `
+    <li class="focus-item">
+      <div class="fi-top">
+        <span class="fi-sev" title="severity ${w.severity || 1}/5">${Array.from({ length: 5 }, (_, k) => `<span class="sev${k < (w.severity || 1) ? ' sev-5' : ''}"></span>`).join('')}</span>
+        ${w.trend ? `<span class="fi-trend tr-${escHtml(w.trend)}">${escHtml(w.trend)}</span>` : ''}
+      </div>
+      <div class="fi-label">${escHtml(w.label || '')}</div>
+      ${w.diagnosis ? `<div class="fi-diag">${escHtml(w.diagnosis)}</div>` : ''}
+    </li>`).join('');
+
+  return `<div class="focus-panel">
+    <div class="focus-head">
+      <span class="focus-title">${IC.bulb} Focus areas</span>
+      <button class="focus-toggle" onclick="toggleFocusPanel()" aria-label="Toggle focus areas">${collapsed ? IC.chevD : IC.chevD.replace('m6 9 6 6 6-6', 'm18 15-6-6-6 6')}</button>
+    </div>
+    ${collapsed ? '' : `
+      ${wp.summary ? `<div class="focus-summary">${escHtml(wp.summary)}</div>` : ''}
+      <ul class="focus-list">${items}</ul>`}
+    <button class="btn focus-refresh w100" onclick="reanalyzeWeak()" ${busy ? 'disabled' : ''}>${busy ? 'analysing…' : 're-analyse'}</button>
+  </div>`;
+}
+
+function composeCardHTML(p) {
+  const hints = (p.hints || []).map(h => {
+    const romaji = h.reading ? readingToRomaji(h.reading) : '';
+    const rd = [h.reading, romaji].filter(Boolean).join(' · ');
+    return `<span class="hint-chip"><span class="hc-jp">${escHtml(h.jp || '')}</span>${rd ? `<span class="hc-rd">${escHtml(rd)}</span>` : ''}<span class="hc-en">${escHtml(h.en || '')}</span></span>`;
+  }).join('');
+
+  const hasHints = (p.hints || []).length > 0;
+  const hintBlock = !hasHints ? '' : p.showHints
+    ? `<div class="compose-hints">${hints}<button class="btn hint-reveal-btn hint-hide-btn" onclick="toggleComposeHint(${p.i})">${IC.x} hide</button></div>`
+    : `<button class="btn hint-reveal-btn" onclick="toggleComposeHint(${p.i})">${IC.bulb} Hint</button>`;
+  const constraintBlock = p.constraint
+    ? `<div class="compose-constraint">${IC.star} must use: <b>${escHtml(p.constraint)}</b></div>`
+    : '';
+
+  const verdictClass = p.submitted && p.review
+    ? (p.review.verdict === 'correct' ? ' correct-card' : p.review.verdict === 'minor' ? ' partial-card' : ' wrong-card')
+    : '';
+
+  return `
+    <div class="drill-card compose-card${verdictClass}" id="cc-${p.i}">
+      <div class="compose-top">
+        <div class="compose-idea">${escHtml(p.idea)}</div>
+        <span class="num">${p.i + 1} / ${S.compose.prompts.length}</span>
+      </div>
+      <div class="compose-pre">${constraintBlock}${hintBlock}</div>
+      <div class="answer-row">
+        <textarea
+          class="answer-input compose-input"
+          id="ci-${p.i}"
+          data-ci="${p.i}"
+          autocomplete="off"
+        >${escHtml(p.input)}</textarea>
+        ${micButtonHTML(`ci-${p.i}`)}
+        <button class="btn compose-submit" data-ci="${p.i}">${IC.send}</button>
+      </div>
+      ${p.submitted ? `<div class="feedback ${p.review ? (p.review.verdict === 'correct' ? 'ok' : p.review.verdict === 'minor' ? 'partial' : 'no') : ''}" id="cfb-${p.i}">${composeReviewHTML(p)}</div>` : ''}
+    </div>
+  `;
+}
+
+function composeReviewHTML(p) {
+  if (p.loading || !p.review) return '<span class="spin"></span> reviewing…';
+  const r = p.review;
+  const mark = r.verdict === 'correct' ? '✓ Looks good' : r.verdict === 'minor' ? '△ Minor fixes' : '✗ Needs work';
+  const annotated = safeAnnotated(buildAnnotated(r.annotated || r.correction || ''));
+  const speak = r.correction
+    ? `<button class="speak-btn drill-speak" data-sentence="${escHtml(stripMarkers(r.correction))}" title="Listen">${IC.volume}</button>`
+    : '';
+  return `
+    <div>${mark}</div>
+    ${r.correction ? `<div class="compose-correction">${annotated} ${speak}</div>` : ''}
+    ${r.translation ? `<div class="tl">${escHtml(r.translation)}</div>` : ''}
+    ${r.note ? `<div style="margin-top:6px">${escHtml(r.note)}</div>` : ''}
+  `;
+}
+
+async function submitCompose(i) {
+  const p = S.compose.prompts[i];
+  if (!p || p.loading) return;
+  const inputEl = document.getElementById(`ci-${i}`);
+  const ans = (inputEl ? inputEl.value : p.input).trim();
+  if (!ans) return;
+  syncComposeInputs();
+  p.input = ans;
+  p.submitted = true;
+  p.loading = true;
+  p.review = null;
+  paintCompose();
+
+  const hintBlock = (p.hints || []).map(h => `${h.jp}（${h.reading}）= ${h.en}`).join('; ');
+  const sys = `You are a warm but precise Japanese tutor. A student was asked to write ONE Japanese sentence expressing a given idea.
+The student may write in romaji, kana, or kanji — these are ALL equally acceptable. Script and orthography are NOT graded:
+- NEVER treat a romaji-spelled particle (o for を, wa for は, e for へ) as an error.
+- NEVER flag "use kanji" or "kana should be kanji" (or vice versa) as a correction.
+- Do not let script/orthography choice affect the verdict at all.
+Judge ONLY the actual Japanese: grammar, particle choice, conjugation, word choice, and whether it naturally expresses the intended meaning. Do not penalise valid alternative phrasings.
+Return ONLY a JSON object, no markdown fences:
+{
+  "verdict": "correct" | "minor" | "wrong",
+  "correction": "the natural Japanese sentence in normal orthography (kanji + kana), plain text",
+  "annotated": "the SAME corrected sentence with [[word|reading|english]] markers on every word — kanji compounds, katakana, and hiragana words (2+ chars); reading in hiragana",
+  "translation": "English translation of the corrected sentence",
+  "note": "1–2 short sentences: if correct, brief praise; otherwise what you actually changed (grammar/word choice only) and why"
+}
+If the exercise specifies a REQUIRED grammar pattern, the answer must use it: if the Japanese is otherwise fine but does not use the required pattern, the verdict is "minor" and the note should nudge them toward it (rewrite the correction to use it). Wrong/unnatural Japanese is still "wrong".
+Whenever the note mentions a Japanese word or phrase as a suggestion or example, append its romaji in parentheses, e.g. 洗濯をしなければならない (sentaku o shinakereba naranai).
+verdict guide: "correct" = grammatical and natural meaning (correction may equal their sentence, just written in normal orthography); "minor" = small grammar fixes (particle, conjugation, word choice); "wrong" = wrong meaning, ungrammatical, not Japanese, or empty. Choosing romaji or kana is never a reason to drop below "correct".`;
+
+  const msg = `Idea to express (in English): ${p.idea}
+${p.constraint ? `REQUIRED grammar pattern the answer must use: ${p.constraint}\n` : ''}${hintBlock ? `Suggested vocab (optional): ${hintBlock}\n` : ''}Student wrote: "${ans}"`;
+
+  try {
+    const raw = await claude([{ role: 'user', content: msg }], sys, 600);
+    const r = parseLooseJSON(raw);
+    p.review = {
+      verdict: ['correct', 'minor', 'wrong'].includes(r.verdict) ? r.verdict : 'minor',
+      correction: r.correction || '',
+      annotated: r.annotated || r.correction || '',
+      translation: r.translation || '',
+      note: r.note || '',
+    };
+    // Record corrected mistakes for weak-point analysis
+    if (p.review.verdict !== 'correct' && p.review.correction) {
+      logMistake({ src: 'c', wrote: ans, fix: stripMarkers(p.review.correction), note: p.review.note, idea: p.idea, constraint: p.constraint });
+    }
+  } catch (e) {
+    p.review = { verdict: 'minor', correction: '', annotated: '', translation: '', note: `Couldn't load review: ${e.message}` };
+  }
+  p.loading = false;
+
+  // Full repaint so the card state, feedback, and score row all refresh together.
+  // syncComposeInputs preserves anything typed in other cards during the await.
+  syncComposeInputs();
+  paintCompose();
+  if (p.review && p.review.correction) speakJapanese(stripMarkers(p.review.correction));
+}
+
+function toggleComposeHint(i) {
+  const p = S.compose.prompts[i];
+  if (!p) return;
+  p.showHints = !p.showHints;
+  syncComposeInputs();
+  paintCompose();
+}
+
+// ── ROLEPLAY MODE ─────────────────────────────────────────────────────────────
+// Azure Japanese voices: NanamiNeural (young F), KeitaNeural (young M), DaichiNeural (mature M),
+// AoiNeural (child F), MayuNeural (adult F), NaokiNeural (adult M), ShioriNeural (soft F)
+const SCENARIO_POOL = [
+  { id: 'sento',      jp: '銭湯',         en: 'Neighborhood bathhouse',    icon: '♨️',  char: 'Tanaka-san, a retired postman in his 70s',              voice: 'ja-JP-DaichiNeural', ctx: 'You\'re soaking in the local bathhouse. Tanaka-san, who\'s lived nearby for 40 years, settles in beside you and starts narrating the neighborhood\'s gossip — whether you asked or not.' },
+  { id: 'ramen_ichi', jp: '深夜ラーメン', en: 'Late-night ramen stall',    icon: '🍜',  char: 'Goto-san, a taciturn chef who decides to talk tonight',  voice: 'ja-JP-NaokiNeural',  ctx: 'It\'s 1am and you\'re the only customer at a tiny counter. Chef Goto-san is famous for refusing to say more than three sentences to anyone — but tonight he seems to want to talk.' },
+  { id: 'taxi',       jp: 'タクシー',     en: 'Opinionated taxi ride',     icon: '🚕',  char: 'Mori-san, a driver with strong opinions on everything',  voice: 'ja-JP-DaichiNeural', ctx: 'You\'ve hailed a taxi for a 20-minute ride. Mori-san immediately shares his views on Japanese society, the weather, and — unprompted — your hairstyle.' },
+  { id: 'koban',      jp: '交番',         en: 'Lost at the police box',    icon: '🚔',  char: 'Yamamoto-kun, a very earnest young officer',            voice: 'ja-JP-KeitaNeural',  ctx: 'You\'ve come to report a lost umbrella — your third this month. Officer Yamamoto-kun is deeply serious about filling out the paperwork correctly.' },
+  { id: 'hanami',     jp: '花見',         en: 'Cherry blossom party',      icon: '🌸',  char: 'Sato-san, who brought way too much food',               voice: 'ja-JP-MayuNeural',   ctx: 'You\'ve been invited to a hanami. Sato-san has set up an enormous spread and is anxiously making sure everyone eats enough. There is no escape from the rice balls.' },
+  { id: 'kissa',      jp: '喫茶店',       en: 'Old-school coffee shop',    icon: '☕',  char: 'The Master, who opened this kissaten in 1972',          voice: 'ja-JP-DaichiNeural', ctx: 'You\'ve wandered into a tiny kissaten unchanged since the 70s. The Master makes your coffee with extreme deliberate slowness, then asks — in detail — where you\'re from.' },
+  { id: 'furuhon',    jp: '古本屋',       en: 'Dusty old bookshop',        icon: '📚',  char: 'Ikeda-san, who knows where every single book is',      voice: 'ja-JP-NaokiNeural',  ctx: 'Floor-to-ceiling shelves. No apparent system. Yet Ikeda-san can find any book in under 10 seconds and is very curious what you\'re looking for today.' },
+  { id: 'izakaya',    jp: '居酒屋',       en: 'After-work confession',     icon: '🍺',  char: 'Nakamura-san, a coworker hiding a secret',             voice: 'ja-JP-KeitaNeural',  ctx: 'Two beers in at an izakaya, Nakamura-san leans across the table and says there\'s something they\'ve been wanting to tell you for months.' },
+  { id: 'onsen',      jp: '露天風呂',     en: 'Outdoor hot spring',        icon: '🛁',  char: 'An innkeeper who thinks you need life advice',         voice: 'ja-JP-DaichiNeural', ctx: 'You\'re soaking in an outdoor hot spring at a mountain inn. The elderly innkeeper joins you and, unprompted, begins sharing wisdom about life, marriage, and the importance of breakfast.' },
+  { id: 'shogi',      jp: '公園将棋',     en: 'Park shogi match',          icon: '♟️',  char: 'Oyaji-san, a retired salaryman who plays every day',   voice: 'ja-JP-DaichiNeural', ctx: 'You\'ve sat at a public shogi board in the park. The old man immediately challenges you. He\'s played here every day for 15 years and has a story for every single move.' },
+  { id: 'tachigui',   jp: '立ち食いそば', en: 'Standing soba bar',         icon: '🍱',  char: 'A salaryman who finishes his meal in 90 seconds',      voice: 'ja-JP-NaokiNeural',  ctx: 'Lunchtime standing soba. The man next to you demolishes his bowl in 90 seconds then — inexplicably — stays to discuss the regional differences in soba culture.' },
+  { id: 'ufo',        jp: 'UFOキャッチャー', en: 'Crane game at the arcade', icon: '🕹️', char: 'A teenager who considers themselves an expert',        voice: 'ja-JP-KeitaNeural',  ctx: 'You\'re at a crane machine in a game center when a teenager materializes beside you. They have very specific opinions about your technique and insist on demonstrating the correct approach.' },
+  { id: 'konbini3',   jp: 'コンビニ深夜', en: 'Konbini at 3am',            icon: '🏪',  char: 'A fellow night owl with a mysterious purchase',        voice: 'ja-JP-ShioriNeural', ctx: 'It\'s 3am. You and another customer keep reaching for the same thing on the shelf. They explain what they\'re buying and it raises far more questions than it answers.' },
+  { id: 'temple',     jp: '寺の掃除',     en: 'Temple cleanup duty',       icon: '⛩️',  char: 'A young monk who is bad at being serene',              voice: 'ja-JP-KeitaNeural',  ctx: 'You\'ve volunteered to sweep a temple. The young monk assigned to work with you keeps interrupting the silence to ask for advice about completely non-spiritual problems.' },
+  { id: 'recycle',    jp: 'リサイクル',   en: 'Recycle shop appraisal',    icon: '♻️',  char: 'Fujii-san, a brutally honest appraiser',               voice: 'ja-JP-NaokiNeural',  ctx: 'You\'ve brought items to sell. Fujii-san gives a long, detailed, and very candid assessment of everything you\'ve brought — including what it says about your taste.' },
+  { id: 'ekiben',     jp: '駅弁選び',     en: 'Choosing a station bento',  icon: '🚂',  char: 'A vendor with fierce regional pride',                  voice: 'ja-JP-MayuNeural',   ctx: 'You\'re at a shinkansen station staring at bento options. The vendor — originally from a different prefecture — passionately explains why their regional box is superior to everything else.' },
+  { id: 'vet',        jp: '動物病院',     en: 'Waiting at the vet',        icon: '🐱',  char: 'An owner treating a minor issue as a full crisis',     voice: 'ja-JP-NanamiNeural', ctx: 'You\'re in the waiting room. The person next to you has brought their cat for what turns out to be an extremely minor thing, but they are treating it as a medical emergency.' },
+  { id: 'karaoke',    jp: 'カラオケ',     en: 'Karaoke box showdown',      icon: '🎤',  char: 'A friend who takes karaoke far too seriously',         voice: 'ja-JP-NanamiNeural', ctx: 'Your friend is warm and relaxed in everyday life — but inside a karaoke box they become intensely strategic about song selection. The queue is filling up and tensions are rising.' },
+  { id: 'tofu',       jp: '豆腐屋',       en: 'Early morning tofu shop',   icon: '🌅',  char: 'A tofu maker who\'s been at it since 4am',            voice: 'ja-JP-DaichiNeural', ctx: 'You\'ve come to buy fresh tofu at 6am. The maker, up since 4am, is in a philosophical mood and wants to discuss the parallels between making good tofu and living a good life.' },
+  { id: 'rakugo',     jp: '落語の後',     en: 'After the rakugo show',     icon: '🎭',  char: 'A young apprentice who just did their debut',          voice: 'ja-JP-KeitaNeural',  ctx: 'You\'re backstage after a rakugo performance. The apprentice is still in full costume, visibly anxious — it was their debut tonight and they desperately want honest feedback.' },
+  { id: 'tsuri',      jp: '釣り',         en: 'Fishing off the pier',      icon: '🎣',  char: 'An old fisherman who measures time differently',       voice: 'ja-JP-DaichiNeural', ctx: 'You\'ve rented a rod at the pier. The old man next to you has fished this exact spot every morning for 30 years. He has a deeply unusual relationship with the concept of urgency.' },
+  { id: 'curry',      jp: 'カレーの行列', en: 'Queuing for famous curry',  icon: '🍛',  char: 'A curry devotee who\'s been here 47 times',            voice: 'ja-JP-NaokiNeural',  ctx: 'You\'re in a long queue outside a legendary curry shop. The person in front has eaten here 47 times and will explain — in full — what makes the 90-minute wait worthwhile.' },
+  { id: 'taiko',      jp: '太鼓',         en: 'Taiko drum trial lesson',   icon: '🥁',  char: 'A sensei who believes in one strike, one soul',        voice: 'ja-JP-DaichiNeural', ctx: 'You\'ve signed up for a trial taiko lesson. The sensei is warm but utterly exacting — your first 45 minutes involve only one drumstroke, repeated, until it is correct.' },
+  { id: 'machiya',    jp: '町屋カフェ',   en: 'Converted machiya café',    icon: '🏮',  char: 'The owner who turned their ancestral home into a café', voice: 'ja-JP-ShioriNeural', ctx: 'You\'re in a beautiful old townhouse turned café. The owner explains the provenance of every object in the room. Some of it is 200 years old. More tea is poured than requested.' },
+  { id: 'parrot',     jp: 'ペットカフェ', en: 'Pet café with a parrot',    icon: '🦜',  char: 'Jiro the parrot, who has opinions',                    voice: 'ja-JP-AoiNeural',    ctx: 'A large grey parrot named Jiro has memorized phrases from past customers. He keeps interrupting your conversation with the staff in ways that are confusing but contextually relevant.' },
+  { id: 'gokon',      jp: '合コン',       en: 'Group date (gokon)',        icon: '🥂',  char: 'Someone who was also dragged here against their will', voice: 'ja-JP-ShioriNeural', ctx: 'You\'ve been brought to a gokon by a friend. The person next to you leans over and whispers that they were also dragged here against their will. You have found each other.' },
+  { id: 'dojo',       jp: '道場',         en: 'After training at the dojo', icon: '🥋', char: 'A training partner who gets very philosophical post-session', voice: 'ja-JP-KeitaNeural', ctx: 'Training is over and you\'re stretching. Your training partner seems relaxed and happy — and wants to talk about what martial arts is actually for.' },
+  { id: 'omiyage',    jp: 'お土産選び',   en: 'Choosing souvenirs',        icon: '🎁',  char: 'A shop assistant who knows everyone\'s preferences',   voice: 'ja-JP-NanamiNeural', ctx: 'You\'re at a souvenir shop trying to find the right gifts. The assistant remembers what previous customers liked and starts confidently directing you toward things you didn\'t know you needed.' },
+  { id: 'yakkyoku',   jp: '薬局',         en: 'At the pharmacy',           icon: '💊',  char: 'A pharmacist who needs to know everything first',      voice: 'ja-JP-MayuNeural',   ctx: 'You\'ve come in for basic cold medicine. The pharmacist wants your full medical history, sleeping patterns, and diet before recommending anything. She is thorough. Very thorough.' },
+  { id: 'sentou_furo',jp: 'ジム更衣室',  en: 'Gym changing room chat',    icon: '🏋️',  char: 'A gym regular who gives unsolicited training advice',  voice: 'ja-JP-NaokiNeural',  ctx: 'You\'re getting changed after a workout. A regular who\'s been coming here for years sizes you up immediately and starts offering very specific advice about your fitness routine.' },
+  // ── Seasonal & festival ──
+  { id: 'matsuri',    jp: '夏祭り',     en: 'Summer festival goldfish scoop', icon: '🎆', char: 'A festival vendor who bets you can\'t catch one',       voice: 'ja-JP-NaokiNeural',  ctx: 'The summer festival is packed. A goldfish scooping vendor watches you fail three times, then starts coaching you with dead-serious intensity — like a martial arts master, but for paper scoops.' },
+  { id: 'hatsumode',  jp: '初詣',       en: 'New Year shrine visit',         icon: '⛩️', char: 'An elderly woman who reads fortunes dramatically',      voice: 'ja-JP-MayuNeural',   ctx: 'January 1st, and the shrine line stretches forever. The woman behind you has already read her fortune and is narrating it like a movie trailer. She insists on interpreting yours too.' },
+  { id: 'obon',       jp: 'お盆',       en: 'Obon family gathering',         icon: '🏮', char: 'A cousin you\'ve never met who knows everything about you', voice: 'ja-JP-NanamiNeural', ctx: 'You\'re at a relative\'s house for Obon. A cousin you\'ve never met appears to know your entire life history and is eager to catch up on years of missed gossip.' },
+  { id: 'setsubun',   jp: '節分',       en: 'Bean-throwing at the temple',   icon: '👹', char: 'A child who takes demon-chasing very seriously',        voice: 'ja-JP-AoiNeural',    ctx: 'It\'s Setsubun and a child at the temple hands you a bag of beans with military precision. They have a tactical plan for maximum demon expulsion and need your cooperation.' },
+  { id: 'tanabata',   jp: '七夕',       en: 'Writing wishes at Tanabata',    icon: '🎋', char: 'A stranger who asks what you\'ll wish for',             voice: 'ja-JP-ShioriNeural', ctx: 'You\'re tying a wish to a bamboo branch at a Tanabata display. The person next to you wants to compare wishes and gets unexpectedly philosophical about what people really want.' },
+  // ── Work & office ──
+  { id: 'elevator',   jp: 'エレベーター', en: 'Awkward elevator small talk',  icon: '🛗', char: 'A department head you\'ve never spoken to',             voice: 'ja-JP-DaichiNeural', ctx: 'You step into the elevator and it\'s just you and the intimidating department head. 30 floors to go. They suddenly ask you a surprisingly personal question.' },
+  { id: 'nomikai',    jp: '飲み会',     en: 'Office drinking party',         icon: '🍶', char: 'Suzuki-buchou, who becomes a different person after beer', voice: 'ja-JP-DaichiNeural', ctx: 'At the office nomikai, your normally stern boss Suzuki-buchou is three beers in and telling stories about his failed dreams of becoming a rock musician. He wants to know your secret ambitions.' },
+  { id: 'shinsotsu',  jp: '新卒研修',   en: 'New employee training day',     icon: '👔', char: 'A fellow new hire who is hilariously over-prepared',    voice: 'ja-JP-KeitaNeural',  ctx: 'It\'s your first day of company training. The person next to you has color-coded notes, three pens, and has already memorized the company song. They want to form a study group.' },
+  { id: 'copying',    jp: 'コピー室',   en: 'Copier room confession',        icon: '🖨️', char: 'A senpai who only shares real talk by the copier',      voice: 'ja-JP-MayuNeural',   ctx: 'You\'re making copies and a senpai appears. Something about the copier room makes people honest — they start telling you things about the company they\'d never say at their desk.' },
+  // ── Transport & travel ──
+  { id: 'shinkansen', jp: '新幹線',     en: 'Shinkansen seatmate chat',      icon: '🚄', char: 'A businesswoman heading home after a long week',        voice: 'ja-JP-MayuNeural',   ctx: 'Three hours on the Shinkansen. The woman in the next seat has cracked open an ekiben and a beer at 2pm on a Friday. She\'s in a reflective mood and starts telling you about her week.' },
+  { id: 'ferry',      jp: 'フェリー',   en: 'Overnight ferry to an island',  icon: '⛴️', char: 'A fisherman returning home after selling his catch',    voice: 'ja-JP-DaichiNeural', ctx: 'You\'re on the overnight ferry. A weathered fisherman shares the deck with you, watching the stars. He talks about the sea like it\'s a person he\'s known his whole life.' },
+  { id: 'bus_rural',  jp: '路線バス',   en: 'Last bus in the countryside',   icon: '🚌', char: 'The only other passenger, a grandmother with a huge bag', voice: 'ja-JP-MayuNeural',   ctx: 'You\'re on the last bus through the mountains. The only other passenger is a grandmother with an enormous bag of vegetables. She insists on sharing them and telling you how to cook each one.' },
+  { id: 'bicycle',    jp: 'レンタサイクル', en: 'Lost on a rental bike tour', icon: '🚲', char: 'A local student who rescues lost cyclists regularly',   voice: 'ja-JP-NanamiNeural', ctx: 'You\'re hopelessly lost on a rental bike in a small town. A high school student pulls up alongside you — apparently this happens so often they\'ve become an unofficial guide.' },
+  // ── Food & drink deep cuts ──
+  { id: 'wagashi',    jp: '和菓子屋',   en: 'Traditional sweets workshop',   icon: '🍡', char: 'A 4th-generation wagashi artisan',                     voice: 'ja-JP-ShioriNeural', ctx: 'You\'ve signed up for a wagashi-making class. The artisan watches your hands like a hawk and has a story for every shape. She says the bean paste knows when you\'re anxious.' },
+  { id: 'sake',       jp: '酒蔵',       en: 'Sake brewery tour tasting',     icon: '🍶', char: 'A young toji who broke family tradition to innovate',   voice: 'ja-JP-KeitaNeural',  ctx: 'You\'re on a sake brewery tour. The young head brewer went against his father\'s recipes to create something new. He\'s pouring samples and explaining each one like introducing a friend.' },
+  { id: 'yatai',      jp: '屋台',       en: 'Fukuoka yatai food stall',      icon: '🍢', char: 'A yatai owner who seats strangers together on purpose',  voice: 'ja-JP-NaokiNeural',  ctx: 'You\'re squeezed onto a bench at a Fukuoka yatai. The owner has a talent for making strangers talk to each other. Tonight it\'s you and a salary man who just quit his job.' },
+  { id: 'kissaten2',  jp: '純喫茶',     en: 'Retro kissaten cream soda',     icon: '🍈', char: 'A university student writing a novel here every day',    voice: 'ja-JP-NanamiNeural', ctx: 'You ordered a cream soda at a retro kissaten. The student at the next table looks up from their manuscript and asks your opinion on a plot point, as if you\'ve been following along.' },
+  { id: 'depachika',  jp: 'デパ地下',   en: 'Department store food hall',     icon: '🎀', char: 'A sample lady with a PhD in persuasion',                voice: 'ja-JP-MayuNeural',   ctx: 'You\'re in the depachika just browsing. A sample lady intercepts you with a toothpick of wagyu. Before you know it, you\'re hearing the cow\'s life story and reaching for your wallet.' },
+  // ── Nature & outdoors ──
+  { id: 'hiking',     jp: '登山',       en: 'Mountain trail encounter',      icon: '⛰️', char: 'A 78-year-old hiker who summits weekly',                voice: 'ja-JP-DaichiNeural', ctx: 'You\'re struggling up a mountain trail when a 78-year-old passes you at twice your speed. They pause to wait for you and share trail wisdom accumulated over hundreds of climbs.' },
+  { id: 'hanabi',     jp: '花火大会',   en: 'Fireworks festival blanket',    icon: '🎇', char: 'A family who insists you share their spot and snacks',   voice: 'ja-JP-MayuNeural',   ctx: 'You\'re looking for a spot at the fireworks festival. A family waves you over to share their blanket. Within minutes you have a beer, edamame, and a seat. They want to know everything.' },
+  { id: 'neko_jima',  jp: '猫島',       en: 'Cat island ferry dock',         icon: '🐈', char: 'The island\'s self-appointed cat historian',             voice: 'ja-JP-ShioriNeural', ctx: 'You\'ve arrived at a cat island. An elderly resident appears and begins introducing you to specific cats by name, explaining their family trees and political alliances.' },
+  { id: 'onsen_town', jp: '温泉街',     en: 'Strolling an onsen town',       icon: '🌙', char: 'A ryokan worker on their break, in yukata and geta',    voice: 'ja-JP-NanamiNeural', ctx: 'You\'re strolling through an onsen town at dusk. A ryokan worker on break falls into step beside you, pointing out hidden spots that only locals know — a free foot bath, the best view.' },
+  // ── Culture & craft ──
+  { id: 'pottery',    jp: '陶芸教室',   en: 'Pottery wheel lesson',          icon: '🏺', char: 'A sensei who communicates mostly through sighs',        voice: 'ja-JP-DaichiNeural', ctx: 'Your clay is a disaster. The pottery sensei says nothing, sighs deeply, then gently reshapes it with one hand. Eventually words come — spare, precise, and oddly profound.' },
+  { id: 'manga_cafe', jp: '漫画喫茶',   en: 'Manga café late night',         icon: '📖', char: 'A regular who\'s read everything in here — literally',   voice: 'ja-JP-KeitaNeural',  ctx: 'It\'s 2am at a manga café. The person in the next booth leans over and asks what you\'re reading. They have frighteningly specific opinions about every series on the shelf.' },
+  { id: 'shodou',     jp: '書道',       en: 'Calligraphy class',             icon: '✒️', char: 'A sensei who reads personality from brushstrokes',       voice: 'ja-JP-MayuNeural',   ctx: 'You\'re in a calligraphy class. The sensei watches you write one character, then calmly explains what it reveals about your personality. It\'s uncomfortably accurate.' },
+  { id: 'kimono',     jp: '着物レンタル', en: 'Kimono rental fitting',        icon: '👘', char: 'A dresser with encyclopedic pattern knowledge',         voice: 'ja-JP-ShioriNeural', ctx: 'You\'re getting fitted for a rental kimono. The dresser holds up each option and explains the symbolism of every pattern — seasons, wishes, hidden messages woven into silk.' },
+  // ── Everyday quirky ──
+  { id: 'laundry',    jp: 'コインランドリー', en: 'Midnight laundromat',      icon: '🧺', char: 'A night-shift worker doing laundry and life reflection', voice: 'ja-JP-NaokiNeural',  ctx: 'Midnight at a coin laundry. The only other person is staring at the dryer like it contains the meaning of life. They start talking about their job, their dreams, and fabric softener preferences.' },
+  { id: 'jihanki',    jp: '自販機',     en: 'Vending machine in the mountains', icon: '🥤', char: 'A hiker amazed the machine exists here',               voice: 'ja-JP-KeitaNeural',  ctx: 'There\'s a vending machine on a mountain road in the middle of nowhere. Another hiker is standing in front of it in disbelief. This shared miracle becomes the basis for a long conversation.' },
+  { id: 'post_office',jp: '郵便局',     en: 'Sending a package home',        icon: '📮', char: 'A postal worker who treats every package like treasure', voice: 'ja-JP-MayuNeural',   ctx: 'You\'re sending a package overseas. The postal worker wants to know exactly what\'s inside — not for customs, but because they\'re genuinely curious. They have opinions about wrapping technique.' },
+  { id: 'barber',     jp: '床屋',       en: 'Old-school barber shop',        icon: '💈', char: 'A barber who\'s been cutting hair since the 60s',        voice: 'ja-JP-DaichiNeural', ctx: 'You\'ve walked into a barber shop that hasn\'t changed since 1965. The barber moves slowly, talks about how hairstyles reflect the era, and has a story for every decade on the wall.' },
+  { id: 'flea',       jp: '蚤の市',     en: 'Sunday flea market haggle',     icon: '🪙', char: 'A seller who prices things based on the story behind them', voice: 'ja-JP-NaokiNeural', ctx: 'At a Sunday flea market, a vendor has priced a chipped teacup at ¥5000 and a gold watch at ¥200. Every item has a story, and the price depends entirely on how good the story is.' },
+  { id: 'dentist',    jp: '歯医者',     en: 'Chatty dental hygienist',       icon: '🦷', char: 'A hygienist who asks questions while your mouth is full', voice: 'ja-JP-NanamiNeural', ctx: 'You\'re at the dentist. The hygienist asks you detailed questions about your life while both hands are in your mouth. She somehow understands your garbled responses perfectly.' },
+  // ── Night life & entertainment ──
+  { id: 'jazz_bar',   jp: 'ジャズバー', en: 'Tiny basement jazz bar',        icon: '🎷', char: 'A bartender who only speaks during song breaks',        voice: 'ja-JP-NaokiNeural',  ctx: 'A basement bar with eight seats. The bartender times all conversation to the gaps between songs. During music, silence is absolute. Between sets, he\'s surprisingly chatty.' },
+  { id: 'batting',    jp: 'バッティングセンター', en: 'Batting center rivalry', icon: '⚾', char: 'A salaryman who visits every night to de-stress',       voice: 'ja-JP-NaokiNeural',  ctx: 'You\'re at a batting center. The salaryman in the next cage has clearly been here every night this week. He notices your swing, offers tips, and eventually confesses this is his therapy.' },
+  { id: 'pachinko',   jp: 'パチンコ',   en: 'Outside the pachinko parlor',   icon: '🎰', char: 'A retiree who treats it as a social club',              voice: 'ja-JP-DaichiNeural', ctx: 'You\'re outside a pachinko parlor when a retiree exits triumphantly. He doesn\'t care about winning — he comes for the community. He explains the unwritten social rules of the regulars.' },
+  { id: 'escape_rm',  jp: '脱出ゲーム', en: 'Escape room with a stranger',   icon: '🔐', char: 'A stranger paired with you who is very competitive',    voice: 'ja-JP-NanamiNeural', ctx: 'You\'ve been paired with a stranger for a two-person escape room. They are treating it like a life-or-death mission and expect total cooperation. The clock is ticking.' },
+  // ── Neighborhood & community ──
+  { id: 'chounaikai',jp: '町内会',     en: 'Neighborhood association meeting', icon: '🏘️', char: 'The neighborhood chief who runs meetings like a general', voice: 'ja-JP-DaichiNeural', ctx: 'You\'ve been asked to attend the neighborhood association meeting. The chief has a 15-item agenda, strong opinions about garbage sorting, and a surprising amount of power over local parking.' },
+  { id: 'dagashi',    jp: '駄菓子屋',   en: 'Retro candy shop after school', icon: '🍬', char: 'The shop owner who\'s watched kids grow up for 40 years', voice: 'ja-JP-MayuNeural',   ctx: 'You\'ve wandered into a tiny dagashiya. The owner knows every child in the neighborhood by name and remembers what candy they bought 20 years ago. She gives you the newcomer treatment.' },
+  { id: 'shotengai',  jp: '商店街',     en: 'Dying shopping street revival',  icon: '🏪', char: 'A young shop owner trying to save the street',           voice: 'ja-JP-KeitaNeural',  ctx: 'Half the shops on this shotengai are shuttered. But one young owner has big plans to revive it. They rope you into taste-testing their new product and want your honest foreign perspective.' },
+];
+
+const AZURE_VOICES = ['ja-JP-NanamiNeural','ja-JP-KeitaNeural','ja-JP-DaichiNeural','ja-JP-AoiNeural','ja-JP-MayuNeural','ja-JP-NaokiNeural','ja-JP-ShioriNeural'];
+
+function fallbackScenarios() {
+  const favIds = S.favorites.map(f => f.id);
+  const pool = SCENARIO_POOL.filter(s => !favIds.includes(s.id));
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, 6);
+}
+
+const JP_SCENARIO_THEMES = [
+  'seasonal festivals & traditions', 'workplace & office culture', 'trains, buses & travel mishaps',
+  'food artisans & hidden restaurants', 'nature, mountains & the sea', 'traditional arts & crafts',
+  'late-night encounters & nightlife', 'neighborhood life & community', 'medical & everyday errands',
+  'school & university life', 'sports & hobbies', 'family gatherings & relationships',
+  'rural Japan & countryside', 'temples, shrines & spirituality', 'shopping & markets',
+  'technology & modern life', 'music, art & performance', 'animals & pets',
+  'housing & moving', 'childhood nostalgia & memories',
+];
+
+function pickJpTheme() {
+  const used = JSON.parse(sessionStorage.getItem('renshuu_used_jp_themes') || '[]');
+  const available = JP_SCENARIO_THEMES.filter(t => !used.includes(t));
+  const pool = available.length > 0 ? available : JP_SCENARIO_THEMES;
+  const theme = pool[Math.floor(Math.random() * pool.length)];
+  const next = available.length > 1 ? [...used, theme] : [theme];
+  sessionStorage.setItem('renshuu_used_jp_themes', JSON.stringify(next));
+  return theme;
+}
+
+async function generateScenarios() {
+  // Try to load cached AI-generated scenarios first
+  const cached = sessionStorage.getItem('renshuu_scenarios_cache');
+  if (cached) {
+    try {
+      const arr = JSON.parse(cached);
+      if (Array.isArray(arr) && arr.length >= 6) {
+        S.scenarios = arr.slice(0, 6);
+        sessionStorage.removeItem('renshuu_scenarios_cache');
+        sessionStorage.setItem('renshuu_scenarios', JSON.stringify(S.scenarios));
+        // Pre-generate next batch in background
+        generateAndCacheJpScenarios();
+        return;
+      }
+    } catch (_) {}
+  }
+
+  const theme = pickJpTheme();
+  const maxRetries = 2;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const reply = await claude([{ role: 'user', content: `Generate 6 unique, creative Japanese roleplay scenarios for a language learner.
+
+THEME FOCUS for this batch: "${theme}"
+At least 4 of the 6 scenarios should relate to this theme. The other 2 can be wildcard — any setting.
+
+Each should have a vivid, memorable character and an interesting situation set in Japan. Vary the character ages, genders, and personality types. Include a mix of: funny, serious, heartwarming, and awkward situations. Avoid clichés like "helpful shopkeeper" or "friendly old man" — give characters specific quirks, secrets, or obsessions.
+
+Return ONLY a JSON array (no markdown, no explanation) where each object has:
+- "id": short kebab-case identifier
+- "jp": location/situation name in Japanese (2-4 characters)
+- "en": short English description (3-6 words)
+- "icon": a single emoji that fits the scene
+- "char": one-line character description (name + personality quirk — be specific!)
+- "ctx": 2-3 sentence scene setup, written in second person, vivid and cinematic
+- "gender": "male_old", "male_young", "male_adult", "female_young", "female_adult", "female_soft", or "child"
+
+Think: the opening of a short film. Surprise me.` }],
+      'You are a creative scenario designer for a Japanese language learning app. You specialize in creating vivid, culturally authentic scenarios with memorable characters. Output valid JSON only.',
+      2000);
+
+      const parsed = JSON.parse(reply.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
+      if (!Array.isArray(parsed) || parsed.length < 1) throw new Error('Bad format');
+
+      const voiceMap = {
+        male_old: 'ja-JP-DaichiNeural', male_young: 'ja-JP-KeitaNeural', male_adult: 'ja-JP-NaokiNeural',
+        female_young: 'ja-JP-NanamiNeural', female_adult: 'ja-JP-MayuNeural', female_soft: 'ja-JP-ShioriNeural',
+        child: 'ja-JP-AoiNeural',
+      };
+      S.scenarios = parsed.map(s => ({
+        id: s.id || ('gen_' + Math.random().toString(36).slice(2, 8)),
+        jp: s.jp, en: s.en, icon: s.icon || '🎭',
+        char: s.char, ctx: s.ctx,
+        voice: voiceMap[s.gender] || AZURE_VOICES[Math.floor(Math.random() * AZURE_VOICES.length)],
+      }));
+      sessionStorage.setItem('renshuu_scenarios', JSON.stringify(S.scenarios));
+      // Pre-generate next batch in background
+      generateAndCacheJpScenarios();
+      return;
+    } catch (e) {
+      console.warn(`Scenario generation attempt ${attempt + 1} failed:`, e);
+      if (attempt === maxRetries) {
+        console.warn('All retries exhausted, using fallback pool');
+        S.scenarios = fallbackScenarios();
+      }
+    }
+  }
+}
+
+async function generateAndCacheJpScenarios() {
+  try {
+    const theme = pickJpTheme();
+    const reply = await claude([{ role: 'user', content: `Generate 6 unique, creative Japanese roleplay scenarios for a language learner.
+
+THEME FOCUS for this batch: "${theme}"
+At least 4 of the 6 scenarios should relate to this theme. The other 2 can be wildcard — any setting.
+
+Each should have a vivid, memorable character and an interesting situation set in Japan. Vary the character ages, genders, and personality types. Include a mix of: funny, serious, heartwarming, and awkward situations. Avoid clichés like "helpful shopkeeper" or "friendly old man" — give characters specific quirks, secrets, or obsessions.
+
+Return ONLY a JSON array (no markdown, no explanation) where each object has:
+- "id": short kebab-case identifier
+- "jp": location/situation name in Japanese (2-4 characters)
+- "en": short English description (3-6 words)
+- "icon": a single emoji that fits the scene
+- "char": one-line character description (name + personality quirk — be specific!)
+- "ctx": 2-3 sentence scene setup, written in second person, vivid and cinematic
+- "gender": "male_old", "male_young", "male_adult", "female_young", "female_adult", "female_soft", or "child"
+
+Think: the opening of a short film. Surprise me.` }],
+    'You are a creative scenario designer for a Japanese language learning app. You specialize in creating vivid, culturally authentic scenarios with memorable characters. Output valid JSON only.',
+    2000);
+
+    const parsed = JSON.parse(reply.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
+    if (Array.isArray(parsed) && parsed.length >= 1) {
+      const voiceMap = {
+        male_old: 'ja-JP-DaichiNeural', male_young: 'ja-JP-KeitaNeural', male_adult: 'ja-JP-NaokiNeural',
+        female_young: 'ja-JP-NanamiNeural', female_adult: 'ja-JP-MayuNeural', female_soft: 'ja-JP-ShioriNeural',
+        child: 'ja-JP-AoiNeural',
+      };
+      const cached = parsed.map(s => ({
+        id: s.id || ('gen_' + Math.random().toString(36).slice(2, 8)),
+        jp: s.jp, en: s.en, icon: s.icon || '🎭',
+        char: s.char, ctx: s.ctx,
+        voice: voiceMap[s.gender] || AZURE_VOICES[Math.floor(Math.random() * AZURE_VOICES.length)],
+      }));
+      sessionStorage.setItem('renshuu_scenarios_cache', JSON.stringify(cached));
+    }
+  } catch (e) {
+    console.warn('Background scenario cache generation failed:', e);
+  }
+}
+
+async function refreshScenarios() {
+  // Show loading state
+  const grid = document.querySelector('.scenario-grid:last-of-type');
+  if (grid) grid.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">Generating fresh scenarios…</div>';
+  await generateScenarios();
+  if (S.scenario && !S.scenarios.find(s => s.id === S.scenario.id) && !S.favorites.find(f => f.id === S.scenario.id)) {
+    S.scenario = null;
+    S.convo = [];
+  }
+  renderRoleplay();
+}
+
+function toggleFavorite(id) {
+  const idx = S.favorites.findIndex(f => f.id === id);
+  if (idx === -1) {
+    // Find the full scenario object from current scenarios or pool
+    const sc = S.scenarios.find(s => s.id === id) || SCENARIO_POOL.find(s => s.id === id);
+    if (sc) {
+      const fav = { ...sc };
+      // Save conversation if this is the active scenario
+      if (S.scenario?.id === id && S.convo.length) {
+        fav.convo = S.convo.map(m => ({ role: m.role, content: m.content, correction: m.correction || undefined }));
+      }
+      S.favorites.push(fav);
+    }
+  } else {
+    S.favorites.splice(idx, 1);
+  }
+  saveFavorites();
+  renderRoleplay();
+  if (S.scenario) scrollChat();
+}
+
+
+function saveFavorites() {
+  localStorage.setItem('renshuu_favorites', JSON.stringify(S.favorites));
+  // Sync to gist in background
+  gistPushAll();
+}
+
+// ── Pixel-art character sprites ──────────────────────────────────────────
+const CHAR_SPRITES = {
+  mature_male: {
+    hair: '#8C8C8C', hairHl: '#B4B4B4',
+    shirt: '#2E4A6A', shirtHl: '#4A6A8A',
+    pixels: [
+      '....HHHHHHHH....',
+      '...HHSSSSSSHHH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSEESSSSEESH..',
+      '..HS..SSSS..SH..',
+      '..HSSSSnSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSmmSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HHSSSSSSSSSH..',
+      '....ssssssss....',
+      '....BBBBBBBB....',
+      '....BBbbbbBB....',
+      '....BBBBBBBB....',
+    ]
+  },
+  adult_male: {
+    hair: '#1A0800', hairHl: '#3A2010',
+    shirt: '#1A3A6A', shirtHl: '#2A5A90',
+    pixels: [
+      '..HHHHHHHHHHHH..',
+      '..HHHSSSSSSHHH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSEESSSSEESH..',
+      '..HS..SSSS..SH..',
+      '..HSSSSnSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSmmSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HHSSSSSSSSSH..',
+      '....ssssssss....',
+      '....BBBBBBBB....',
+      '....BBbbbbBB....',
+      '....BBBBBBBB....',
+    ]
+  },
+  young_male: {
+    hair: '#1A0800', hairHl: '#4A2010',
+    shirt: '#1A6030', shirtHl: '#2A8050',
+    pixels: [
+      '..HHHhHHHHhHHH..',
+      '..HHHSSSSSSHHH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSEESSSSEESH..',
+      '..HS..SSSS..SH..',
+      '..HSSSSnSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSmmSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HHSSSSSSSSSH..',
+      '....ssssssss....',
+      '....BBBBBBBB....',
+      '....BBbbbbBB....',
+      '....BBBBBBBB....',
+    ]
+  },
+  adult_female: {
+    hair: '#1A0800', hairHl: '#3A2010',
+    shirt: '#8A2050', shirtHl: '#AA4070',
+    pixels: [
+      '..HHHHHHHHHHHH..',
+      '..HHHhhhhhHHHH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSEESSSSEESH..',
+      '..HS..SSSS..SH..',
+      '..HSSSSnSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSmmSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HHSSSSSSSSSH..',
+      '..HHHhhhhhHHHH..',
+      '.HHhBBBBBBBBhHH.',
+      '.HHhBBbbbbBBhHH.',
+      '.HHhBBBBBBBBhHH.',
+    ]
+  },
+  young_female: {
+    hair: '#1A0800', hairHl: '#3A2010',
+    shirt: '#6030A0', shirtHl: '#8050C0',
+    pixels: [
+      '..HHHHHHHHHHHH..',
+      '..HHHhhhhhHHHH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSEESSSSEESH..',
+      '..HS..SSSS..SH..',
+      '..HSSSSnSSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HSSSSmmSSSSH..',
+      '..HSSSSSSSSSSH..',
+      '..HHSSSSSSSSSH..',
+      '..HHHhhhhhHHHH..',
+      '.HHhBBBBBBBBhHH.',
+      '.HHhBBbbbbBBhHH.',
+      '.HHhBBBBBBBBhHH.',
+    ]
+  },
+};
+
+const VOICE_SPRITE_MAP = {
+  'ja-JP-DaichiNeural': 'mature_male',
+  'ja-JP-NaokiNeural':  'adult_male',
+  'ja-JP-KeitaNeural':  'young_male',
+  'ja-JP-NanamiNeural': 'adult_female',
+  'ja-JP-MayuNeural':   'adult_female',
+  'ja-JP-ShioriNeural': 'young_female',
+  'ja-JP-AoiNeural':    'young_female',
+  // English voices (for reverse roleplay)
+  'en-US-GuyNeural':      'adult_male',
+  'en-US-DavisNeural':    'young_male',
+  'en-US-JennyNeural':    'adult_female',
+  'en-US-AriaNeural':     'young_female',
+  'en-GB-RyanNeural':     'mature_male',
+  'en-GB-SoniaNeural':    'adult_female',
+  'en-AU-WilliamNeural':  'adult_male',
+  'en-AU-NatashaNeural':  'young_female',
+};
+
+function renderSprite(type, px) {
+  px = px || 2;
+  const sp = CHAR_SPRITES[type] || CHAR_SPRITES.adult_male;
+  const size = 16 * px;
+  const cm = {
+    '.': null, 'S': '#EFC090', 's': '#C89060',
+    'H': sp.hair, 'h': sp.hairHl,
+    'E': '#1A0800', 'W': '#F8F8F8',
+    'm': '#8B3030', 'n': '#D09060',
+    'B': sp.shirt, 'b': sp.shirtHl,
+  };
+  let rects = '';
+  sp.pixels.forEach((row, y) => {
+    [...row].forEach((ch, x) => {
+      const c = cm[ch];
+      if (c) rects += `<rect x="${x*px}" y="${y*px}" width="${px}" height="${px}" fill="${c}"/>`;
+    });
+  });
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" shape-rendering="crispEdges">${rects}</svg>`;
+}
+
+function getSprite(voice, px) {
+  return renderSprite(VOICE_SPRITE_MAP[voice] || 'adult_male', px);
+}
+
+// ── Scenario-specific sprite modifications ───────────────────────────────
+// hatRows: replaces pixel rows 0–1 (hair top). Use K=hatColor, k=hatHl, S=skin
+// overlay: array of {x,y,c} drawn on top of the base sprite
+// ── Accessory kit: named parts that can be applied to any sprite ─────────
+// hatRows replace pixel rows 0-1. K=hatColor, k=hatHl, S=skin.
+// overlay: [{x,y,c}] drawn on top.
+const ACCESSORY_KIT = {
+  // ── Shoulder companions ──────────────────────────────────────────────
+  parrot: {
+    overlay:[
+      {x:13,y:8, c:'#22AA22'},{x:14,y:8, c:'#FF6600'},
+      {x:13,y:9, c:'#22AA22'},{x:14,y:9, c:'#22AA22'},
+      {x:13,y:10,c:'#FFCC00'},{x:14,y:10,c:'#22AA22'},
+      {x:13,y:11,c:'#157715'},{x:14,y:11,c:'#157715'},
+    ]
+  },
+  cat: {
+    overlay:[
+      {x:13,y:7,c:'#E08830'},{x:15,y:7,c:'#E08830'},
+      {x:13,y:8,c:'#E08830'},{x:14,y:8,c:'#E08830'},{x:15,y:8,c:'#E08830'},
+      {x:13,y:9,c:'#E08830'},{x:14,y:9,c:'#EEEECC'},{x:15,y:9,c:'#E08830'},
+      {x:13,y:10,c:'#CC7720'},{x:14,y:10,c:'#CC7720'},{x:15,y:10,c:'#CC7720'},
+      {x:12,y:11,c:'#CC7720'},{x:13,y:11,c:'#CC7720'},
+    ]
+  },
+  // ── Hats ─────────────────────────────────────────────────────────────
+  police_cap: {
+    hatRows:['..KKKKKKKKKKKK..','..kKKKKKKKKKKk..'],
+    hatColor:'#1A2A6A', hatHl:'#2A3A7A',
+    overlay:[{x:7,y:1,c:'#C8A020'},{x:8,y:1,c:'#C8A020'}]
+  },
+  // chef_hat is computed dynamically (mature vs adult/young base)
+  tonsure: {
+    hatRows:['..KKKKKKKKKKKK..','..KKKKKKKKKKKK..'],
+    hatColor:'#EFC090', hatHl:'#EFC090',
+  },
+  fishing_hat: {
+    hatRows:['....kKkKkKkK....', '.KKKKKKKKKKKKKK.'],
+    hatColor:'#8B7355', hatHl:'#A68B60',
+  },
+  taxi_cap: {
+    hatRows:['....KKKKKKKK....','..kKKKKKKKKKKk..'],
+    hatColor:'#1A1A1A', hatHl:'#2A2A2A',
+  },
+  wide_hat: {
+    hatRows:['....KKKKKKKK....', '.kKKKKKKKKKKKKk.'],
+    hatColor:'#7A8C40', hatHl:'#9AAA55',
+  },
+  baseball_cap: {
+    hatRows:['..KKKKKKKKKKKK..', '.kKKKKKKKKKKKKk.'],
+    hatColor:'#CC2222', hatHl:'#AA1111',
+  },
+  beanie: {
+    hatRows:['..KkKkKkKkKkKk..','..KKKKKKKKKKKK..'],
+    hatColor:'#446688', hatHl:'#335577',
+  },
+  beret: {
+    hatRows:['..KKKKKKKKKKkK..','...KKKKKKKKk....'],
+    hatColor:'#2A2A4A', hatHl:'#3A3A6A',
+  },
+  hard_hat: {
+    hatRows:['..KKKKKKKKKKKK..', '.kKKKKKKKKKKKKk.'],
+    hatColor:'#FFCC00', hatHl:'#E6B800',
+  },
+  top_hat: {
+    hatRows:['....KKKKKKKK....', '.kKKKKKKKKKKKKk.'],
+    hatColor:'#111111', hatHl:'#333333',
+  },
+  // ── Face accessories ─────────────────────────────────────────────────
+  glasses: {
+    overlay:[
+      {x:3,y:5,c:'#444444'},{x:6,y:5,c:'#444444'},
+      {x:9,y:5,c:'#444444'},{x:12,y:5,c:'#444444'},
+      {x:4,y:6,c:'#444444'},{x:5,y:6,c:'#444444'},
+      {x:7,y:6,c:'#666666'},{x:8,y:6,c:'#666666'},
+      {x:10,y:6,c:'#444444'},{x:11,y:6,c:'#444444'},
+    ]
+  },
+  sunglasses: {
+    overlay:[
+      {x:3,y:5,c:'#1A1A2A'},{x:4,y:5,c:'#223355'},{x:5,y:5,c:'#223355'},
+      {x:6,y:5,c:'#1A1A2A'},{x:7,y:5,c:'#222222'},{x:8,y:5,c:'#222222'},
+      {x:9,y:5,c:'#1A1A2A'},{x:10,y:5,c:'#223355'},{x:11,y:5,c:'#223355'},
+      {x:12,y:5,c:'#1A1A2A'},
+    ]
+  },
+  surgical_mask: {
+    overlay:[
+      {x:3,y:8,c:'#E8E8E8'},{x:4,y:8,c:'#E8E8E8'},{x:5,y:8,c:'#E8E8E8'},
+      {x:6,y:8,c:'#E8E8E8'},{x:7,y:8,c:'#E8E8E8'},{x:8,y:8,c:'#E8E8E8'},
+      {x:9,y:8,c:'#E8E8E8'},{x:10,y:8,c:'#E8E8E8'},{x:11,y:8,c:'#E8E8E8'},{x:12,y:8,c:'#E8E8E8'},
+      {x:3,y:9,c:'#D8D8D8'},{x:4,y:9,c:'#D8D8D8'},{x:5,y:9,c:'#D8D8D8'},
+      {x:6,y:9,c:'#D8D8D8'},{x:7,y:9,c:'#D8D8D8'},{x:8,y:9,c:'#D8D8D8'},
+      {x:9,y:9,c:'#D8D8D8'},{x:10,y:9,c:'#D8D8D8'},{x:11,y:9,c:'#D8D8D8'},{x:12,y:9,c:'#D8D8D8'},
+      {x:3,y:10,c:'#E8E8E8'},{x:4,y:10,c:'#E8E8E8'},{x:5,y:10,c:'#E8E8E8'},
+      {x:6,y:10,c:'#E8E8E8'},{x:7,y:10,c:'#E8E8E8'},{x:8,y:10,c:'#E8E8E8'},
+      {x:9,y:10,c:'#E8E8E8'},{x:10,y:10,c:'#E8E8E8'},{x:11,y:10,c:'#E8E8E8'},{x:12,y:10,c:'#E8E8E8'},
+    ]
+  },
+  // ── Clothing details ─────────────────────────────────────────────────
+  tie: {
+    overlay:[
+      {x:7,y:12,c:'#AA1111'},{x:8,y:12,c:'#AA1111'},
+      {x:7,y:13,c:'#CC1111'},{x:8,y:13,c:'#CC1111'},
+      {x:7,y:14,c:'#CC1111'},{x:8,y:14,c:'#CC1111'},
+      {x:8,y:15,c:'#AA0000'},
+    ]
+  },
+  bow_tie: {
+    overlay:[
+      {x:5,y:12,c:'#550088'},{x:6,y:12,c:'#6600AA'},
+      {x:7,y:12,c:'#7700AA'},{x:8,y:12,c:'#7700AA'},
+      {x:9,y:12,c:'#6600AA'},{x:10,y:12,c:'#550088'},
+    ]
+  },
+  medical: {
+    overlay:[
+      {x:7,y:13,c:'#CC2222'},{x:7,y:14,c:'#CC2222'},{x:7,y:15,c:'#CC2222'},
+      {x:6,y:14,c:'#CC2222'},{x:8,y:14,c:'#CC2222'},
+    ]
+  },
+  // ── Held items / corner icons ─────────────────────────────────────────
+  sake_cup: {
+    overlay:[
+      {x:13,y:9, c:'#F0F0F0'},{x:14,y:9, c:'#F0F0F0'},
+      {x:12,y:10,c:'#F0F0F0'},{x:13,y:10,c:'#E0E0E0'},{x:14,y:10,c:'#F0F0F0'},
+      {x:13,y:11,c:'#F0F0F0'},{x:14,y:11,c:'#F0F0F0'},
+    ]
+  },
+  fan: {
+    overlay:[
+      {x:14,y:7,c:'#FFCC44'},{x:15,y:7,c:'#FFCC44'},
+      {x:13,y:8,c:'#FFCC44'},{x:14,y:8,c:'#FF8844'},{x:15,y:8,c:'#FFCC44'},
+      {x:13,y:9,c:'#FFCC44'},{x:14,y:9,c:'#FFCC44'},{x:15,y:9,c:'#FF8844'},
+      {x:13,y:10,c:'#884400'},{x:13,y:11,c:'#884400'},
+    ]
+  },
+  hachimaki: {
+    overlay:[
+      {x:3,y:2,c:'#F5F5F5'},{x:4,y:2,c:'#F5F5F5'},{x:5,y:2,c:'#F5F5F5'},
+      {x:6,y:2,c:'#F5F5F5'},{x:7,y:2,c:'#CC2222'},{x:8,y:2,c:'#CC2222'},
+      {x:9,y:2,c:'#F5F5F5'},{x:10,y:2,c:'#F5F5F5'},{x:11,y:2,c:'#F5F5F5'},
+      {x:12,y:2,c:'#F5F5F5'},
+    ]
+  },
+  headband: {
+    overlay:[
+      {x:3,y:2,c:'#3355CC'},{x:4,y:2,c:'#3355CC'},{x:5,y:2,c:'#3355CC'},
+      {x:6,y:2,c:'#3355CC'},{x:7,y:2,c:'#3355CC'},{x:8,y:2,c:'#3355CC'},
+      {x:9,y:2,c:'#3355CC'},{x:10,y:2,c:'#3355CC'},{x:11,y:2,c:'#3355CC'},
+      {x:12,y:2,c:'#3355CC'},
+    ]
+  },
+  music_note: {
+    overlay:[
+      {x:14,y:0,c:'#CC8800'},{x:15,y:0,c:'#CC8800'},
+      {x:15,y:1,c:'#CC8800'},
+      {x:14,y:2,c:'#CC8800'},{x:15,y:2,c:'#CC8800'},
+    ]
+  },
+  // ── New accessories for expanded scenarios ──
+  apron: {
+    overlay:[
+      {x:5,y:13,c:'#F0F0F0'},{x:6,y:13,c:'#F0F0F0'},{x:7,y:13,c:'#F0F0F0'},
+      {x:8,y:13,c:'#F0F0F0'},{x:9,y:13,c:'#F0F0F0'},{x:10,y:13,c:'#F0F0F0'},
+      {x:5,y:14,c:'#E8E8E8'},{x:6,y:14,c:'#F0F0F0'},{x:7,y:14,c:'#F0F0F0'},
+      {x:8,y:14,c:'#F0F0F0'},{x:9,y:14,c:'#F0F0F0'},{x:10,y:14,c:'#E8E8E8'},
+      {x:6,y:15,c:'#E8E8E8'},{x:7,y:15,c:'#F0F0F0'},{x:8,y:15,c:'#F0F0F0'},{x:9,y:15,c:'#E8E8E8'},
+    ]
+  },
+  straw_hat: {
+    hatRows:['.KKKKKKKKKKKKKK.','KkKkKkKkKkKkKkKK'],
+    hatColor:'#D4B06A', hatHl:'#C09850',
+  },
+  yukata: {
+    overlay:[
+      {x:6,y:13,c:'#3A5A8A'},{x:7,y:13,c:'#4A6A9A'},{x:8,y:13,c:'#4A6A9A'},{x:9,y:13,c:'#3A5A8A'},
+      {x:6,y:14,c:'#3A5A8A'},{x:7,y:14,c:'#4A6A9A'},{x:8,y:14,c:'#4A6A9A'},{x:9,y:14,c:'#3A5A8A'},
+      {x:7,y:12,c:'#C8A850'},{x:8,y:12,c:'#C8A850'},  // obi
+    ]
+  },
+  hair_ribbon: {
+    overlay:[
+      {x:12,y:1,c:'#CC3355'},{x:13,y:1,c:'#CC3355'},
+      {x:13,y:0,c:'#EE4466'},{x:14,y:0,c:'#CC3355'},
+      {x:12,y:2,c:'#EE4466'},{x:13,y:2,c:'#CC3355'},
+    ]
+  },
+  backpack: {
+    overlay:[
+      {x:1,y:12,c:'#2A6A2A'},{x:2,y:12,c:'#2A6A2A'},
+      {x:1,y:13,c:'#358035'},{x:2,y:13,c:'#358035'},
+      {x:1,y:14,c:'#358035'},{x:2,y:14,c:'#358035'},
+      {x:1,y:15,c:'#2A6A2A'},{x:2,y:15,c:'#2A6A2A'},
+    ]
+  },
+  headphones: {
+    overlay:[
+      {x:2,y:2,c:'#333333'},{x:3,y:2,c:'#333333'},
+      {x:12,y:2,c:'#333333'},{x:13,y:2,c:'#333333'},
+      {x:2,y:3,c:'#555555'},{x:3,y:3,c:'#555555'},
+      {x:12,y:3,c:'#555555'},{x:13,y:3,c:'#555555'},
+      {x:3,y:1,c:'#333333'},{x:4,y:0,c:'#333333'},{x:5,y:0,c:'#333333'},
+      {x:6,y:0,c:'#333333'},{x:7,y:0,c:'#333333'},{x:8,y:0,c:'#333333'},
+      {x:9,y:0,c:'#333333'},{x:10,y:0,c:'#333333'},{x:11,y:0,c:'#333333'},
+      {x:12,y:1,c:'#333333'},
+    ]
+  },
+  brush: {
+    overlay:[
+      {x:14,y:7,c:'#884400'},{x:14,y:8,c:'#884400'},
+      {x:14,y:9,c:'#884400'},{x:14,y:10,c:'#884400'},
+      {x:14,y:11,c:'#222222'},{x:14,y:12,c:'#222222'},
+    ]
+  },
+  lantern: {
+    overlay:[
+      {x:14,y:6,c:'#CC2222'},{x:15,y:6,c:'#CC2222'},
+      {x:13,y:7,c:'#CC2222'},{x:14,y:7,c:'#FF6644'},{x:15,y:7,c:'#CC2222'},
+      {x:13,y:8,c:'#CC2222'},{x:14,y:8,c:'#FF6644'},{x:15,y:8,c:'#CC2222'},
+      {x:14,y:9,c:'#CC2222'},{x:15,y:9,c:'#CC2222'},
+      {x:14,y:10,c:'#888844'},
+    ]
+  },
+  camera: {
+    overlay:[
+      {x:13,y:8,c:'#222222'},{x:14,y:8,c:'#222222'},{x:15,y:8,c:'#222222'},
+      {x:13,y:9,c:'#222222'},{x:14,y:9,c:'#4488CC'},{x:15,y:9,c:'#222222'},
+      {x:13,y:10,c:'#222222'},{x:14,y:10,c:'#222222'},{x:15,y:10,c:'#222222'},
+    ]
+  },
+  candy: {
+    overlay:[
+      {x:14,y:8,c:'#FF66AA'},{x:15,y:8,c:'#FFFFFF'},
+      {x:14,y:9,c:'#FFFFFF'},{x:15,y:9,c:'#FF66AA'},
+      {x:14,y:10,c:'#884400'},
+    ]
+  },
+};
+
+// ── HD (64×64) sprite data for SVG portraits/avatars/scenes ────────────
+// Rect format: [x, y, width, height, color]
+// `head` rects are replaced by accessory `head` rects when the accessory
+// covers the hair (hats). `body` rects are always drawn. `overlay` rects
+// from accessories draw on top.
+const CHAR_SPRITES_HD = {
+  mature_male: {
+    head: [
+      [14,6,36,2,'#7A7A7A'],
+      [12,8,40,2,'#8C8C8C'],
+      [11,10,42,2,'#9A9A9A'],
+      [10,12,44,2,'#9A9A9A'],
+      [14,9,14,2,'#B4B4B4'],[36,9,10,2,'#B4B4B4'],
+      [10,14,3,18,'#8C8C8C'],[51,14,3,18,'#8C8C8C'],
+      [9,14,1,18,'#6A6A6A'],[54,14,1,18,'#6A6A6A'],
+    ],
+    body: [
+      [14,13,36,1,'#E8B888'],
+      [13,14,38,26,'#EFC090'],
+      [14,40,36,2,'#E8B888'],
+      [16,42,32,2,'#D8A878'],
+      [18,14,14,3,'#F5D0A0'],
+      [11,22,3,8,'#D8A878'],[50,22,3,8,'#D8A878'],
+      [12,24,1,4,'#C09060'],[51,24,1,4,'#C09060'],
+      [17,20,10,1,'#5A5A5A'],[17,21,10,1,'#707070'],
+      [36,20,10,1,'#5A5A5A'],[36,21,10,1,'#707070'],
+      [18,23,9,5,'#FFFFFF'],[36,23,9,5,'#FFFFFF'],
+      [18,23,9,1,'#1A0800'],[36,23,9,1,'#1A0800'],
+      [20,24,4,4,'#3A5A6A'],[38,24,4,4,'#3A5A6A'],
+      [21,25,2,2,'#1A0800'],[39,25,2,2,'#1A0800'],
+      [21,24,1,1,'#FFFFFF'],[39,24,1,1,'#FFFFFF'],
+      [14,25,2,1,'#C09060'],[48,25,2,1,'#C09060'],
+      [13,26,3,1,'#C09060'],[48,26,3,1,'#C09060'],
+      [30,29,2,1,'#D8A878'],
+      [29,30,1,3,'#D8A878'],[32,30,1,3,'#D8A878'],
+      [30,33,3,1,'#C09060'],
+      [29,34,2,1,'#C09060'],[33,34,2,1,'#C09060'],
+      [30,34,1,1,'#A07050'],[33,34,1,1,'#A07050'],
+      [22,36,20,1,'#A06050'],
+      [23,37,18,1,'#C07060'],
+      [24,38,16,1,'#E08070'],
+      [26,42,12,1,'#C09060'],
+      [22,44,20,4,'#C89060'],
+      [22,44,20,1,'#A07040'],
+      [6,48,52,16,'#2E4A6A'],
+      [6,48,52,2,'#1A2A40'],
+      [4,48,4,16,'#1A2A40'],[56,48,4,16,'#1A2A40'],
+    ],
+  },
+  adult_male: {
+    head: [
+      [12,4,40,2,'#1A0800'],
+      [10,6,44,3,'#1A0800'],
+      [9,9,46,3,'#1A0800'],
+      [9,12,3,16,'#1A0800'],[52,12,3,16,'#1A0800'],
+      [14,5,8,3,'#3A2010'],[34,6,8,2,'#3A2010'],
+      [12,12,12,5,'#1A0800'],[40,12,12,5,'#1A0800'],
+      [22,12,20,2,'#1A0800'],
+    ],
+    body: [
+      [14,11,36,2,'#E8B888'],
+      [13,13,38,27,'#EFC090'],
+      [14,40,36,2,'#E8B888'],
+      [16,42,32,3,'#D8A878'],
+      [20,44,24,2,'#C89060'],
+      [20,14,12,3,'#F5D0A0'],
+      [11,22,3,7,'#D8A878'],[50,22,3,7,'#D8A878'],
+      [17,19,10,2,'#1A0800'],[36,19,10,2,'#1A0800'],
+      [18,23,9,5,'#FFFFFF'],[36,23,9,5,'#FFFFFF'],
+      [18,23,9,1,'#1A0800'],[36,23,9,1,'#1A0800'],
+      [20,24,4,4,'#3A4A2A'],[38,24,4,4,'#3A4A2A'],
+      [21,25,2,2,'#1A0800'],[39,25,2,2,'#1A0800'],
+      [22,24,1,1,'#FFFFFF'],[40,24,1,1,'#FFFFFF'],
+      [30,29,3,1,'#D8A878'],
+      [29,30,1,4,'#D8A878'],[33,30,1,4,'#D8A878'],
+      [29,34,5,1,'#C09060'],
+      [22,36,20,1,'#A06050'],
+      [23,37,18,1,'#C07060'],
+      [24,38,16,1,'#D87060'],
+      [2,46,60,18,'#1A3A6A'],
+      [2,46,60,2,'#0A2A50'],
+      [22,46,20,4,'#0A2A50'],
+    ],
+  },
+  young_male: {
+    head: [
+      [14,2,3,4,'#1A0800'],
+      [20,0,3,6,'#1A0800'],
+      [27,2,3,4,'#1A0800'],
+      [34,0,3,6,'#1A0800'],
+      [41,2,3,4,'#1A0800'],
+      [47,0,3,6,'#1A0800'],
+      [11,6,42,3,'#1A0800'],
+      [9,9,46,3,'#1A0800'],
+      [9,12,3,10,'#1A0800'],[52,12,3,10,'#1A0800'],
+      [14,7,6,3,'#3A2010'],[28,7,6,3,'#4A2010'],[42,7,6,3,'#3A2010'],
+      [14,12,6,4,'#1A0800'],[44,12,6,4,'#1A0800'],
+      [22,12,20,2,'#1A0800'],
+    ],
+    body: [
+      [14,11,36,2,'#E8B888'],
+      [13,13,38,27,'#EFC090'],
+      [14,40,36,2,'#E8B888'],
+      [16,42,32,3,'#D8A878'],
+      [20,44,24,2,'#C89060'],
+      [20,14,12,3,'#F5D5A8'],
+      [11,22,3,7,'#D8A878'],[50,22,3,7,'#D8A878'],
+      [17,19,10,2,'#1A0800'],[36,19,10,2,'#1A0800'],
+      [18,21,8,1,'#0A0400'],[37,21,8,1,'#0A0400'],
+      [18,23,9,5,'#FFFFFF'],[36,23,9,5,'#FFFFFF'],
+      [18,23,9,1,'#1A0800'],[36,23,9,1,'#1A0800'],
+      [20,24,4,4,'#3A7A30'],[38,24,4,4,'#3A7A30'],
+      [21,25,2,2,'#1A0800'],[39,25,2,2,'#1A0800'],
+      [22,24,1,1,'#aaffaa'],[40,24,1,1,'#aaffaa'],
+      [30,29,3,1,'#D8A878'],
+      [29,30,1,4,'#D8A878'],[33,30,1,4,'#D8A878'],
+      [29,34,5,1,'#C09060'],
+      [30,35,3,1,'#A07050'],
+      [22,37,2,2,'#A06050'],[40,37,2,2,'#A06050'],
+      [23,38,18,2,'#A06050'],
+      [24,39,16,1,'#E08080'],
+      [25,38,14,1,'#FFFFFF'],
+      [2,46,60,18,'#1A6030'],
+      [2,46,60,2,'#0A3010'],
+      [22,46,20,4,'#0A3010'],
+    ],
+  },
+  adult_female: {
+    head: [
+      [6,22,4,42,'#1A0800'],[54,22,4,42,'#1A0800'],
+      [5,30,1,34,'#0A0400'],[58,30,1,34,'#0A0400'],
+      [12,4,40,2,'#1A0800'],
+      [10,6,44,3,'#1A0800'],
+      [9,9,46,3,'#1A0800'],
+      [9,12,3,14,'#1A0800'],[52,12,3,14,'#1A0800'],
+      [14,6,6,3,'#3A2010'],[22,5,4,3,'#3A2010'],[36,6,6,3,'#3A2010'],
+      [12,12,6,6,'#1A0800'],[46,12,6,6,'#1A0800'],
+      [13,13,3,2,'#3A2010'],
+    ],
+    body: [
+      [14,11,36,2,'#E8B888'],
+      [13,13,38,26,'#EFC090'],
+      [14,39,36,2,'#E8B888'],
+      [16,41,32,3,'#D8A878'],
+      [18,13,14,3,'#F5D5A8'],
+      [11,22,3,6,'#D8A878'],[50,22,3,6,'#D8A878'],
+      [11,28,3,2,'#FFD700'],[50,28,3,2,'#FFD700'],
+      [17,19,10,1,'#1A0800'],[36,19,10,1,'#1A0800'],
+      [18,20,8,1,'#3A2010'],[37,20,8,1,'#3A2010'],
+      [17,22,10,6,'#FFFFFF'],[36,22,10,6,'#FFFFFF'],
+      [17,22,10,2,'#1A0800'],[36,22,10,2,'#1A0800'],
+      [19,23,6,5,'#5A3A20'],[38,23,6,5,'#5A3A20'],
+      [21,24,3,3,'#1A0800'],[40,24,3,3,'#1A0800'],
+      [22,24,2,2,'#FFFFFF'],[41,24,2,2,'#FFFFFF'],
+      [17,28,10,1,'#3A2010'],[36,28,10,1,'#3A2010'],
+      [31,30,2,3,'#D8A878'],
+      [30,32,1,2,'#D8A878'],[33,32,1,2,'#D8A878'],
+      [30,34,4,1,'#C09060'],
+      [14,31,6,3,'#F5A0B0'],[44,31,6,3,'#F5A0B0'],
+      [24,36,16,1,'#A04050'],
+      [22,37,20,2,'#C05060'],
+      [23,38,18,1,'#D87080'],
+      [24,39,16,1,'#A04050'],
+      [26,38,3,1,'#E89098'],
+      [2,44,60,20,'#8A2050'],
+      [2,44,60,2,'#6A1030'],
+      [20,44,24,6,'#6A1030'],
+      [22,46,20,4,'#8A2050'],
+    ],
+  },
+  young_female: {
+    head: [
+      [2,22,8,30,'#1A0800'],[54,22,8,30,'#1A0800'],
+      [0,22,2,30,'#0A0400'],[62,22,2,30,'#0A0400'],
+      [3,22,3,6,'#3A2010'],[58,22,3,6,'#3A2010'],
+      [2,20,8,3,'#FF6090'],[54,20,8,3,'#FF6090'],
+      [3,20,2,1,'#FFB0C0'],[55,20,2,1,'#FFB0C0'],
+      [12,4,40,2,'#1A0800'],
+      [10,6,44,3,'#1A0800'],
+      [9,9,46,3,'#1A0800'],
+      [9,12,3,10,'#1A0800'],[52,12,3,10,'#1A0800'],
+      [16,5,6,2,'#3A2010'],[30,5,4,2,'#3A2010'],
+      [12,12,8,5,'#1A0800'],[44,12,8,5,'#1A0800'],
+      [20,12,24,2,'#1A0800'],
+      [29,12,6,3,'#3A2010'],
+    ],
+    body: [
+      [14,11,36,2,'#E8B888'],
+      [13,13,38,26,'#EFC090'],
+      [14,39,36,2,'#E8B888'],
+      [16,41,32,3,'#D8A878'],
+      [20,14,14,3,'#F5D5A8'],
+      [11,22,3,6,'#D8A878'],[50,22,3,6,'#D8A878'],
+      [17,19,10,1,'#1A0800'],[36,19,10,1,'#1A0800'],
+      [17,21,10,8,'#FFFFFF'],[36,21,10,8,'#FFFFFF'],
+      [17,21,10,2,'#1A0800'],[36,21,10,2,'#1A0800'],
+      [18,22,8,6,'#6030A0'],[37,22,8,6,'#6030A0'],
+      [19,23,6,5,'#1A0800'],[38,23,6,5,'#1A0800'],
+      [20,23,3,2,'#FFFFFF'],[39,23,3,2,'#FFFFFF'],
+      [17,29,10,1,'#1A0800'],[36,29,10,1,'#1A0800'],
+      [13,31,7,4,'#F5A0B0'],[44,31,7,4,'#F5A0B0'],
+      [31,32,2,2,'#D8A878'],
+      [30,34,4,1,'#C09060'],
+      [24,36,2,1,'#A04050'],[38,36,2,1,'#A04050'],
+      [25,37,14,2,'#A04050'],
+      [26,38,12,1,'#FFFFFF'],
+      [27,38,10,1,'#E08090'],
+      [2,44,60,20,'#6030A0'],
+      [2,44,60,2,'#402070'],
+      [22,44,20,5,'#402070'],
+    ],
+  },
+};
+
+// HD accessories — match keys with ACCESSORY_KIT. `head` rects replace
+// the character's `head` rects (used for hats); `overlay` rects draw on top.
+const ACCESSORY_KIT_HD = {
+  parrot: {
+    overlay: [
+      [50,30,8,2,'#22AA22'],
+      [50,32,4,4,'#22AA22'],[54,32,4,4,'#FF6600'],
+      [50,36,8,2,'#FFCC00'],
+      [50,38,8,4,'#157715'],
+      [56,30,2,2,'#1A0800'],
+    ],
+  },
+  cat: {
+    overlay: [
+      [50,28,3,3,'#E08830'],[58,28,3,3,'#E08830'],
+      [50,31,12,4,'#E08830'],
+      [54,33,4,2,'#EEEECC'],
+      [50,35,12,3,'#CC7720'],
+      [48,38,12,4,'#CC7720'],
+      [52,32,1,1,'#1A0800'],[58,32,1,1,'#1A0800'],
+    ],
+  },
+  police_cap: {
+    head: [
+      [10,12,44,8,'#1A2A6A'],
+      [12,8,40,4,'#1A2A6A'],
+      [10,18,44,2,'#0A1A4A'],
+      [8,20,48,3,'#0A1A4A'],
+      [12,10,40,1,'#3A4A8A'],
+      [26,12,12,4,'#C8A020'],
+      [28,13,8,2,'#FFE060'],
+    ],
+  },
+  tonsure: {
+    head: [
+      [14,6,36,4,'#EFC090'],
+      [12,10,40,4,'#EFC090'],
+      [14,8,8,2,'#D8A878'],[42,8,8,2,'#D8A878'],
+      [10,14,3,18,'#8C8C8C'],[51,14,3,18,'#8C8C8C'],
+    ],
+  },
+  fishing_hat: {
+    head: [
+      [10,4,44,8,'#8B7355'],
+      [4,10,56,4,'#A68B60'],
+      [4,14,56,2,'#6B5335'],
+      [12,4,4,4,'#A68B60'],[28,4,4,4,'#A68B60'],[44,4,4,4,'#A68B60'],
+    ],
+  },
+  taxi_cap: {
+    head: [
+      [14,6,36,12,'#1A1A1A'],
+      [10,16,44,4,'#2A2A2A'],
+      [16,8,32,2,'#3A3A3A'],
+      [26,12,12,3,'#FFCC00'],
+    ],
+  },
+  wide_hat: {
+    head: [
+      [14,4,36,10,'#7A8C40'],
+      [2,12,60,4,'#9AAA55'],
+      [2,16,60,2,'#5A6C30'],
+      [16,6,32,2,'#9AAA55'],
+    ],
+  },
+  baseball_cap: {
+    head: [
+      [12,8,40,12,'#CC2222'],
+      [10,16,44,4,'#AA1111'],
+      [4,18,52,4,'#AA1111'],
+      [14,10,32,2,'#EE3333'],
+      [28,12,8,4,'#FFFFFF'],
+    ],
+  },
+  beanie: {
+    head: [
+      [12,2,40,18,'#446688'],
+      [12,4,40,2,'#335577'],
+      [12,8,40,2,'#335577'],
+      [12,12,40,2,'#335577'],
+      [12,16,40,2,'#335577'],
+      [10,18,44,4,'#446688'],
+      [28,0,8,4,'#335577'],
+    ],
+  },
+  beret: {
+    head: [
+      [12,4,36,12,'#2A2A4A'],
+      [44,2,8,8,'#3A3A6A'],
+      [10,14,40,4,'#2A2A4A'],
+      [16,8,24,3,'#3A3A6A'],
+    ],
+  },
+  hard_hat: {
+    head: [
+      [12,8,40,12,'#FFCC00'],
+      [10,18,44,4,'#E6B800'],
+      [4,20,56,2,'#E6B800'],
+      [14,6,32,4,'#FFCC00'],
+      [30,8,4,12,'#CC9900'],
+    ],
+  },
+  top_hat: {
+    head: [
+      [16,0,32,16,'#111111'],
+      [10,16,44,2,'#111111'],
+      [4,18,56,4,'#111111'],
+      [4,22,56,2,'#000000'],
+      [16,12,32,2,'#333333'],
+    ],
+  },
+  glasses: {
+    overlay: [
+      [12,21,18,1,'#444444'],
+      [12,28,18,1,'#444444'],
+      [12,21,1,8,'#444444'],
+      [29,21,1,8,'#444444'],
+      [34,21,18,1,'#444444'],
+      [34,28,18,1,'#444444'],
+      [34,21,1,8,'#444444'],
+      [51,21,1,8,'#444444'],
+      [30,24,4,1,'#444444'],
+    ],
+  },
+  sunglasses: {
+    overlay: [
+      [12,21,18,7,'#1A1A2A'],
+      [13,22,16,2,'#223355'],
+      [34,21,18,7,'#1A1A2A'],
+      [35,22,16,2,'#223355'],
+      [30,24,4,2,'#1A1A2A'],
+      [13,26,4,1,'#446688'],
+      [35,26,4,1,'#446688'],
+    ],
+  },
+  surgical_mask: {
+    overlay: [
+      [12,32,40,12,'#E8E8E8'],
+      [12,34,40,2,'#D8D8D8'],
+      [12,38,40,2,'#D8D8D8'],
+      [12,42,40,2,'#D8D8D8'],
+      [10,33,2,10,'#C8C8C8'],[52,33,2,10,'#C8C8C8'],
+      [10,33,2,2,'#888888'],[52,33,2,2,'#888888'],
+    ],
+  },
+  tie: {
+    overlay: [
+      [29,46,6,3,'#AA1111'],
+      [28,49,8,4,'#CC1111'],
+      [27,53,10,9,'#CC1111'],
+      [30,55,4,5,'#AA0000'],
+      [29,49,1,11,'#EE3333'],
+    ],
+  },
+  bow_tie: {
+    overlay: [
+      [20,46,8,8,'#550088'],
+      [36,46,8,8,'#550088'],
+      [22,48,4,4,'#7700AA'],
+      [38,48,4,4,'#7700AA'],
+      [28,48,8,4,'#6600AA'],
+    ],
+  },
+  medical: {
+    overlay: [
+      [29,52,6,2,'#CC2222'],
+      [31,50,2,6,'#CC2222'],
+    ],
+  },
+  sake_cup: {
+    overlay: [
+      [50,32,10,2,'#F0F0F0'],
+      [48,34,14,4,'#F0F0F0'],
+      [50,38,10,2,'#E0E0E0'],
+      [52,34,8,3,'#FFFFFF'],
+      [50,40,10,1,'#888888'],
+    ],
+  },
+  fan: {
+    overlay: [
+      [54,28,8,12,'#FFCC44'],
+      [56,30,4,8,'#FF8844'],
+      [50,40,4,8,'#884400'],
+      [52,28,2,2,'#FFCC44'],
+    ],
+  },
+  hachimaki: {
+    overlay: [
+      [10,8,44,4,'#F5F5F5'],
+      [28,8,8,4,'#CC2222'],
+      [10,8,44,1,'#CCCCCC'],
+      [54,8,4,8,'#F5F5F5'],
+    ],
+  },
+  headband: {
+    overlay: [
+      [10,8,44,4,'#3355CC'],
+      [10,9,44,1,'#5577EE'],
+      [54,9,4,6,'#3355CC'],
+    ],
+  },
+  music_note: {
+    overlay: [
+      [54,2,8,8,'#CC8800'],
+      [60,2,2,12,'#CC8800'],
+      [54,12,4,2,'#CC8800'],
+    ],
+  },
+  apron: {
+    overlay: [
+      [16,46,32,18,'#F0F0F0'],
+      [16,46,32,2,'#D8D8D8'],
+      [22,46,20,4,'#E8E8E8'],
+      [18,52,4,2,'#D8D8D8'],[42,52,4,2,'#D8D8D8'],
+      [30,54,4,4,'#E0E0E0'],
+    ],
+  },
+  straw_hat: {
+    head: [
+      [4,8,56,8,'#D4B06A'],
+      [0,14,64,4,'#C09850'],
+      [0,18,64,2,'#A88030'],
+      [4,8,56,1,'#E8C880'],
+      [8,12,4,2,'#A88030'],[24,12,4,2,'#A88030'],[40,12,4,2,'#A88030'],[52,12,4,2,'#A88030'],
+    ],
+  },
+  yukata: {
+    overlay: [
+      [4,46,56,18,'#3A5A8A'],
+      [4,46,56,2,'#2A4A7A'],
+      [22,46,20,5,'#2A4A7A'],
+      [4,52,56,4,'#C8A850'],
+      [8,52,2,4,'#8A6840'],[20,52,2,4,'#8A6840'],[42,52,2,4,'#8A6840'],[54,52,2,4,'#8A6840'],
+      [10,58,4,2,'#4A6A9A'],[50,58,4,2,'#4A6A9A'],
+    ],
+  },
+  hair_ribbon: {
+    overlay: [
+      [44,4,12,8,'#CC3355'],
+      [42,6,2,4,'#CC3355'],[56,6,2,4,'#CC3355'],
+      [46,2,4,4,'#EE4466'],
+      [50,2,4,4,'#EE4466'],
+      [48,4,4,4,'#FFFFFF'],
+    ],
+  },
+  backpack: {
+    overlay: [
+      [0,46,8,18,'#2A6A2A'],
+      [0,46,8,2,'#358035'],
+      [2,48,4,12,'#358035'],
+      [0,60,8,4,'#1A4A1A'],
+    ],
+  },
+  headphones: {
+    overlay: [
+      [8,8,4,12,'#333333'],
+      [52,8,4,12,'#333333'],
+      [8,8,4,2,'#555555'],[52,8,4,2,'#555555'],
+      [8,18,4,2,'#222222'],[52,18,4,2,'#222222'],
+      [12,2,40,4,'#333333'],
+      [12,4,40,2,'#555555'],
+    ],
+  },
+  brush: {
+    overlay: [
+      [56,28,4,16,'#884400'],
+      [56,44,4,8,'#222222'],
+      [56,52,4,4,'#000000'],
+      [57,28,2,16,'#A06600'],
+    ],
+  },
+  lantern: {
+    overlay: [
+      [54,24,8,4,'#444444'],
+      [50,28,12,16,'#CC2222'],
+      [50,32,12,2,'#FF6644'],
+      [50,38,12,2,'#FF6644'],
+      [50,28,12,1,'#AA0000'],
+      [50,43,12,1,'#AA0000'],
+      [54,44,4,4,'#888844'],
+      [55,46,2,2,'#FFCC44'],
+    ],
+  },
+  camera: {
+    overlay: [
+      [50,32,12,8,'#222222'],
+      [50,32,12,1,'#444444'],
+      [54,34,4,4,'#4488CC'],
+      [55,35,2,2,'#88BBEE'],
+      [54,30,4,2,'#444444'],
+      [60,33,2,1,'#FF0000'],
+    ],
+  },
+  candy: {
+    overlay: [
+      [54,32,4,4,'#FF66AA'],
+      [58,32,4,4,'#FFFFFF'],
+      [54,36,4,4,'#FFFFFF'],
+      [58,36,4,4,'#FF66AA'],
+      [56,40,2,8,'#884400'],
+    ],
+  },
+};
+
+// Build the rect SVG markup for a character + accessory at HD (64×64).
+function buildHdRects(baseType, mod) {
+  const char = CHAR_SPRITES_HD[baseType] || CHAR_SPRITES_HD.adult_male;
+  const head = (mod && mod.head) || char.head;
+  const body = char.body;
+  const overlay = (mod && mod.overlay) || [];
+  const all = [...head, ...body, ...overlay];
+  return all.map(r => `<rect x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}" fill="${r[4]}"/>`).join('');
+}
+
+// Resolve the HD accessory mod for a scenario (incl. dynamic chef_hat).
+function resolveHdMod(sc, baseType) {
+  const acc = inferAccessory(sc);
+  if (!acc) return null;
+  if (acc === 'chef_hat') {
+    return {
+      head: [
+        [12,0,40,16,'#F0F0F0'],
+        [10,12,44,8,'#F0F0F0'],
+        [10,18,44,2,'#D8D8D8'],
+        [16,2,8,10,'#FFFFFF'],
+        [28,4,8,8,'#FFFFFF'],
+        [40,2,8,10,'#FFFFFF'],
+        [16,12,32,2,'#D8D8D8'],
+      ],
+    };
+  }
+  return ACCESSORY_KIT_HD[acc] || null;
+}
+
+// ── Infer accessory from scenario text ───────────────────────────────────
+// Reads sc.id + sc.en + sc.char, so works for any scenario including
+// procedurally generated ones — no hardcoded IDs needed.
+function inferAccessory(sc) {
+  const t = `${sc.id||''} ${sc.en||''} ${sc.char||''}`.toLowerCase();
+  // companions (cat before parrot so cat-café doesn't match pet-café → parrot)
+  if (/cat.caf|neko.caf|kitten.*sit|kitty.*perch/.test(t))          return 'cat';
+  if (/parrot|bird.*caf|pet.caf/.test(t))                           return 'parrot';
+  // hats
+  if (/police|officer|koban/.test(t))                               return 'police_cap';
+  if (/chef|ramen|soba|cook|tofu|noodle|yakitori|izakaya.*chef/.test(t)) return 'chef_hat';
+  if (/monk|temple|priest|zen|buddh/.test(t))                       return 'tonsure';
+  if (/fish|pier|angl|fisherman/.test(t))                           return 'fishing_hat';
+  if (/taxi|cab driver|chauffeur/.test(t))                          return 'taxi_cap';
+  if (/magic|magician|illusionist|trick/.test(t))                   return 'top_hat';
+  if (/hard.hat|construct|builder|work.site|renovation/.test(t))    return 'hard_hat';
+  if (/artist|paint.*studio|art class|gallery|atelier/.test(t))     return 'beret';
+  if (/winter|cold.*weather|snow|ski|knit hat/.test(t))             return 'beanie';
+  if (/baseball|sport.*casual|ufo.catcher|crane.game|arcade/.test(t)) return 'baseball_cap';
+  if (/garden|florist|flower.market|farm|outdoor.stall/.test(t))    return 'wide_hat';
+  // face
+  if (/surgical.mask|wear.*mask|cold.*sneez|hay fever/.test(t))     return 'surgical_mask';
+  if (/sunglasses|fashion.*cool|trendy|influencer/.test(t))         return 'sunglasses';
+  if (/book.?shop|second.hand book|librari|used book/.test(t))      return 'glasses';
+  if (/professor|scholar|researcher|scientist/.test(t))             return 'glasses';
+  // clothing
+  if (/wedding|formal dinner|black tie|gala|ceremony/.test(t))      return 'bow_tie';
+  if (/business|salaryman|office worker|company.*meeting|suit/.test(t)) return 'tie';
+  if (/doctor|pharmacist|vet|clinic|hospital|nurse/.test(t))        return 'medical';
+  // held / icons
+  if (/izakaya|sake bar|pub|drinking party|beer garden/.test(t))    return 'sake_cup';
+  if (/festival|matsuri|bon.odori|traditional dance|summer.event/.test(t)) return 'fan';
+  if (/taiko|drum.*lesson|one stroke|one soul/.test(t))             return 'hachimaki';
+  if (/karaoke|karaoke box|sing.*song/.test(t))                     return 'music_note';
+  if (/gym|workout|fitness|dojo|martial art|kendo|judo/.test(t))    return 'headband';
+  // New scenario accessories
+  if (/wagashi|sweet.*shop|confection|dagashi|candy|駄菓子/.test(t))  return 'candy';
+  if (/sake.*brew|toji|brewery|酒蔵/.test(t))                       return 'apron';
+  if (/pottery|ceramic|陶芸|clay/.test(t))                          return 'apron';
+  if (/calligraph|書道|brush.*stroke/.test(t))                      return 'brush';
+  if (/kimono|着物|yukata|浴衣|ryokan|onsen.*town|温泉街/.test(t))   return 'yukata';
+  if (/festival|matsuri|夏祭り|goldfish|bon.odori|tanabata|七夕|obon|盆/.test(t)) return 'lantern';
+  if (/hik|mountain|trail|登山|climb/.test(t))                      return 'backpack';
+  if (/manga.*caf|漫画|comic|concert|jazz|music|バンド/.test(t))     return 'headphones';
+  if (/hair.*ribbon|school.*girl|dagashi.*owner|ribbon/.test(t))    return 'hair_ribbon';
+  if (/farm|rice.*field|rural|田舎|countryside|straw/.test(t))      return 'straw_hat';
+  if (/tourist|camera|photo|sightsee|travel/.test(t))               return 'camera';
+  if (/elevator|office|nomikai|shinsotsu|新卒|copying|copier/.test(t)) return 'tie';
+  if (/barber|床屋|hair.*cut|salon/.test(t))                        return 'glasses';
+  if (/dentist|歯|dental|hygienist/.test(t))                        return 'surgical_mask';
+  if (/escape.*room|脱出|batting|バッティング/.test(t))               return 'headband';
+  if (/flea.*market|蚤の市|market|商店街|shotengai/.test(t))         return 'straw_hat';
+  if (/laundry|コインランドリー|post.*office|郵便/.test(t))           return 'glasses';
+  if (/ferry|boat|フェリー|ship|sailor/.test(t))                    return 'fishing_hat';
+  if (/surf|サーフ|beach|ビーチ/.test(t))                           return 'sunglasses';
+  return null;
+}
+
+// ── Scene backgrounds (layered rects in 80×50 viewBox) ──────────────────
+// Each rect: [x, y, width, height, fill]
+// charX/charY = where to place the 2×-scaled character sprite in the scene
+const SCENE_BACKGROUNDS = {
+  bathhouse: {
+    charX: 24, charY: 12,
+    r: [
+      [0,0,80,50,'#1a1008'],
+      [0,0,80,10,'#3a2814'],
+      [0,2,80,1,'#4a3824'],[0,5,80,1,'#4a3824'],[0,8,80,1,'#4a3824'],
+      [0,9,80,2,'#5a4830'],
+      [18,0,3,10,'#5a4830'],[58,0,3,10,'#5a4830'],
+      [38,2,4,5,'#aa6620'],[39,3,2,2,'#ddaa40'],
+      [0,11,80,14,'#5a7a88'],
+      [0,14,80,1,'#4a6a78'],[0,18,80,1,'#4a6a78'],[0,22,80,1,'#4a6a78'],
+      [10,11,1,14,'#4a6a78'],[20,11,1,14,'#4a6a78'],[30,11,1,14,'#4a6a78'],
+      [40,11,1,14,'#4a6a78'],[50,11,1,14,'#4a6a78'],[60,11,1,14,'#4a6a78'],
+      [70,11,1,14,'#4a6a78'],
+      [0,25,80,25,'#2a5a78'],
+      [0,25,80,2,'#3a6a88'],
+      [5,26,15,1,'#4a7a98'],[35,25,10,1,'#4a7a98'],[58,26,16,1,'#4a7a98'],
+      [0,38,80,12,'#1a4a68'],
+      [14,17,4,3,'rgba(180,200,220,0.12)'],[48,15,5,4,'rgba(180,200,220,0.12)'],
+      [28,19,3,2,'rgba(180,200,220,0.08)'],
+      [6,20,6,5,'#5a4020'],[6,20,6,1,'#7a6040'],
+      [70,16,5,7,'#e0d8c0'],[70,16,5,1,'#f0e8d0'],
+    ]
+  },
+  restaurant: {
+    charX: 26, charY: 10,
+    r: [
+      [0,0,80,50,'#1a1008'],
+      [0,0,80,8,'#2a1a0a'],
+      [12,2,4,5,'#cc4420'],[13,3,2,2,'#ff8844'],
+      [35,1,4,5,'#cc4420'],[36,2,2,2,'#ff8844'],
+      [60,2,4,5,'#cc4420'],[61,3,2,2,'#ff8844'],
+      [0,8,80,16,'#3a2a1a'],
+      [2,9,76,1,'#5a4830'],
+      [5,10,3,4,'#446688'],[10,10,2,4,'#88aa44'],[14,10,3,4,'#884422'],
+      [20,10,2,4,'#446688'],[25,10,3,4,'#aa6622'],[30,10,2,4,'#446688'],
+      [2,14,76,1,'#5a4830'],
+      [5,15,3,3,'#664422'],[10,15,2,3,'#88aa44'],[14,15,3,3,'#446688'],
+      [20,15,2,3,'#aa4422'],[25,15,3,3,'#664422'],
+      [55,9,20,8,'#f0e0c0'],[56,10,18,6,'#e8d8b0'],
+      [0,24,80,4,'#5a4020'],[0,24,80,1,'#7a6040'],
+      [0,28,80,6,'#4a3018'],[0,28,80,1,'#5a4020'],
+      [0,34,80,16,'#2a1a0a'],
+      [0,40,80,1,'#1a0a00'],[0,45,80,1,'#1a0a00'],
+      [15,34,5,3,'#5a4830'],[17,37,1,5,'#4a3820'],
+      [40,34,5,3,'#5a4830'],[42,37,1,5,'#4a3820'],
+      [65,34,5,3,'#5a4830'],[67,37,1,5,'#4a3820'],
+      [30,10,6,5,'rgba(200,180,160,0.1)'],[45,8,4,6,'rgba(200,180,160,0.08)'],
+    ]
+  },
+  park: {
+    charX: 26, charY: 16,
+    r: [
+      [0,0,80,22,'#4a88cc'],
+      [0,0,80,4,'#3a78bb'],[0,18,80,4,'#5a98dd'],
+      [8,3,12,3,'#d0e0f0'],[10,2,8,2,'#e0eeff'],
+      [55,5,10,3,'#d0e0f0'],[57,4,6,2,'#e0eeff'],
+      [2,8,16,14,'#dd88aa'],[4,6,12,4,'#ee99bb'],
+      [6,10,8,4,'#cc7799'],[3,12,14,6,'#dd88aa'],
+      [8,20,4,12,'#5a3a20'],[9,20,2,12,'#6a4a30'],
+      [60,6,18,14,'#dd88aa'],[62,4,14,4,'#ee99bb'],
+      [64,8,10,4,'#cc7799'],[61,10,16,6,'#dd88aa'],
+      [68,18,4,14,'#5a3a20'],[69,18,2,14,'#6a4a30'],
+      [25,8,2,1,'#ffaacc'],[42,12,1,1,'#ffaacc'],[35,5,1,1,'#ffaacc'],
+      [50,10,2,1,'#ffaacc'],[18,14,1,1,'#ffaacc'],
+      [0,22,80,28,'#4a8838'],
+      [0,22,80,3,'#5a9848'],
+      [20,24,40,26,'#c8b898'],
+      [22,24,36,2,'#d8c8a8'],
+      [20,24,2,26,'#a89878'],[58,24,2,26,'#a89878'],
+      [62,26,12,2,'#6a4a30'],[63,28,2,6,'#5a3a20'],[72,28,2,6,'#5a3a20'],
+      [62,26,12,1,'#7a5a40'],
+      [24,28,14,8,'#3366aa'],[24,28,14,1,'#4477bb'],
+    ]
+  },
+  shop: {
+    charX: 26, charY: 16,
+    r: [
+      [0,0,80,50,'#2a2018'],
+      [0,0,80,6,'#3a2a18'],
+      [15,1,50,2,'#e8e8dd'],[16,2,48,1,'#f8f8f0'],
+      [0,6,80,20,'#d8c8a8'],
+      [0,7,30,2,'#6a5030'],[0,12,30,2,'#6a5030'],[0,17,30,2,'#6a5030'],
+      [2,9,4,3,'#cc4444'],[7,9,3,3,'#4488aa'],[12,9,4,3,'#88aa44'],
+      [18,9,3,3,'#ddaa44'],[22,9,4,3,'#aa4488'],
+      [2,14,3,3,'#4488aa'],[7,14,4,3,'#cc8844'],[13,14,3,3,'#44aa88'],
+      [18,14,4,3,'#aa4444'],[23,14,3,3,'#8844aa'],
+      [50,7,30,2,'#6a5030'],[50,12,30,2,'#6a5030'],[50,17,30,2,'#6a5030'],
+      [52,9,4,3,'#ddaa44'],[58,9,3,3,'#cc4444'],[63,9,4,3,'#4488aa'],
+      [52,14,3,3,'#88aa44'],[57,14,4,3,'#aa4488'],[63,14,3,3,'#cc8844'],
+      [32,7,16,12,'#88bbdd'],
+      [32,7,16,1,'#6a5030'],[32,18,16,1,'#6a5030'],
+      [32,7,1,12,'#6a5030'],[47,7,1,12,'#6a5030'],[39,7,1,12,'#6a5030'],
+      [0,26,80,4,'#7a5a38'],[0,26,80,1,'#8a6a48'],
+      [60,22,8,4,'#3a3a3a'],[60,22,8,1,'#5a5a5a'],
+      [0,30,80,20,'#8a7860'],
+      [0,35,80,1,'#7a6850'],[0,42,80,1,'#7a6850'],
+    ]
+  },
+  cafe: {
+    charX: 28, charY: 16,
+    r: [
+      [0,0,80,50,'#2a1a10'],
+      [0,0,80,6,'#3a2a18'],
+      [38,1,4,4,'#ffcc66'],[39,1,2,1,'#ffdd88'],
+      [36,5,8,2,'rgba(255,204,102,0.15)'],
+      [0,6,80,22,'#6a5038'],
+      [0,8,80,1,'#7a6048'],[0,14,80,1,'#7a6048'],[0,20,80,1,'#7a6048'],
+      [4,8,28,14,'#6088aa'],
+      [4,8,28,1,'#4a3828'],[4,21,28,1,'#4a3828'],
+      [4,8,1,14,'#4a3828'],[31,8,1,14,'#4a3828'],[17,8,1,14,'#4a3828'],
+      [5,8,4,14,'#cc8844'],[28,8,4,14,'#cc8844'],
+      [9,9,8,5,'#88bbdd'],[9,14,8,7,'#8a7a6a'],
+      [18,9,9,5,'#88bbdd'],[18,14,9,7,'#9a8a7a'],
+      [55,8,20,10,'#5a4028'],
+      [57,9,4,3,'#cc8844'],[63,9,3,3,'#88aa44'],[68,9,4,3,'#4488aa'],
+      [45,9,6,6,'#4a3020'],[46,10,4,4,'#88aa88'],
+      [20,28,30,3,'#5a4028'],
+      [22,31,2,8,'#4a3018'],[46,31,2,8,'#4a3018'],
+      [28,26,3,2,'#e8e0d0'],[38,26,3,2,'#e8e0d0'],
+      [29,25,1,1,'#8a6a4a'],[39,25,1,1,'#8a6a4a'],
+      [0,28,80,22,'#3a2a18'],
+      [0,34,80,1,'#2a1a08'],[0,42,80,1,'#2a1a08'],
+      [72,18,5,10,'#4a8838'],[73,16,3,4,'#5a9848'],[74,28,1,5,'#5a3a20'],
+    ]
+  },
+  night: {
+    charX: 26, charY: 14,
+    r: [
+      [0,0,80,20,'#0a0a2a'],
+      [0,16,80,4,'#1a1a3a'],
+      [5,2,1,1,'#f8f8ff'],[18,4,1,1,'#f8f8ff'],[62,3,1,1,'#f8f8ff'],
+      [45,1,1,1,'#f8f8ff'],[72,5,1,1,'#f8f8ff'],[30,2,1,1,'#d8d8ff'],
+      [70,2,4,4,'#e8e8cc'],[71,1,2,1,'#f0f0dd'],
+      [0,8,18,12,'#1a1a28'],[0,6,14,2,'#1a1a28'],
+      [62,6,18,14,'#1a1a28'],[66,4,10,2,'#1a1a28'],
+      [3,9,3,2,'#aa8844'],[8,9,3,2,'#8888aa'],[3,13,3,2,'#aa8844'],
+      [65,8,3,2,'#aa8844'],[70,8,3,2,'#8888aa'],[75,10,3,2,'#aa8844'],
+      [20,8,12,4,'#ff4466'],[21,9,10,2,'#ff6688'],
+      [45,10,14,3,'#44aaff'],[46,11,12,1,'#66ccff'],
+      [35,7,6,3,'#44ff88'],[36,8,4,1,'#66ffaa'],
+      [0,20,80,30,'#1a1a1a'],
+      [0,20,80,2,'#2a2a2a'],
+      [22,28,10,2,'rgba(255,68,102,0.12)'],
+      [47,30,12,2,'rgba(68,170,255,0.12)'],
+      [36,32,5,1,'rgba(68,255,136,0.08)'],
+      [25,34,8,1,'#3a3a3a'],[45,34,8,1,'#3a3a3a'],
+      [4,20,6,10,'#2a4a6a'],
+      [5,21,4,4,'#88aacc'],[5,26,4,3,'#aa6644'],
+      [5,21,4,1,'#aaccee'],
+      [20,14,30,6,'#e8e0d0'],
+      [21,15,28,4,'#aaccee'],
+      [20,14,30,1,'#44aa66'],
+      [0,6,80,1,'#2a2a3a'],
+    ]
+  },
+  temple: {
+    charX: 26, charY: 14,
+    r: [
+      [0,0,80,16,'#6a9ab8'],
+      [0,0,80,4,'#5a8aa8'],[0,12,80,4,'#7aaac8'],
+      [0,4,20,12,'#2a6a2a'],[60,2,20,14,'#2a6a2a'],
+      [2,6,16,8,'#3a7a3a'],[64,4,14,10,'#3a7a3a'],
+      [15,6,50,3,'#4a3a2a'],
+      [12,9,56,2,'#5a4a38'],
+      [10,11,60,1,'#6a5a48'],
+      [14,6,1,3,'#6a5a48'],[64,6,1,3,'#6a5a48'],
+      [16,7,48,1,'#6a5a48'],
+      [14,12,52,14,'#d8c8a0'],
+      [20,14,14,10,'#c0b890'],[20,14,14,1,'#6a5a48'],
+      [26,14,1,10,'#a09870'],
+      [40,14,14,10,'#c0b890'],[40,14,14,1,'#6a5a48'],
+      [46,14,1,10,'#a09870'],
+      [19,12,1,14,'#5a4a38'],[34,12,1,14,'#5a4a38'],
+      [39,12,1,14,'#5a4a38'],[55,12,1,14,'#5a4a38'],
+      [10,26,60,4,'#7a6a50'],[10,26,60,1,'#8a7a60'],
+      [30,30,20,20,'#a0a098'],
+      [32,31,4,3,'#909088'],[40,32,5,3,'#909088'],[35,36,4,3,'#909088'],
+      [42,38,4,3,'#909088'],[33,40,5,3,'#909088'],
+      [0,16,14,34,'#c8c0b0'],[66,16,14,34,'#c8c0b0'],
+      [2,20,10,1,'#b8b0a0'],[2,24,10,1,'#b8b0a0'],[2,28,10,1,'#b8b0a0'],
+      [68,22,10,1,'#b8b0a0'],[68,26,10,1,'#b8b0a0'],
+      [5,26,4,3,'#8a8a80'],[71,24,3,3,'#8a8a80'],
+      [14,30,52,20,'#6a8a48'],
+    ]
+  },
+  street: {
+    charX: 26, charY: 16,
+    r: [
+      [0,0,80,18,'#5a98cc'],
+      [0,0,80,5,'#4a88bb'],[0,14,80,4,'#6aa8dd'],
+      [15,3,14,3,'#d8e8f8'],[17,2,10,2,'#e8f0ff'],
+      [55,5,12,3,'#d8e8f8'],[57,4,8,2,'#e8f0ff'],
+      [0,6,22,12,'#c8b898'],[0,4,18,4,'#b8a888'],
+      [3,7,4,3,'#6088aa'],[10,7,4,3,'#6088aa'],
+      [3,12,4,3,'#6088aa'],[10,12,4,3,'#6088aa'],
+      [5,15,8,3,'#cc4444'],[6,16,6,1,'#e8d8c0'],
+      [58,4,22,14,'#d8c8a8'],[62,2,14,4,'#c8b898'],
+      [62,6,4,3,'#6088aa'],[70,6,4,3,'#6088aa'],
+      [62,12,4,3,'#6088aa'],[70,12,4,3,'#6088aa'],
+      [64,15,10,3,'#4466aa'],[65,16,8,1,'#e8d8c0'],
+      [22,14,36,4,'#cc6644'],[22,14,36,1,'#dd7755'],
+      [22,8,36,6,'#e8d8c0'],
+      [26,9,12,4,'#88bbdd'],[42,9,12,4,'#88bbdd'],
+      [0,18,80,32,'#a09888'],
+      [0,18,80,2,'#b0a898'],
+      [0,20,80,2,'#c0b8a0'],
+      [0,30,80,1,'#908878'],[0,38,80,1,'#908878'],
+      [0,3,80,1,'#4a4a4a'],[38,0,1,4,'#5a5a5a'],
+      [8,22,5,4,'#4a4a4a'],[9,22,1,2,'#888888'],[12,22,1,2,'#888888'],
+      [56,20,3,4,'#4a8838'],[57,24,1,2,'#6a5a4a'],
+    ]
+  },
+  taxi: {
+    charX: 26, charY: 12,
+    r: [
+      [0,0,80,50,'#444444'],
+      [0,0,80,8,'#888888'],
+      [0,7,80,2,'#666666'],
+      [0,9,80,18,'#4a78aa'],
+      [2,10,14,8,'#7a8a9a'],[18,12,10,6,'#6a7a8a'],[30,9,12,9,'#8a9aaa'],
+      [44,11,8,7,'#7a8a9a'],[54,10,12,8,'#6a7a8a'],[68,12,10,6,'#8a9aaa'],
+      [38,9,4,18,'#555555'],
+      [0,9,80,1,'#555555'],[0,26,80,1,'#555555'],
+      [5,12,2,2,'#ccaa66'],[10,13,2,2,'#ccaa66'],
+      [22,13,2,2,'#ccaa66'],[35,11,2,2,'#ccaa66'],
+      [48,12,2,2,'#ccaa66'],[58,13,2,2,'#ccaa66'],
+      [72,13,2,2,'#ccaa66'],
+      [0,27,80,6,'#3a3a3a'],[0,27,80,1,'#4a4a4a'],
+      [55,28,12,4,'#1a1a1a'],[56,29,10,2,'#44aa44'],
+      [0,33,80,17,'#6a5a4a'],[0,33,80,2,'#7a6a5a'],
+      [0,38,80,1,'#5a4a3a'],[0,43,80,1,'#5a4a3a'],
+      [5,28,14,5,'#7a6a5a'],[6,27,12,2,'#8a7a6a'],
+      [75,28,3,2,'#888888'],
+    ]
+  },
+  dojo: {
+    charX: 26, charY: 14,
+    r: [
+      [0,0,80,50,'#2a1a10'],
+      [0,0,80,6,'#3a2a18'],
+      [0,5,80,2,'#5a4830'],
+      [15,0,3,6,'#5a4830'],[40,0,3,6,'#5a4830'],[65,0,3,6,'#5a4830'],
+      [0,7,80,20,'#d8d0c0'],
+      [30,8,20,2,'#5a4830'],[32,10,16,3,'#d0c8b8'],
+      [38,10,4,3,'#cc4444'],
+      [8,9,8,12,'#f0e8d8'],[9,10,6,10,'#e8e0d0'],
+      [64,9,8,12,'#f0e8d8'],[65,10,6,10,'#e8e0d0'],
+      [11,11,2,1,'#2a2a2a'],[11,13,2,1,'#2a2a2a'],[11,15,2,1,'#2a2a2a'],
+      [67,11,2,1,'#2a2a2a'],[67,13,2,1,'#2a2a2a'],[67,15,2,1,'#2a2a2a'],
+      [72,14,6,12,'#5a4830'],
+      [73,15,1,10,'#888888'],[76,15,1,10,'#888888'],[74,16,1,8,'#aa8844'],
+      [0,27,80,23,'#8a7a58'],[0,27,80,1,'#9a8a68'],
+      [0,32,80,1,'#7a6a48'],[0,38,80,1,'#7a6a48'],[0,44,80,1,'#7a6a48'],
+      [20,28,40,1,'#a09a78'],
+      [15,30,50,18,'#9a8a68'],[15,30,50,1,'#a09a78'],
+    ]
+  },
+  festival: {
+    charX: 24, charY: 16,
+    r: [
+      [0,0,80,50,'#0a0820'],  // night sky
+      [2,2,2,1,'#FFFFCC'],[18,1,1,1,'#FFFFCC'],[35,3,1,1,'#FFFFCC'],[55,1,2,1,'#FFFFCC'],[70,2,1,1,'#FFFFCC'],
+      // lantern strings
+      [5,6,3,4,'#CC2222'],[6,7,1,2,'#FF6644'],
+      [18,5,3,4,'#CC2222'],[19,6,1,2,'#FF6644'],
+      [33,6,3,4,'#CC2222'],[34,7,1,2,'#FF6644'],
+      [48,5,3,4,'#CC2222'],[49,6,1,2,'#FF6644'],
+      [63,6,3,4,'#CC2222'],[64,7,1,2,'#FF6644'],
+      [5,5,60,1,'#444444'],  // string
+      // stall frame left
+      [0,12,18,3,'#6A4020'],[0,15,18,35,'#3A2010'],
+      [2,16,14,2,'#5A3820'],[2,19,14,1,'#5A3820'],
+      [3,17,3,1,'#FFCC44'],[7,17,3,1,'#88CC44'],[11,17,3,1,'#FF8844'],
+      // stall frame right
+      [58,12,22,3,'#6A4020'],[58,15,22,35,'#3A2010'],
+      [60,16,18,2,'#5A3820'],[60,19,18,1,'#5A3820'],
+      [61,17,3,1,'#FF8844'],[65,17,3,1,'#4488FF'],[69,17,3,1,'#FFCC44'],
+      // ground
+      [0,45,80,5,'#3A2A1A'],[0,45,80,1,'#4A3A2A'],
+      // crowd silhouettes
+      [3,40,4,5,'#1A1020'],[10,41,3,4,'#1A1020'],[50,40,4,5,'#1A1020'],[60,41,3,4,'#1A1020'],
+      [70,40,5,5,'#1A1020'],
+    ]
+  },
+  office: {
+    charX: 24, charY: 14,
+    r: [
+      [0,0,80,50,'#E8E4DC'],  // beige walls
+      [0,0,80,4,'#D0CCC4'],   // ceiling
+      // fluorescent lights
+      [10,2,20,1,'#F8F8F0'],[50,2,20,1,'#F8F8F0'],
+      // window
+      [30,5,20,14,'#88AACC'],[30,5,20,1,'#666666'],[30,18,20,1,'#666666'],
+      [30,5,1,14,'#666666'],[49,5,1,14,'#666666'],[39,5,1,14,'#666666'],
+      // desks
+      [2,30,25,3,'#8A7A60'],[2,30,25,1,'#9A8A70'],
+      [53,30,25,3,'#8A7A60'],[53,30,25,1,'#9A8A70'],
+      // monitors on desks
+      [8,26,5,4,'#222222'],[9,27,3,2,'#4488AA'],
+      [60,26,5,4,'#222222'],[61,27,3,2,'#4488AA'],
+      // chairs
+      [10,33,4,6,'#333333'],[62,33,4,6,'#333333'],
+      // floor
+      [0,40,80,10,'#9A9080'],[0,40,80,1,'#AAA090'],
+      [0,45,80,1,'#8A8070'],
+      // potted plant
+      [74,24,4,6,'#228833'],[75,30,2,3,'#8A6A40'],
+    ]
+  },
+  train: {
+    charX: 24, charY: 12,
+    r: [
+      [0,0,80,50,'#D8D0C8'],  // interior ceiling
+      // overhead rack
+      [0,4,80,2,'#888888'],[0,4,80,1,'#999999'],
+      // window
+      [8,8,26,14,'#6688AA'],[38,8,26,14,'#6688AA'],
+      [8,8,26,1,'#555555'],[8,21,26,1,'#555555'],
+      [38,8,26,1,'#555555'],[38,21,26,1,'#555555'],
+      // scenery through windows
+      [12,12,8,4,'#558844'],[18,10,6,6,'#448833'],
+      [42,11,10,5,'#558844'],[50,13,8,3,'#448833'],
+      // seats
+      [0,26,16,8,'#2A5A8A'],[0,26,16,1,'#3A6A9A'],
+      [64,26,16,8,'#2A5A8A'],[64,26,16,1,'#3A6A9A'],
+      // floor
+      [0,38,80,12,'#8A8078'],[0,38,80,1,'#9A9088'],
+      [0,44,80,1,'#7A7068'],
+      // handles
+      [20,0,2,8,'#AAAAAA'],[40,0,2,8,'#AAAAAA'],[60,0,2,8,'#AAAAAA'],
+      [19,7,4,2,'#CCCCCC'],[39,7,4,2,'#CCCCCC'],[59,7,4,2,'#CCCCCC'],
+    ]
+  },
+  mountain: {
+    charX: 24, charY: 18,
+    r: [
+      [0,0,80,50,'#88AACC'],  // sky
+      // distant mountains
+      [0,10,20,15,'#6A8A6A'],[15,8,25,17,'#5A7A5A'],[35,12,20,13,'#7A9A7A'],
+      [50,9,30,16,'#5A7A5A'],
+      // snow caps
+      [22,8,6,3,'#E8E8E8'],[58,9,8,3,'#E8E8E8'],
+      // treeline
+      [0,22,80,4,'#3A6A3A'],
+      [5,20,4,4,'#2A5A2A'],[15,19,5,5,'#2A5A2A'],[28,20,4,4,'#3A6A3A'],
+      [45,19,5,5,'#2A5A2A'],[60,20,4,4,'#2A5A2A'],[72,19,5,5,'#3A6A3A'],
+      // trail / ground
+      [0,26,80,24,'#8A7A5A'],
+      [0,26,80,2,'#9A8A6A'],
+      [25,28,30,1,'#AA9A7A'],  // trail
+      [20,32,40,1,'#AA9A7A'],
+      [15,36,50,1,'#AA9A7A'],
+      // rocks
+      [5,30,4,3,'#7A7A6A'],[65,28,5,4,'#6A6A5A'],[45,34,3,2,'#7A7A6A'],
+      // small flowers
+      [10,27,1,1,'#FFCC44'],[35,29,1,1,'#FF88AA'],[55,27,1,1,'#FFCC44'],[70,30,1,1,'#FF88AA'],
+    ]
+  },
+  waterfront: {
+    charX: 22, charY: 14,
+    r: [
+      [0,0,80,50,'#CC8844'],  // sunset sky
+      [0,0,80,8,'#DD9955'],
+      [0,8,80,4,'#CC7733'],
+      // sun
+      [60,2,8,8,'#FFCC44'],[61,3,6,6,'#FFDD66'],
+      // water
+      [0,22,80,28,'#2A5A8A'],
+      [0,22,80,2,'#3A6A9A'],
+      [5,26,12,1,'#4A7AAA'],[30,28,15,1,'#4A7AAA'],[55,25,18,1,'#4A7AAA'],
+      [10,32,10,1,'#1A4A7A'],[40,34,12,1,'#1A4A7A'],[60,30,14,1,'#1A4A7A'],
+      // pier/dock
+      [0,20,55,3,'#6A5030'],[0,20,55,1,'#7A6040'],
+      // pier posts
+      [8,22,2,8,'#5A4020'],[25,22,2,8,'#5A4020'],[42,22,2,8,'#5A4020'],
+      // distant boats
+      [62,18,6,2,'#EEEEEE'],[64,16,2,2,'#AA3333'],
+      // railing
+      [0,18,50,1,'#5A4020'],[5,15,1,4,'#5A4020'],[15,15,1,4,'#5A4020'],
+      [25,15,1,4,'#5A4020'],[35,15,1,4,'#5A4020'],[45,15,1,4,'#5A4020'],
+    ]
+  },
+};
+
+function inferBackground(sc) {
+  const t = `${sc.id||''} ${sc.en||''} ${sc.ctx||''}`.toLowerCase();
+  if (/bath|sento|onsen|hot.spring|soaking/.test(t)) return 'bathhouse';
+  if (/ramen|soba|curry|tofu|noodle|stall|counter|bento|ekiben|yatai/.test(t)) return 'restaurant';
+  if (/festival|matsuri|goldfish|firework|hanabi|tanabata|setsubun|obon|bon.odori|lantern/.test(t)) return 'festival';
+  if (/mountain|hik|trail|登山|climb|summit/.test(t)) return 'mountain';
+  if (/ferry|pier|fish|waterfront|harbour|harbor|dock|boat|island|cat.*island/.test(t)) return 'waterfront';
+  if (/shinkansen|train|railway|ferry|bus.*countryside|bus.*rural/.test(t)) return 'train';
+  if (/office|elevator|nomikai|shinsotsu|copier|copying|salaryman|cowork/.test(t)) return 'office';
+  if (/park|cherry|hanami|blossom|shogi|bench/.test(t)) return 'park';
+  if (/book|pharmacy|recycle|souvenir|apprais|shop(?!.*coff)|barber|dentist|post.office|flea.*market/.test(t)) return 'shop';
+  if (/caf[eé]|coffee|kissaten|machiya|tea.?house|cream.soda|onsen.*town/.test(t)) return 'cafe';
+  if (/night|3am|konbini|arcade|karaoke|crane|ufo|neon|jazz|pachinko|batting|escape.room|laundro|midnight/.test(t)) return 'night';
+  if (/temple|monk|rakugo|taiko|drum|shrine|hatsumode|calligraph|書道|pottery|陶芸/.test(t)) return 'temple';
+  if (/taxi|cab.driv|chauffeur|ride|uber|rideshare/.test(t)) return 'taxi';
+  if (/gym|workout|fitness|dojo|martial|kendo|judo|changing|surf/.test(t)) return 'dojo';
+  if (/izakaya|bar|pub|gokon|drink|beer|sake.*brew|nomikai/.test(t)) return 'restaurant';
+  if (/vet|clinic|hospital|doctor|emergency/.test(t)) return 'shop';
+  if (/dagashi|wagashi|sweet|kimono|manga.*caf|depachika|shotengai|corner.shop/.test(t)) return 'shop';
+  if (/bicycle|rental.*bike|vending|自販機|neighborhood|chounaikai/.test(t)) return 'street';
+  // Broader patterns for English roleplay scenarios
+  if (/diner|breakfast|brunch|thanksgiving|food.truck|cooking|class|lesson/.test(t)) return 'restaurant';
+  if (/hotel|hostel|airbnb|lobby|reception|check.?in/.test(t)) return 'cafe';
+  if (/beach|bbq|barbecue|wildlife|campus|university|national.park|outback|farm/.test(t)) return 'park';
+  if (/concert|gig|stadium|baseball|game|quiz.night/.test(t)) return 'night';
+  if (/interview|office|corporate|cowork/.test(t)) return 'office';
+  if (/bookshop|library|duty.free|shopping|garage.sale|thrift|market|spice/.test(t)) return 'shop';
+  if (/subway|underground|station|train|bus/.test(t)) return 'street';
+  if (/museum|gallery/.test(t)) return 'shop';
+  if (/canal|boat|sydney.*bus/.test(t)) return 'waterfront';
+  if (/rain|bus.stop|neighbor|laundromat/.test(t)) return 'street';
+  return 'street';
+}
+
+// Returns SVG rect markup for a scenario's character sprite at HD (64×64 grid).
+function getScenarioSpriteRects(sc) {
+  if (!sc?.voice) return '';
+  const baseType = VOICE_SPRITE_MAP[sc.voice] || 'adult_male';
+  const mod = resolveHdMod(sc, baseType);
+  return buildHdRects(baseType, mod);
+}
+
+// Full scene SVG: background + character positioned in the scene
+function renderScene(sc) {
+  if (!sc) return '';
+  const bgType = inferBackground(sc);
+  const bg = SCENE_BACKGROUNDS[bgType] || SCENE_BACKGROUNDS.street;
+
+  let svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 50" shape-rendering="crispEdges" preserveAspectRatio="xMidYMid slice">';
+  // Background layers
+  svg += bg.r.map(([x,y,w,h,c]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`).join('');
+  // Character sprite (HD: native 64×64). Scale to match prior visual size of
+  // 16-grid × 2 = 32 units → 64-grid × 0.5 = 32 units.
+  const charRects = getScenarioSpriteRects(sc);
+  if (charRects) {
+    svg += `<g transform="translate(${bg.charX},${bg.charY}) scale(0.5)">${charRects}</g>`;
+  }
+  svg += '</svg>';
+  return svg;
+}
+
+// Portrait: cropped head view of the character sprite (HD viewBox 4× of legacy 1 0 14 12).
+function renderPortrait(sc) {
+  if (!sc?.voice) return '';
+  const rects = getScenarioSpriteRects(sc);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="4 0 56 48" shape-rendering="crispEdges" preserveAspectRatio="xMidYMin meet">${rects}</svg>`;
+}
+
+function getScenarioSprite(sc, px) {
+  if (!sc?.voice) return '';
+  px = px || 2;
+  const size = 16 * px; // preserve previous on-screen size; HD content uses 64×64 viewBox
+  const rects = getScenarioSpriteRects(sc);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 64 64" shape-rendering="crispEdges">${rects}</svg>`;
+}
+
+function favAvatar(sc) {
+  const name = sc.char.split(',')[0].trim();
+  const face = sc.voice
+    ? `<div class="fav-face fav-face-sprite">${renderPortrait(sc)}</div>`
+    : `<div class="fav-face">${sc.icon || '👤'}</div>`;
+  return `
+    <div class="fav-avatar" onclick="pickScenario('${sc.id}')">
+      <button class="fav-remove-btn" onclick="showRemoveFavModal('${sc.id}');event.stopPropagation()" title="Remove from favorites">×</button>
+      ${face}
+      <div class="fav-name">${escHtml(name)}</div>
+      <div class="fav-tooltip"><strong>${escHtml(sc.jp)} — ${escHtml(sc.en)}</strong><br>${escHtml(sc.char)}<br><span style="color:var(--muted)">${escHtml(sc.ctx)}</span></div>
+    </div>`;
+}
+
+function showRemoveFavModal(id) {
+  const sc = S.favorites.find(f => f.id === id);
+  if (!sc) return;
+  const name = sc.char.split(',')[0].trim();
+  let modal = document.getElementById('favRemoveModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'favRemoveModal';
+    modal.className = 'fav-modal-backdrop';
+    modal.innerHTML = `
+      <div class="fav-modal">
+        <div class="fav-modal-title">Remove favorite?</div>
+        <div class="fav-modal-body" id="favRemoveModalBody"></div>
+        <div class="fav-modal-btns">
+          <button class="btn-cancel" onclick="closeFavRemoveModal()">Cancel</button>
+          <button class="btn-remove" id="favRemoveConfirmBtn">Remove</button>
+        </div>
+      </div>`;
+    modal.addEventListener('click', e => { if (e.target === modal) closeFavRemoveModal(); });
+    document.body.appendChild(modal);
+  }
+  document.getElementById('favRemoveModalBody').textContent = `Remove "${name}" from your favorites?`;
+  document.getElementById('favRemoveConfirmBtn').onclick = () => { toggleFavorite(id); closeFavRemoveModal(); };
+  modal.classList.add('active');
+}
+
+function closeFavRemoveModal() {
+  const modal = document.getElementById('favRemoveModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function scCard(sc) {
+  const isFav = S.favorites.some(f => f.id === sc.id);
+  const isSel = S.scenario?.id === sc.id;
+  const visual = S.sierraMode
+    ? `<div class="sc-scene-preview">${renderScene(sc)}</div>`
+    : `<div class="sc-sprite">${getScenarioSprite(sc, 3)}</div>`;
+  return `
+    <div class="scenario-card ${isSel ? 'sel' : ''} ${isFav && !isSel ? 'fav-card' : ''}" onclick="pickScenario('${sc.id}')">
+      <button class="sc-fav ${isFav ? 'active' : ''}" onclick="toggleFavorite('${sc.id}');event.stopPropagation()" title="${isFav ? 'Remove from favorites' : 'Save to favorites'}">${IC.star}</button>
+      ${visual}
+      <div class="sc-jp">${sc.jp}</div>
+      <div class="sc-en">${sc.en}</div>
+      <div class="sc-char">${sc.char}</div>
+    </div>`;
+}
+
+function backToScenarios() {
+  cancelSpeech();
+  S.scenario = null;
+  renderRoleplay();
+}
+
+function renderRoleplay() {
+  setPageTheme();
+  const m = document.getElementById('mainContent');
+
+  // Active conversation — show full-screen, no picker
+  if (S.scenario) {
+    m.innerHTML = S.sierraMode ? `
+      <div class="rpg-frame">
+        <div class="rpg-scene">
+          ${renderScene(S.scenario)}
+          <div class="rpg-scene-label">${escHtml(S.scenario.char)}</div>
+        </div>
+        <div class="rpg-dialogue-wrap">
+          <div class="rpg-head">
+            <button class="btn" onclick="backToScenarios()">${IC.back} Back</button>
+            <div class="label" style="flex:1;text-align:center"></div>
+            ${roleplayMenuHTML()}
+          </div>
+          <div class="rpg-dialogue" id="chatWin">${renderMessages()}</div>
+          <div class="rpg-input-area">
+            <textarea class="rpg-input" id="chatIn" rows="1"
+              placeholder="日本語か romaji で…"
+              oninput="autoGrowInput(this)"
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"
+            ></textarea>
+            ${micButtonHTML('chatIn')}
+            <button class="rpg-send" id="sendBtn" onclick="sendMsg()">${IC.send}</button>
+          </div>
+        </div>
+        <div class="rpg-bd-drawer" id="rpBdDrawer">
+          <div class="rpg-bd-drawer-head">
+            <div class="label">Breakdown</div>
+            <button class="btn" onclick="closeStdBdDrawer()"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+          </div>
+          <div class="rpg-bd-drawer-body" id="rpBdDrawerBody"></div>
+        </div>
+      </div>
+    ` : `
+      <div class="chat-wrap">
+        <div class="chat-head">
+          <button class="btn" onclick="backToScenarios()">${IC.back} Back</button>
+          <div class="label">${S.scenario.jp} — ${S.scenario.en}</div>
+          ${roleplayMenuHTML()}
+        </div>
+        <div class="chat-window" id="chatWin">${renderMessages()}</div>
+        <div class="chat-foot">
+          <textarea class="chat-input" id="chatIn" rows="1"
+            placeholder="日本語か romaji で…"
+            oninput="autoGrowInput(this)"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"
+          ></textarea>
+          ${micButtonHTML('chatIn')}
+          <button class="send-btn" id="sendBtn" onclick="sendMsg()">${IC.send}</button>
+        </div>
+        <div class="chat-tip">Enter to send · Shift+Enter for new line · romaji auto-converted</div>
+      </div>
+    `;
+    scrollChat();
+    return;
+  }
+
+  // No active conversation — show picker
+  const favScenarios = S.favorites;
+  m.innerHTML = `
+    <div>
+      ${favScenarios.length ? `
+        <div class="fav-header-row">
+          <div class="label">★ Favorites</div>
+        </div>
+        <div class="fav-row">${favScenarios.map(favAvatar).join('')}</div>
+      ` : ''}
+      <div class="sc-section-head">
+        <div class="label">Scenarios</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn" style="font-size:10px;padding:4px 10px" onclick="rpgLaunch()">${IC.map} Explore</button>
+          <button class="btn" style="font-size:10px;padding:4px 10px" onclick="refreshScenarios()">${IC.refresh} Refresh</button>
+        </div>
+      </div>
+      <div style="color:var(--muted);font-size:11px;margin-bottom:10px">
+        Claude plays the scene using your vocab. Star a scenario to save it to favorites.
+      </div>
+      <div class="scenario-grid">
+        ${S.scenarios.map(scCard).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderMessages() {
+  if (!S.convo.length) {
+    return S.sierraMode
+      ? '<div style="color:#4a4a6a;font-size:12px;margin:auto;text-align:center;font-family:Nunito Sans,sans-serif">Starting…</div>'
+      : '<div style="color:var(--muted);font-size:12px;margin:auto;text-align:center">Starting…</div>';
+  }
+  return S.convo.map((msg, i) => {
+    if (msg.divider) {
+      return '<div class="rpg-episode-divider"><span class="ep-label">${IC.ff} Time passes…</span></div>';
+    }
+    const isReal = msg.role === 'assistant' && msg.content && msg.content !== '…';
+    let body = msg.role === 'assistant'
+      ? (msg.display || safeAnnotated(buildAnnotated(msg.content)))
+      : (msg.display || escHtml(msg.content));
+    if (S.sierraMode && msg.role === 'assistant') body = formatActions(body);
+    const nextMsg = S.convo[i + 1];
+    const correctionHere = msg.role === 'user' && nextMsg?.correction
+      ? `<div class="msg-correction">↳ ${formatCorrection(nextMsg.correction)}</div>` : '';
+    const hasBd = isReal && msg.breakdown;
+
+    if (S.sierraMode) {
+      const portraitHtml = msg.role === 'assistant' && S.scenario
+        ? `<div class="rpg-portrait-frame">${renderPortrait(S.scenario)}</div>` : '';
+      const charName = S.scenario ? escHtml(S.scenario.char.split('—')[0].split(',')[0].replace(/\s*\([^)]*\)\s*/g, '').trim() || S.scenario.char) : '';
+      const nameHtml = msg.role === 'assistant'
+        ? `<div class="rpg-name">${charName}</div>`
+        : `<div class="rpg-name">You</div>`;
+      return `
+        <div class="rpg-msg msg ${msg.role}${hasBd ? ' has-breakdown' : ''}">
+          ${portraitHtml}
+          <div class="rpg-bubble">
+            ${nameHtml}
+            <div class="msg-body">${body}</div>
+            ${correctionHere}
+            ${isReal ? `
+            <div class="msg-foot rpg-foot">
+              <button class="speak-btn" data-mi="${i}" title="Speak aloud">${IC.volume} Listen</button>
+              <button class="breakdown-btn" data-mi="${i}" title="Break down">${IC.book} Breakdown</button>
+            </div>
+            <div class="audio-player" id="ap-${i}" style="display:none">
+              <button class="ap-btn" data-ap="${i}" title="Play/Pause">${IC.play}</button>
+              <div class="ap-track" data-ap-track="${i}"><div class="ap-fill"></div></div>
+              <span class="ap-time">0:00</span>
+            </div>` : ''}
+          </div>
+        </div>`;
+    }
+
+    // Classic style
+    const avatarHtml = msg.role === 'assistant' && S.scenario
+      ? `<div class="msg-avatar">${getScenarioSprite(S.scenario, 2)}</div>` : '';
+    const inner = `
+        <div class="msg-inner">
+          <div class="msg-body">${body}</div>
+          ${correctionHere}
+          ${isReal ? `
+          <div class="msg-foot">
+            <button class="speak-btn" data-mi="${i}" title="Speak aloud">${IC.volume}</button>
+            <button class="breakdown-btn" data-mi="${i}" title="Break down this message">${IC.book}</button>
+          </div>
+          <div class="audio-player" id="ap-${i}" style="display:none">
+            <button class="ap-btn" data-ap="${i}" title="Play/Pause">${IC.play}</button>
+            <div class="ap-track" data-ap-track="${i}"><div class="ap-fill"></div></div>
+            <span class="ap-time">0:00</span>
+          </div>` : ''}
+        </div>
+        ${hasBd ? `<div class="msg-breakdown">${msg.breakdown}</div>` : ''}`;
+    return `
+      <div class="msg ${msg.role}${hasBd ? ' has-breakdown' : ''}">
+        ${avatarHtml}
+        ${msg.role === 'assistant' ? `<div class="msg-main">${inner}</div>` : inner}
+      </div>`;
+  }).join('');
+}
+
+function escHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Safe for use inside a double-quoted HTML attribute (escHtml + the quote char).
+function escAttr(s) {
+  return escHtml(s).replace(/"/g, '&quot;');
+}
+
+function formatCorrection(s) {
+  // Escape HTML, then convert numbered points to line breaks and bold the error arrows
+  return escHtml(s || '')
+    .replace(/(\d+)\.\s/g, '<br><strong>$1.</strong> ')
+    .replace(/→/g, '<strong>→</strong>')
+    .replace(/✓\s*([^\n<]*)/g, (_m, fix) => {
+      const romaji = fix.trim();
+      // Show the kana alongside the romaji when the fix is pure romaji.
+      let kana = '';
+      try {
+        if (typeof wanakana !== 'undefined' && romaji && !/[\u3040-\u30ff\u4e00-\u9fff]/.test(romaji)) {
+          kana = wanakana.toHiragana(romaji, { passRomaji: false });
+        }
+      } catch (_) {}
+      const inner = kana && kana !== romaji ? `${kana}（${romaji}）` : romaji;
+      return `<br><span class="correction-fix">✓ ${inner}</span>`;
+    })
+    .replace(/^<br>/, '');
+}
+
+function pickScenario(id) {
+  cancelSpeech();
+  // On desktop, always use sierra split view and collapse sidebar
+  if (window.innerWidth >= 768) {
+    S.sierraMode = true;
+    const layout = document.getElementById('layout');
+    if (!layout.classList.contains('sidebar-collapsed')) {
+      layout.classList.add('sidebar-collapsed');
+      const tb = document.getElementById('sidebarToggle');
+      if (tb) tb.innerHTML = IC.chevRR;
+    }
+  }
+  // Check for saved conversation in favorites
+  const fav = S.favorites.find(f => f.id === id);
+  if (fav && fav.convo && fav.convo.length) {
+    S.scenario = fav;
+    S.convo = fav.convo;
+    renderRoleplay();
+    buildSysPrompt(S.scenario);
+    scrollChat();
+    return;
+  }
+  S.scenario = S.scenarios.find(s => s.id === id) || S.favorites.find(f => f.id === id) || SCENARIO_POOL.find(s => s.id === id) || null;
+  S.convo = [];
+  renderRoleplay();
+  startChat();
+}
+
+function resetChat() {
+  cancelSpeech();
+  S.convo = [];
+  renderRoleplay();
+  startChat();
+}
+
+const VOCAB_LEVELS = [
+  { name: 'Strict', desc: 'Use only words from your Anki deck.' },
+  { name: 'Mostly known', desc: 'Strongly prefer your known words; keep new words minimal.' },
+  { name: 'Balanced', desc: 'Known words as a base, with some new words introduced naturally.' },
+  { name: 'Relaxed', desc: 'Let the conversation flow naturally, using known words as a base.' },
+];
+
+// Directive injected into the roleplay system prompt for each vocab level.
+const VOCAB_DIRECTIVES = [
+  `STRICT CONSTRAINT: Use ONLY words from this known vocabulary list. Do NOT introduce words the student hasn't studied, except unavoidable particles and the scenario's own proper nouns. If you can't express something with known words, rephrase it using simpler known words.`,
+  `Strongly prefer words from this known vocabulary list. Minimise using words the student hasn't studied yet — keep unknown words to only essential particles, greetings, and words required by the scenario context. If you must use an unknown word, keep it simple and high-frequency.`,
+  `Use this known vocabulary as your base, but naturally introduce a few new words each turn to gently expand the student's range. Keep new words simple and high-frequency, and make their meaning clear from context.`,
+  `Use this known vocabulary as a foundation, but let the conversation flow naturally — freely use new words wherever a native speaker naturally would, while keeping the overall level appropriate (around N4–N3) and comprehensible.`,
+];
+
+function getVocabLevel() {
+  const raw = localStorage.getItem('renshuu_vocab_level');
+  if (raw !== null) return Math.max(0, Math.min(3, parseInt(raw, 10) || 0));
+  // Migrate from the old "Stick to known words" checkbox: off → relaxed, on → mostly.
+  return localStorage.getItem('renshuu_vocab_constrain') === '0' ? 3 : 1;
+}
+
+function setVocabLevel(v) {
+  const lvl = Math.max(0, Math.min(3, parseInt(v, 10) || 0));
+  localStorage.setItem('renshuu_vocab_level', String(lvl));
+  const info = VOCAB_LEVELS[lvl];
+  const nameEl = document.getElementById('vocabLevelVal');
+  const descEl = document.getElementById('vocabLevelDesc');
+  if (nameEl) nameEl.textContent = info.name;
+  if (descEl) descEl.textContent = info.desc;
+}
+
+function buildSysPrompt(sc) {
+  const words = pickWords(12);
+  S.sessionWords = words;
+  const youngList = words.filter(w => w.tier === 'y').map(w => `${w.jp}（${w.en}）`).join('、');
+  const allList  = words.map(w => `${w.jp} = ${w.en}`).join(', ');
+  S.usedWords = new Set();
+  // Build compact known-words list from entire Anki deck, scaled by the vocab-level slider.
+  const vocabLevel = getVocabLevel();
+  const allKnown = [...S.cards.new, ...S.cards.young, ...S.cards.mature].map(c => c.jp);
+  const knownList = allKnown.length ? allKnown.join('、') : '';
+  S.sysPrompt = `You are playing the role of ${sc.char}. Scenario: ${sc.en}. ${sc.ctx}
+
+VOCABULARY TO USE NATURALLY: ${allList}
+PRIORITY — embed these YOUNG words (studied but not yet mastered) whenever natural: ${youngList || '(none this session)'}
+${knownList ? `\nSTUDENT'S KNOWN VOCABULARY (their full Anki deck): ${knownList}\nIMPORTANT: ${VOCAB_DIRECTIVES[vocabLevel]}\n` : ''}
+Rules:
+1. Respond in Japanese only. STRICT LIMIT: 1–3 sentences. Most replies should be 1–2 sentences — like a real conversation, not a monologue. One-word or one-phrase reactions (え？本当？ / そうだね / いいね！) are great. NEVER write 4+ sentences. This is a back-and-forth dialogue, not a speech.
+2. Weave in vocab from the list, especially the priority young words.
+3. Stay in character. Ask a natural follow-up question each turn (but not every single turn — sometimes just react).
+4. After your Japanese, if the student made errors in their MOST RECENT message ONLY (grammar, vocab, particle, conjugation, word choice, unnatural phrasing), add: [Correction: explain what was wrong, what it should be, and briefly why. Cover every mistake in that message — don't skip any. Be specific: show the wrong text → correct text. Use numbered points (1. 2. 3.) for multiple errors so each is clear. Do NOT correct errors from earlier messages — only the latest one. Then, on the LAST line, write a full corrected version of what the student should have said, entirely in romaji, prefixed exactly with "✓ ". Example: "1. だれごらい → どのくらい (dono kurai) — だれごらい isn't a word; どのくらい means 'about how much/long'\n✓ kore wa dono kurai desu ka?"]
+5. Aim for N4–N3 level.
+6. Mark EVERY Japanese word with [[word|reading|english]] pipe markers — this includes kanji compounds (with okurigana), katakana words, AND hiragana words/phrases (2+ chars). Use hiragana as the reading for both katakana and hiragana-only words. Do NOT leave any word unmarked — every content word needs a tooltip. Example: [[日本語|にほんご|Japanese]]は[[面白い|おもしろい|interesting]]し、[[コーヒー|こーひー|coffee]]も[[やっぱり|やっぱり|as expected]][[美味しい|おいしい|delicious]]。[[でも|でも|but]][[ちょっと|ちょっと|a little]][[むずかしい|むずかしい|difficult]][[ですね|ですね|isn't it]]。
+7. The student may write in rōmaji (e.g. "watashi wa gakusei desu") — understand it as Japanese and respond naturally. Only correct it if there is an actual grammar or vocab mistake, not just for using romaji.
+
+REMEMBER: 1–3 sentences MAX for your Japanese reply. This is the most important rule. Short and conversational.`;
+}
+
+function saveConvoToFavorite() {
+  if (!S.scenario) return;
+  const fav = S.favorites.find(f => f.id === S.scenario.id);
+  if (fav) {
+    fav.convo = S.convo
+      .filter(m => m.content !== '…')
+      .map(m => { const o = { role: m.role, content: m.content, _id: m._id, correction: m.correction || undefined }; if (m.divider) o.divider = true; return o; });
+    saveFavorites();
+  }
+}
+
+async function fastForward({ sc, getConvo, pushMsg, updateView, btnId }) {
+  const convo = getConvo();
+  if (!sc || convo.length < 2) return;
+
+  const btn = document.getElementById(btnId);
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+
+  const recentMsgs = convo.filter(m => !m.divider && m.content !== '…').slice(-20).map(m => ({ role: m.role, content: m.content }));
+
+  const summaryPrompt = `You are a narrator summarising an ongoing conversation for context.
+The student has been talking with ${sc.char} at ${sc.en}. ${sc.ctx}
+Write a brief 2-3 sentence summary in ENGLISH of what happened, the relationship dynamic, any plans made, and the emotional tone. Focus on details that would matter when they meet again.`;
+
+  try {
+    const summary = await claude(
+      [...recentMsgs, { role: 'user', content: 'Summarise this conversation so far for continuity.' }],
+      summaryPrompt, 300, 'claude-haiku-4-5-20251001'
+    );
+
+    pushMsg({ role: 'system', content: '', divider: true });
+
+    buildSysPrompt(sc);
+    S.sysPrompt += `\n\nEPISODE CONTINUITY — This is NOT the first meeting. The student and your character have an ongoing relationship.\nPrevious episode summary: ${summary}\nTIME SKIP: Some time has passed since you last met. Start a new scene — different place, time of day, or situation, but consistent with ${sc.en}. Reference something from the previous conversation naturally. Show that the relationship has progressed. Do NOT repeat the same opening greeting.`;
+
+    const reply = await claude(
+      [{ role: 'user', content: 'Continue the story. We meet again after some time has passed. Greet me in character, referencing our previous encounter.' }],
+      S.sysPrompt, 800
+    );
+
+    const corrRx = /\[Corrections?:\s*([\s\S]*?)\]?\s*$/i;
+    const clean = reply.replace(corrRx, '').trim();
+    pushMsg({ role: 'assistant', content: clean });
+    updateView();
+  } catch (e) {
+    pushMsg({ role: 'assistant', content: 'エラーが発生しました。もう一度お願いします。' });
+    updateView();
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = IC.ff; }
+  }
+}
+
+function roleplFastForward() {
+  fastForward({
+    sc: S.scenario,
+    btnId: 'roleplFfBtn',
+    getConvo: () => S.convo,
+    pushMsg: msg => { S.convo.push({ ...msg, _id: msgId() }); },
+    updateView: () => { updateChat(); saveConvoToFavorite(); },
+  });
+}
+
+// Kebab overflow menu for the roleplay header (fast-forward, favourite, reset).
+function roleplayMenuHTML() {
+  const isFav = S.scenario && S.favorites.some(f => f.id === S.scenario.id);
+  return `<div class="kebab-wrap">
+      <button class="btn" onclick="toggleRoleplayMenu(event)" title="More" aria-label="More options">${IC.kebab}</button>
+      <div class="kebab-menu" hidden>
+        <button class="kebab-item" onclick="closeRoleplayMenu();roleplFastForward()">${IC.ff} Fast forward</button>
+        <button class="kebab-item${isFav ? ' is-fav' : ''}" onclick="closeRoleplayMenu();toggleFavorite(S.scenario.id)">${IC.star} ${isFav ? 'Remove favourite' : 'Favourite'}</button>
+        <button class="kebab-item" onclick="closeRoleplayMenu();resetChat()">${IC.reset} Reset</button>
+      </div>
+    </div>`;
+}
+
+function toggleRoleplayMenu(e) {
+  e.stopPropagation();
+  const menu = e.currentTarget.closest('.kebab-wrap')?.querySelector('.kebab-menu');
+  if (!menu) return;
+  const willOpen = menu.hasAttribute('hidden');
+  closeRoleplayMenu();
+  if (willOpen) {
+    menu.removeAttribute('hidden');
+    setTimeout(() => document.addEventListener('click', closeRoleplayMenu, { once: true }), 0);
+  }
+}
+
+function closeRoleplayMenu() {
+  document.querySelectorAll('.kebab-menu:not([hidden])').forEach(m => m.setAttribute('hidden', ''));
+}
+
+async function startChat() {
+  const chatWin = document.getElementById('chatWin');
+  if (!chatWin) return;
+  chatWin.innerHTML = '<div class="loading-row"><span class="spin"></span> setting the scene…</div>';
+
+  const sc = S.scenario;
+  buildSysPrompt(sc);
+
+  try {
+    const opening = await claude(
+      [{ role: 'user', content: '[Open the scenario with a natural, brief Japanese greeting or question — 1–2 sentences only.]' }],
+      S.sysPrompt
+    );
+    S.convo = [{ role: 'assistant', content: opening, _id: msgId() }];
+    updateChat();
+    saveConvoToFavorite();
+  } catch (e) {
+    chatWin.innerHTML = `<div style="color:var(--red);font-size:12px">Error: ${e.message}</div>`;
+  }
+}
+
+function updateChat() {
+  const chatWin = document.getElementById('chatWin');
+  if (!chatWin) return;
+  chatWin.innerHTML = renderMessages();
+  restoreAudioPlayer();
+  scrollChat();
+}
+
+async function sendMsg() {
+  const inp = document.getElementById('chatIn');
+  const sendBtn = document.getElementById('sendBtn');
+  const raw = inp?.value.trim();
+  if (!raw) return;
+
+  // Convert romaji → hiragana when the input contains no Japanese characters
+  let text = raw;
+  if (!/[\u3040-\u30ff\u4e00-\u9fff]/.test(raw)) {
+    try { text = wanakana.toHiragana(raw, { passRomaji: false }); } catch (_) {}
+  }
+
+  inp.value = '';
+  inp.style.height = 'auto';
+  if (sendBtn) sendBtn.disabled = true;
+
+  S.convo.push({ role: 'user', content: text, display: escHtml(text), _id: msgId() });
+  S.convo.push({ role: 'assistant', content: '…', display: '<span class="spin"></span>', _id: 'spinner' });
+  updateChat();
+
+  try {
+    const msgs = S.convo
+      .filter(m => m.content !== '…' && !m.divider)
+      .map(m => ({ role: m.role, content: m.content }));
+
+    // Vocab reinforcement: track used words and remind about unused ones
+    const reinforceOn = localStorage.getItem('renshuu_vocab_reinforce') !== '0';
+    if (reinforceOn && S.sessionWords?.length) {
+      // Scan all assistant messages for session words already used
+      const allText = S.convo.filter(m => m.role === 'assistant' && m.content !== '…').map(m => m.content).join(' ');
+      for (const w of S.sessionWords) {
+        if (allText.includes(w.jp)) S.usedWords.add(w.jp);
+      }
+      const unused = S.sessionWords.filter(w => !S.usedWords.has(w.jp));
+      if (unused.length > 0) {
+        const nudge = `[System: You haven't used these vocab words yet — try to work them in naturally: ${unused.map(w => `${w.jp}（${w.en}）`).join('、')}]`;
+        msgs.push({ role: 'user', content: nudge });
+      }
+    }
+
+    const reply = await claude(msgs, S.sysPrompt, 500);
+
+    // parse optional [Correction: ...] — greedy match to final ] since corrections may contain ]] annotation markers
+    const corrRx = /\[Corrections?:\s*([\s\S]*?)\]?\s*$/i;
+    const corrMatch = reply.match(corrRx);
+    const clean = reply.replace(corrRx, '').trim();
+    const correction = corrMatch ? corrMatch[1].replace(/\[\[([^\[\]|]+)\|[^\[\]]+\]\]/g, '$1').trim() : null;
+
+    // Track newly used vocab words from this reply
+    if (reinforceOn && S.sessionWords?.length) {
+      for (const w of S.sessionWords) {
+        if (clean.includes(w.jp)) S.usedWords.add(w.jp);
+      }
+    }
+
+    if (correction) logMistake({ src: 'r', wrote: text, fix: correction });
+
+    // replace spinner
+    S.convo.pop();
+    S.convo.push({ role: 'assistant', content: clean, correction, _id: msgId() });
+    updateChat();
+    saveConvoToFavorite();
+  } catch (e) {
+    S.convo.pop();
+    S.convo.push({ role: 'assistant', content: `Error: ${e.message}`, display: `<span style="color:var(--red)">${escHtml(e.message)}</span>`, _id: msgId() });
+    updateChat();
+  }
+
+  const newSend = document.getElementById('sendBtn');
+  if (newSend) newSend.disabled = false;
+  const newInp = document.getElementById('chatIn');
+  if (newInp) newInp.focus();
+}
+
+function scrollChat() {
+  const w = document.getElementById('chatWin');
+  if (w) setTimeout(() => w.scrollTop = w.scrollHeight, 60);
+}
+
+// Grow a chat textarea to fit its content (up to a max), then scroll internally.
+function autoGrowInput(el) {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+}
+
+// ── ENGLISH ROLEPLAY MODE (英語ロールプレイ — 逆バージョン) ──────────────────
+
+const ENG_AZURE_VOICES = [
+  'en-US-GuyNeural','en-US-DavisNeural','en-US-JennyNeural','en-US-AriaNeural',
+  'en-GB-RyanNeural','en-GB-SoniaNeural','en-AU-WilliamNeural','en-AU-NatashaNeural',
+];
+
+const ENG_SCENARIO_POOL = [
+  // American settings
+  { id:'eng-diner', jp:'ダイナー', en:'アメリカの食堂で朝食を注文', icon:'🍳', char:'Sally, a chatty waitress at a small-town diner who remembers every regular', charJp:'サリー — 常連客を全員覚えているおしゃべりなウェイトレス', ctx:'A small-town American diner at breakfast time. Sally comes to take the order with a pot of coffee already in hand. She has opinions about everything on the menu.', voice:'en-US-JennyNeural' },
+  { id:'eng-roadtrip', jp:'ガソリンスタンド', en:'ロードトリップ中の休憩', icon:'⛽', char:'Hank, a gas station attendant who has never left his hometown', charJp:'ハンク — 地元から出たことのないガソリンスタンドの店員', ctx:'A lonely gas station on a long American highway. Hank is curious about where you are from and where you are headed. He gives directions using landmarks only locals would know.', voice:'en-US-GuyNeural' },
+  { id:'eng-nyc-subway', jp:'NY地下鉄', en:'ニューヨークの地下鉄で道を聞く', icon:'🚇', char:'Marcus, a New Yorker who talks fast but means well', charJp:'マーカス — 早口だけど親切なニューヨーカー', ctx:'You are on the NYC subway trying to figure out which stop to get off at. Marcus notices your confused expression and starts helping — while also giving unsolicited advice about the best pizza in the city.', voice:'en-US-DavisNeural' },
+  { id:'eng-baseball', jp:'野球観戦', en:'アメリカの野球場で観戦', icon:'⚾', char:'Doug, a die-hard fan who has been coming to games for 30 years', charJp:'ダグ — 30年通いの熱狂的ファン', ctx:'You are at an American baseball game. The guy next to you, Doug, assumes you know nothing about baseball and enthusiastically explains every play. He also has strong opinions about hot dogs.', voice:'en-US-GuyNeural' },
+  { id:'eng-thanksgiving', jp:'感謝祭', en:'ホストファミリーの感謝祭ディナー', icon:'🦃', char:'Linda, a warm host mother who cooks way too much food', charJp:'リンダ — 料理を作りすぎる温かいホストマザー', ctx:'You are spending Thanksgiving with your American host family. Linda insists you try everything and keeps asking if you want more. The whole family is curious about Japanese holidays.', voice:'en-US-JennyNeural' },
+  { id:'eng-campus', jp:'キャンパス', en:'アメリカの大学キャンパスツアー', icon:'🎓', char:'Zoe, an enthusiastic student ambassador', charJp:'ゾーイ — テンション高めの学生アンバサダー', ctx:'You are touring an American university campus. Zoe is showing you around, using a lot of campus slang you might not know. She wants to know about universities in Japan.', voice:'en-US-AriaNeural' },
+  { id:'eng-garage-sale', jp:'ガレージセール', en:'ガレージセールで値段交渉', icon:'🏷️', char:'Barbara, who prices things based on how much she likes you', charJp:'バーバラ — 好感度で値段を変えるおばさん', ctx:'You have found some interesting items at a neighborhood garage sale. Barbara is chatty and curious about what life is like in Japan. Prices seem negotiable if you have good conversation.', voice:'en-US-JennyNeural' },
+  // British settings
+  { id:'eng-pub', jp:'パブ', en:'ロンドンのパブでクイズナイト', icon:'🍺', char:'Nigel, a pub quiz master with impossibly obscure questions', charJp:'ナイジェル — 超マニアックなクイズマスター', ctx:'You have wandered into a London pub quiz night. Nigel invites you to join his team because they need someone who knows about Japan. His British humour takes some getting used to.', voice:'en-GB-RyanNeural' },
+  { id:'eng-tea', jp:'アフタヌーンティー', en:'ホテルでアフタヌーンティー', icon:'🫖', char:'Mrs. Pemberton, who takes tea etiquette very seriously', charJp:'ペンバートン夫人 — ティーマナーに厳しい英国淑女', ctx:'You are having afternoon tea at a London hotel. Mrs. Pemberton at the next table notices your technique and politely begins coaching you on proper tea etiquette. She has thoughts on the scone-cream order debate.', voice:'en-GB-SoniaNeural' },
+  { id:'eng-kings-cross', jp:'キングスクロス駅', en:'ロンドンの駅で乗り換えを聞く', icon:'🚂', char:'Trevor, a helpful but slightly sarcastic station worker', charJp:'トレヴァー — 親切だけど少し皮肉屋な駅員', ctx:'You are at King\'s Cross station trying to figure out the Tube map. Trevor helps you but cannot resist making dry British jokes about tourists. He secretly loves recommending hidden London gems.', voice:'en-GB-RyanNeural' },
+  { id:'eng-fish-chips', jp:'フィッシュ＆チップス', en:'海辺のフィッシュ＆チップス屋', icon:'🐟', char:'Chip — yes, that is really his name — the shop owner', charJp:'チップ — 本名がチップの店主', ctx:'You are at a seaside fish and chips shop. The owner, who everyone calls Chip, is proud of his family recipe and wants to know what you think. He also has questions about Japanese seafood.', voice:'en-GB-RyanNeural' },
+  { id:'eng-village', jp:'イングランドの村', en:'のどかな村のマーケットで買い物', icon:'🏡', char:'Dorothy, a village market vendor who grows everything herself', charJp:'ドロシー — 全て自家栽培のマーケットおばあちゃん', ctx:'You are browsing a quaint English village market. Dorothy is selling vegetables and homemade preserves. She is fascinated by Japanese food and keeps asking how to cook with miso.', voice:'en-GB-SoniaNeural' },
+  // Australian settings
+  { id:'eng-beach-bbq', jp:'ビーチBBQ', en:'オーストラリアのビーチでバーベキュー', icon:'🏖️', char:'Shane, an Aussie who uses slang you have never heard of', charJp:'シェーン — 聞いたことのないスラングを連発するオージー', ctx:'You have been invited to a beach BBQ in Australia. Shane is manning the grill and speaks in heavy Australian slang. He thinks everything is no worries and keeps offering you prawns.', voice:'en-AU-WilliamNeural' },
+  { id:'eng-melbourne-cafe', jp:'メルボルンカフェ', en:'メルボルンのおしゃれなカフェ', icon:'☕', char:'Mia, a barista who takes coffee extremely seriously', charJp:'ミア — コーヒーに異常にこだわるバリスタ', ctx:'You are at a Melbourne specialty coffee shop. Mia asks detailed questions about your coffee preferences and is genuinely offended by the idea of instant coffee. She wants to know about Japanese kissaten.', voice:'en-AU-NatashaNeural' },
+  { id:'eng-wildlife', jp:'動物園', en:'オーストラリアの動物園ツアー', icon:'🦘', char:'Bruce, a wildlife guide who talks to animals', charJp:'ブルース — 動物に話しかける飼育員', ctx:'You are on a guided tour of an Australian wildlife park. Bruce introduces you to every animal by name and seems to understand their responses. He is curious whether you have kangaroos in Japan.', voice:'en-AU-WilliamNeural' },
+  { id:'eng-sydney-bus', jp:'シドニーバス', en:'シドニーのバスで隣の人と会話', icon:'🚌', char:'Emma, a uni student heading home from class', charJp:'エマ — 授業帰りの大学生', ctx:'You are on a bus in Sydney and the person next to you starts chatting. Emma is studying Japanese at university and is excited to practice, but keeps mixing up Japanese and English.', voice:'en-AU-NatashaNeural' },
+  // Japanese settings (practicing English in Japan)
+  { id:'eng-eikaiwa', jp:'英会話カフェ', en:'渋谷の英会話カフェ', icon:'💬', char:'Ryan, an American expat who runs conversation tables', charJp:'ライアン — 英会話テーブルを仕切るアメリカ人', ctx:'You are at an English conversation cafe in Shibuya. Ryan hosts a table for intermediate learners and keeps the conversation flowing with interesting topics. He has lived in Tokyo for 5 years.', voice:'en-US-DavisNeural' },
+  { id:'eng-tourist-help', jp:'道案内', en:'迷子の外国人観光客を助ける', icon:'🗺️', char:'Oliver, a confused but cheerful tourist', charJp:'オリバー — 迷子だけど陽気な観光客', ctx:'A tourist approaches you near a train station in Tokyo, looking lost. Oliver cannot read any signs and needs help finding his hotel. He only speaks English and is very grateful for any help.', voice:'en-GB-RyanNeural' },
+  { id:'eng-hotel', jp:'ホテル受付', en:'海外のホテルでチェックイン', icon:'🏨', char:'Catherine, a precise and professional front desk agent', charJp:'キャサリン — きっちりしたフロント係', ctx:'You are checking into a hotel abroad. Catherine needs to verify your reservation details, explain the hotel facilities, and give you directions to your room. She speaks clearly but uses hotel-specific vocabulary.', voice:'en-US-JennyNeural' },
+  { id:'eng-interview', jp:'面接', en:'外資系企業の英語面接', icon:'💼', char:'David Chen, a hiring manager who asks tricky questions', charJp:'デイビッド・チェン — トリッキーな質問をする面接官', ctx:'You are in an English job interview at an international company. David is friendly but professional, and asks both standard interview questions and some surprising ones. He wants to understand your experience and motivation.', voice:'en-US-GuyNeural' },
+  { id:'eng-airport', jp:'空港', en:'海外の空港で入国審査', icon:'✈️', char:'Officer Martinez, thorough but not unfriendly', charJp:'マルティネス審査官 — 厳格だけど悪い人ではない', ctx:'You are going through immigration at an international airport. Officer Martinez asks about the purpose of your visit, how long you are staying, and where you will be. Direct answers work best.', voice:'en-US-GuyNeural' },
+  { id:'eng-airbnb', jp:'Airbnb', en:'Airbnbのホストとやり取り', icon:'🏠', char:'Sophie, a chatty Airbnb host who loves hosting Japanese guests', charJp:'ソフィー — 日本人ゲスト大好きなAirbnbホスト', ctx:'You have just arrived at your Airbnb. Sophie shows you around, explains the house rules, recommends local restaurants, and asks about your travel plans. She has hosted many Japanese guests before.', voice:'en-GB-SoniaNeural' },
+  { id:'eng-hostel', jp:'ホステル', en:'ホステルのラウンジで友達作り', icon:'🛏️', char:'Luca, a backpacker from Italy who speaks English as a second language too', charJp:'ルカ — 英語が第二言語のイタリア人バックパッカー', ctx:'You are in a hostel common room. Luca starts chatting — his English is not perfect either, which makes you feel more relaxed. He wants to compare travel stories and share tips.', voice:'en-US-DavisNeural' },
+  { id:'eng-doctor', jp:'病院', en:'海外の病院で症状を説明', icon:'🏥', char:'Dr. Williams, a patient and understanding GP', charJp:'ウィリアムズ先生 — 辛抱強くて理解のある医師', ctx:'You are feeling unwell while traveling and visit a local clinic. Dr. Williams needs you to describe your symptoms in English. She speaks slowly and clearly, and asks follow-up questions to understand your condition.', voice:'en-GB-SoniaNeural' },
+  { id:'eng-duty-free', jp:'免税店', en:'空港の免税店でお土産選び', icon:'🛍️', char:'Priya, a sales associate with strong opinions about gifts', charJp:'プリヤ — お土産選びに強いこだわりを持つ店員', ctx:'You are shopping for souvenirs at an airport duty-free shop. Priya asks who the gifts are for and has very specific recommendations. She is curious about omiyage culture in Japan.', voice:'en-US-AriaNeural' },
+  { id:'eng-emergency', jp:'緊急事態', en:'海外で助けを求める', icon:'🆘', char:'Kate, a helpful stranger who stops to help', charJp:'ケイト — たまたま居合わせた親切な人', ctx:'You have lost your wallet while traveling. A kind stranger named Kate stops to help. She helps you figure out what to do — cancel cards, contact the embassy, file a police report. She speaks clearly and patiently.', voice:'en-AU-NatashaNeural' },
+  { id:'eng-cooking', jp:'料理教室', en:'英語の料理教室に参加', icon:'👨‍🍳', char:'Chef Marco, passionate about teaching through food', charJp:'マルコシェフ — 料理を通じて教えることに情熱を注ぐ', ctx:'You have joined an English-language cooking class abroad. Chef Marco explains each step while you cook together. He is interested in Japanese cooking techniques and keeps asking about dashi.', voice:'en-US-GuyNeural' },
+  { id:'eng-bookshop', jp:'洋書店', en:'海外の本屋でおすすめを聞く', icon:'📚', char:'Alice, a bookshop owner who reads three books a week', charJp:'アリス — 週3冊読む本屋のオーナー', ctx:'You are browsing an English bookshop and ask for recommendations. Alice wants to know what genres you like and starts pulling books off shelves faster than you can keep up. She has read everything.', voice:'en-GB-SoniaNeural' },
+  { id:'eng-concert', jp:'コンサート', en:'海外のコンサート会場で隣の人と', icon:'🎵', char:'Jake, who has seen this band seventeen times', charJp:'ジェイク — このバンドを17回見ているファン', ctx:'You are at a concert abroad waiting for the show to start. Jake notices your excitement and starts sharing trivia about the band. He wants to know about the Japanese music scene.', voice:'en-US-DavisNeural' },
+  { id:'eng-gym', jp:'ジム', en:'海外のジムでトレーニング仲間と', icon:'🏋️', char:'Tom, a personal trainer who gives free unsolicited advice', charJp:'トム — 頼んでもいないアドバイスをくれるトレーナー', ctx:'You have joined a gym while abroad. Tom watches your form and cannot help but offer suggestions. He is curious about Japanese fitness culture and martial arts.', voice:'en-AU-WilliamNeural' },
+  // ── American settings (additional) ──
+  { id:'eng-food-truck', jp:'フードトラック', en:'ポートランドのフードトラックで注文', icon:'🌮', char:'Miguel, a food truck owner who explains every ingredient', charJp:'ミゲル — 全材料を説明してくれるフードトラックオーナー', ctx:'You are at a Portland food truck pod with dozens of options. Miguel calls you over and walks you through his fusion menu. He wants to know about Japanese street food and is considering adding takoyaki.', voice:'en-US-DavisNeural' },
+  { id:'eng-uber', jp:'ライドシェア', en:'アメリカでUberに乗る', icon:'🚗', char:'DeShawn, a rideshare driver who moonlights as a comedian', charJp:'デショーン — 副業でコメディアンをしているドライバー', ctx:'Your Uber driver DeShawn is testing new material on you. His jokes require understanding American pop culture references you might not know. He patiently explains each one, which somehow makes them funnier.', voice:'en-US-DavisNeural' },
+  { id:'eng-thrift', jp:'古着屋', en:'アメリカのスリフトストアで掘り出し物', icon:'👕', char:'Jasmine, a vintage clothing expert with an eye for treasure', charJp:'ジャスミン — お宝を見つける達人のヴィンテージ通', ctx:'You are in a massive thrift store feeling overwhelmed. Jasmine notices and starts curating finds for you. She has a theory about what your style says about you and wants to know about Japanese fashion.', voice:'en-US-AriaNeural' },
+  { id:'eng-farmers-market', jp:'ファーマーズマーケット', en:'日曜朝のファーマーズマーケット', icon:'🍎', char:'Frank, an organic farmer who names all his chickens', charJp:'フランク — 鶏に全部名前をつけるオーガニック農家', ctx:'At a Sunday farmers market, Frank is selling eggs and vegetables. He tells you the name of the chicken that laid each egg. He is fascinated by Japanese farming and asks about rice cultivation.', voice:'en-US-GuyNeural' },
+  { id:'eng-laundromat', jp:'コインランドリー', en:'NYのコインランドリーで待ち時間', icon:'🧺', char:'Rosa, a grandmother who has been doing laundry here for 30 years', charJp:'ローザ — 30年通いのおばあちゃん', ctx:'You are waiting for your laundry in a New York laundromat. Rosa takes the seat next to you and immediately starts telling stories about the neighborhood. She offers you homemade cookies from a bag.', voice:'en-US-JennyNeural' },
+  { id:'eng-national-park', jp:'国立公園', en:'アメリカの国立公園でレンジャーと', icon:'🏞️', char:'Ranger Kim, who has seen a lot of tourists do dumb things', charJp:'キム・レンジャー — 観光客の愚行を見尽くした公園レンジャー', ctx:'You are hiking in an American national park. Ranger Kim stops you for a friendly chat about trail safety. She has incredible stories about wildlife encounters and is curious about hiking culture in Japan.', voice:'en-US-AriaNeural' },
+  // ── British settings (additional) ──
+  { id:'eng-museum', jp:'博物館', en:'大英博物館でボランティアガイドと', icon:'🏛️', char:'Harold, a retired professor who volunteers as a museum guide', charJp:'ハロルド — ボランティアガイドの退職教授', ctx:'You are at the British Museum staring at a display. Harold appears beside you and begins explaining the exhibit with the enthusiasm of someone who has waited all day for a curious visitor. He has questions about Japanese museums.', voice:'en-GB-RyanNeural' },
+  { id:'eng-canal', jp:'運河ボート', en:'ロンドンの運河でボートカフェ', icon:'🚤', char:'Gemma, who lives on a narrowboat and runs a floating café', charJp:'ジェマ — ナローボートに住むフローティングカフェのオーナー', ctx:'You have found a café on a canal boat in London. Gemma serves you tea while explaining why she gave up her office job to live on the water. She wants to know about houseboats in Japan.', voice:'en-GB-SoniaNeural' },
+  { id:'eng-corner-shop', jp:'角の商店', en:'イギリスの街角のショップで', icon:'🏪', char:'Raj, a corner shop owner who knows everything happening on the street', charJp:'ラジ — 通りの全てを把握している角の商店主', ctx:'You pop into a corner shop for a snack. Raj is a one-man information centre for the entire neighborhood. He recommends things based on what he thinks you look like you need today.', voice:'en-GB-RyanNeural' },
+  { id:'eng-rainy-bus', jp:'雨のバス停', en:'イギリスのバス停で雨宿り', icon:'🌧️', char:'Margaret, who has perfected the art of complaining about weather', charJp:'マーガレット — 天気への不満を芸術に昇華した女性', ctx:'You are at a British bus stop in the rain. Margaret begins a masterclass in complaining about weather while somehow making it charming. The bus is late, which gives her even more material.', voice:'en-GB-SoniaNeural' },
+  // ── Australian settings (additional) ──
+  { id:'eng-surf', jp:'サーフィン', en:'オーストラリアでサーフィンレッスン', icon:'🏄', char:'Taz, a surf instructor whose vocabulary is 60% slang', charJp:'タズ — 語彙の6割がスラングのサーフインストラクター', ctx:'You have signed up for a surf lesson. Taz uses so much Australian slang that it is basically a second language. He is patient with your surfing but baffled that you do not know what arvo means.', voice:'en-AU-WilliamNeural' },
+  { id:'eng-outback', jp:'アウトバック', en:'オーストラリアの田舎のパブで', icon:'🤠', char:'Bluey, a farmer who drove two hours for a cold beer', charJp:'ブルーイ — ビールのために2時間運転してきた農家', ctx:'You are at a pub in outback Australia. Bluey has driven two hours from his farm for a drink and some human contact. He is thrilled to have someone new to talk to and has endless questions about Japan.', voice:'en-AU-WilliamNeural' },
+  { id:'eng-market-aus', jp:'マーケット', en:'メルボルンのクイーンビクトリアマーケット', icon:'🛒', char:'Nina, a spice vendor who wants you to smell everything', charJp:'ニーナ — 全部匂いを嗅がせたいスパイス売り', ctx:'You are exploring Queen Victoria Market in Melbourne. Nina runs a spice stall and is on a mission to find the perfect spice blend for you. She asks about Japanese spices and is fascinated by shichimi.', voice:'en-AU-NatashaNeural' },
+  // ── Japan-based English practice (additional) ──
+  { id:'eng-lost-phone', jp:'落とし物', en:'外国人が電車にスマホを忘れた', icon:'📱', char:'Chris, a panicking tourist who left his phone on the train', charJp:'クリス — 電車にスマホを忘れてパニック中の観光客', ctx:'A tourist runs up to you at the station in a panic. Chris left his phone on the train and does not know how to talk to station staff. He needs your help navigating the lost-and-found process in English.', voice:'en-US-DavisNeural' },
+  { id:'eng-izakaya-tourists', jp:'居酒屋案内', en:'居酒屋で外国人に注文を助ける', icon:'🏮', char:'Sarah and Mike, a couple trying to order without pictures', charJp:'サラとマイク — 写真なしのメニューに苦戦するカップル', ctx:'A foreign couple at the next table in an izakaya is staring helplessly at a Japanese-only menu. They notice you and ask for help. They want recommendations and have many questions about Japanese food etiquette.', voice:'en-US-JennyNeural' },
+  { id:'eng-temple-guide', jp:'寺ガイド', en:'外国人に英語でお寺を案内', icon:'🛕', char:'Elena, a curious traveler who asks deep questions about Buddhism', charJp:'エレナ — 仏教について深い質問をする好奇心旺盛な旅行者', ctx:'You meet a traveler at a temple who asks if you can explain what she is seeing. Elena asks thoughtful questions about rituals, symbols, and beliefs. Explaining Japanese culture in English is harder than you thought.', voice:'en-US-AriaNeural' },
+  { id:'eng-cowork', jp:'コワーキング', en:'コワーキングスペースで外国人と', icon:'💻', char:'Patrick, a digital nomad who has worked from 30 countries', charJp:'パトリック — 30カ国で仕事してきたデジタルノマド', ctx:'You are at a coworking space and Patrick sits at your table. He is working remotely from Tokyo for a month and wants tips on where to go. He is also curious about Japanese work culture versus Western styles.', voice:'en-GB-RyanNeural' },
+  { id:'eng-bar-quiz', jp:'バークイズ', en:'六本木のバーで英語クイズナイト', icon:'🧠', char:'Yuki, a Japanese quiz master who runs everything in English', charJp:'ユキ — 全て英語で進行するクイズマスター', ctx:'You have joined a pub quiz at a bar in Roppongi. The quizmaster Yuki runs it entirely in English and the questions mix Japanese and Western culture. Your team needs someone who can bridge both worlds.', voice:'en-US-DavisNeural' },
+  { id:'eng-neighbor', jp:'隣人', en:'外国人の新しい隣人に挨拶', icon:'🏠', char:'Alex, who just moved to Japan and is overwhelmed by garbage rules', charJp:'アレックス — ゴミ出しルールに圧倒されている新しい隣人', ctx:'Your new neighbor Alex has just moved to Japan from abroad. They are completely confused by garbage sorting, neighborhood rules, and the mysterious calendar on their door. They need your help badly.', voice:'en-US-AriaNeural' },
+];
+
+function engFallbackScenarios() {
+  const favIds = S.engFavorites.map(f => f.id);
+  const pool = ENG_SCENARIO_POOL.filter(s => !favIds.includes(s.id));
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, 6);
+}
+
+const ENG_SCENARIO_THEMES = [
+  'travel emergencies & logistics', 'food, restaurants & cooking', 'making friends & socializing',
+  'work, interviews & professional life', 'shopping & bargaining', 'health & medical situations',
+  'cultural exchange & explaining Japan', 'sports, hobbies & outdoors', 'accommodation & living abroad',
+  'entertainment, music & nightlife', 'education & campus life', 'family, relationships & celebrations',
+  'transportation & getting around', 'technology & modern life', 'small talk & everyday encounters',
+  'volunteering & community', 'art, museums & galleries', 'nature, wildlife & environment',
+];
+
+function pickEngTheme() {
+  const used = JSON.parse(sessionStorage.getItem('renshuu_used_eng_themes') || '[]');
+  const available = ENG_SCENARIO_THEMES.filter(t => !used.includes(t));
+  const pool = available.length > 0 ? available : ENG_SCENARIO_THEMES;
+  const theme = pool[Math.floor(Math.random() * pool.length)];
+  const next = available.length > 1 ? [...used, theme] : [theme];
+  sessionStorage.setItem('renshuu_used_eng_themes', JSON.stringify(next));
+  return theme;
+}
+
+const ENG_VOICE_MAP = {
+  male_old:    { american:'en-US-GuyNeural',    british:'en-GB-RyanNeural',  australian:'en-AU-WilliamNeural' },
+  male_young:  { american:'en-US-DavisNeural',  british:'en-GB-RyanNeural',  australian:'en-AU-WilliamNeural' },
+  male_adult:  { american:'en-US-GuyNeural',    british:'en-GB-RyanNeural',  australian:'en-AU-WilliamNeural' },
+  female_young:{ american:'en-US-AriaNeural',   british:'en-GB-SoniaNeural', australian:'en-AU-NatashaNeural' },
+  female_adult:{ american:'en-US-JennyNeural',  british:'en-GB-SoniaNeural', australian:'en-AU-NatashaNeural' },
+  female_soft: { american:'en-US-AriaNeural',   british:'en-GB-SoniaNeural', australian:'en-AU-NatashaNeural' },
+};
+
+function buildEngGenPrompt(theme) {
+  return `Generate 6 unique English conversation roleplay scenarios for a Japanese person learning English.
+
+THEME FOCUS for this batch: "${theme}"
+At least 4 of the 6 scenarios should relate to this theme. The other 2 can be wildcard — any setting.
+
+Mix settings: some in Japan (talking to foreigners), some in America, some in UK, some in Australia. Vary character ages, genders, accents, and personality types. Include a mix of: funny, awkward, heartwarming, and stressful situations. Give characters specific quirks, not generic friendliness.
+
+Return ONLY a JSON array where each object has:
+- "id": short kebab-case identifier (prefix with "eng-")
+- "jp": location name in Japanese/katakana (2-6 chars)
+- "en": short description IN JAPANESE (一言で場面を説明)
+- "icon": a single emoji
+- "char": one-line character description in English (name + personality quirk — be specific!)
+- "charJp": same character description in Japanese
+- "ctx": 2-3 sentence scene setup in English, vivid and cinematic
+- "gender": "male_old", "male_young", "male_adult", "female_young", "female_adult", "female_soft"
+- "accent": "american", "british", or "australian"
+
+Think: the opening of a short film. Surprise me.`;
+}
+
+async function generateEngScenarios() {
+  // Try to load cached AI-generated scenarios first
+  const cached = sessionStorage.getItem('renshuu_eng_scenarios_cache');
+  if (cached) {
+    try {
+      const arr = JSON.parse(cached);
+      if (Array.isArray(arr) && arr.length >= 6) {
+        S.engScenarios = arr.slice(0, 6);
+        sessionStorage.removeItem('renshuu_eng_scenarios_cache');
+        sessionStorage.setItem('renshuu_eng_scenarios', JSON.stringify(S.engScenarios));
+        generateAndCacheEngScenarios();
+        return;
+      }
+    } catch (_) {}
+  }
+
+  const theme = pickEngTheme();
+  const maxRetries = 2;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const reply = await claude([{ role: 'user', content: buildEngGenPrompt(theme) }],
+      'You are a creative scenario designer for an English learning app aimed at Japanese speakers. You specialize in vivid, culturally rich scenarios with memorable characters. Output valid JSON only.',
+      2000);
+
+      const parsed = JSON.parse(reply.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
+      if (!Array.isArray(parsed) || parsed.length < 1) throw new Error('Bad format');
+
+      S.engScenarios = parsed.map(s => ({
+        id: s.id || ('eng_' + Math.random().toString(36).slice(2, 8)),
+        jp: s.jp, en: s.en, icon: s.icon || '🎭',
+        char: s.char, charJp: s.charJp || s.char, ctx: s.ctx,
+        voice: ENG_VOICE_MAP[s.gender]?.[s.accent] || ENG_AZURE_VOICES[Math.floor(Math.random() * ENG_AZURE_VOICES.length)],
+      }));
+      sessionStorage.setItem('renshuu_eng_scenarios', JSON.stringify(S.engScenarios));
+      generateAndCacheEngScenarios();
+      return;
+    } catch (e) {
+      console.warn(`English scenario generation attempt ${attempt + 1} failed:`, e);
+      if (attempt === maxRetries) {
+        console.warn('All retries exhausted, using fallback pool');
+        S.engScenarios = engFallbackScenarios();
+      }
+    }
+  }
+}
+
+async function generateAndCacheEngScenarios() {
+  try {
+    const theme = pickEngTheme();
+    const reply = await claude([{ role: 'user', content: buildEngGenPrompt(theme) }],
+    'You are a creative scenario designer for an English learning app aimed at Japanese speakers. You specialize in vivid, culturally rich scenarios with memorable characters. Output valid JSON only.',
+    2000);
+
+    const parsed = JSON.parse(reply.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
+    if (Array.isArray(parsed) && parsed.length >= 1) {
+      const cached = parsed.map(s => ({
+        id: s.id || ('eng_' + Math.random().toString(36).slice(2, 8)),
+        jp: s.jp, en: s.en, icon: s.icon || '🎭',
+        char: s.char, charJp: s.charJp || s.char, ctx: s.ctx,
+        voice: ENG_VOICE_MAP[s.gender]?.[s.accent] || ENG_AZURE_VOICES[Math.floor(Math.random() * ENG_AZURE_VOICES.length)],
+      }));
+      sessionStorage.setItem('renshuu_eng_scenarios_cache', JSON.stringify(cached));
+    }
+  } catch (e) {
+    console.warn('Background English scenario cache generation failed:', e);
+  }
+}
+
+async function refreshEngScenarios() {
+  const grid = document.querySelector('.scenario-grid:last-of-type');
+  if (grid) grid.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">新しいシナリオを生成中…</div>';
+  await generateEngScenarios();
+  if (S.engScenario && !S.engScenarios.find(s => s.id === S.engScenario.id) && !S.engFavorites.find(f => f.id === S.engScenario.id)) {
+    S.engScenario = null;
+    S.engConvo = [];
+  }
+  renderEngRoleplay();
+}
+
+function toggleEngFavorite(id) {
+  const idx = S.engFavorites.findIndex(f => f.id === id);
+  if (idx === -1) {
+    const sc = S.engScenarios.find(s => s.id === id) || ENG_SCENARIO_POOL.find(s => s.id === id);
+    if (sc) {
+      const fav = { ...sc };
+      if (S.engScenario?.id === id && S.engConvo.length) {
+        fav.convo = S.engConvo.map(m => ({ role: m.role, content: m.content, correction: m.correction || undefined }));
+      }
+      S.engFavorites.push(fav);
+    }
+  } else {
+    S.engFavorites.splice(idx, 1);
+  }
+  saveEngFavorites();
+  renderEngRoleplay();
+  if (S.engScenario) scrollChat();
+}
+
+function saveEngFavorites() {
+  localStorage.setItem('renshuu_eng_favorites', JSON.stringify(S.engFavorites));
+}
+
+function saveEngConvoToFavorite() {
+  if (!S.engScenario) return;
+  const fav = S.engFavorites.find(f => f.id === S.engScenario.id);
+  if (fav) {
+    fav.convo = S.engConvo
+      .filter(m => m.content !== '…')
+      .map(m => ({ role: m.role, content: m.content, _id: m._id, correction: m.correction || undefined }));
+    saveEngFavorites();
+  }
+}
+
+function engScCard(sc) {
+  const isFav = S.engFavorites.some(f => f.id === sc.id);
+  const isSel = S.engScenario?.id === sc.id;
+  const visual = S.sierraMode
+    ? `<div class="sc-scene-preview">${renderScene(sc)}</div>`
+    : `<div class="sc-sprite">${getScenarioSprite(sc, 3)}</div>`;
+  return `
+    <div class="scenario-card ${isSel ? 'sel' : ''} ${isFav && !isSel ? 'fav-card' : ''}" onclick="pickEngScenario('${sc.id}')">
+      <button class="sc-fav ${isFav ? 'active' : ''}" onclick="toggleEngFavorite('${sc.id}');event.stopPropagation()" title="${isFav ? 'お気に入り解除' : 'お気に入り登録'}">${IC.star}</button>
+      ${visual}
+      <div class="sc-jp">${sc.jp}</div>
+      <div class="sc-en">${sc.en}</div>
+      <div class="sc-char">${sc.charJp || sc.char}</div>
+    </div>`;
+}
+
+function renderEngRoleplay() {
+  setPageTheme();
+  const m = document.getElementById('mainContent');
+  const favScenarios = S.engFavorites;
+
+  m.innerHTML = `
+    <div>
+      ${favScenarios.length ? `
+        <div class="sc-section-head">
+          <div class="label">★ お気に入り</div>
+        </div>
+        <div class="scenario-grid" style="margin-bottom:18px">
+          ${favScenarios.map(engScCard).join('')}
+        </div>
+      ` : ''}
+      <div class="sc-section-head">
+        <div class="label">シナリオ</div>
+        <button class="btn" style="font-size:10px;padding:4px 10px" onclick="refreshEngScenarios()">${IC.refresh} 更新</button>
+      </div>
+      <div style="color:var(--muted);font-size:11px;margin-bottom:10px">
+        英語で会話の練習をしましょう。AIが英語で返答し、間違いを直してくれます。
+      </div>
+      <div class="scenario-grid">
+        ${S.engScenarios.map(engScCard).join('')}
+      </div>
+    </div>
+
+    ${S.engScenario ? (S.sierraMode ? `
+      <div class="rpg-frame">
+        <div class="rpg-scene">
+          ${renderScene(S.engScenario)}
+          <div class="rpg-scene-label">${S.engScenario.jp} — ${S.engScenario.en}</div>
+        </div>
+        <div class="rpg-dialogue-wrap">
+          <div class="rpg-head">
+            <div class="label">${escHtml(S.engScenario.charJp || S.engScenario.char)}</div>
+            <button class="btn" onclick="resetEngChat()">リセット</button>
+          </div>
+          <div class="rpg-dialogue" id="chatWin">${renderEngMessages()}</div>
+          <div class="rpg-input-area">
+            <textarea class="rpg-input" id="chatIn" rows="1"
+              placeholder="英語で入力… (日本語でもOK)"
+              oninput="autoGrowInput(this)"
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendEngMsg()}"
+            ></textarea>
+            <button class="rpg-send" id="sendBtn" onclick="sendEngMsg()">${IC.send}</button>
+          </div>
+          <div class="rpg-tip">Enterで送信 · Shift+Enterで改行</div>
+        </div>
+      </div>
+    ` : `
+      <div class="chat-wrap">
+        <div class="chat-head">
+          <div class="label">${S.engScenario.jp} — ${S.engScenario.en}</div>
+          <button class="btn" onclick="resetEngChat()">リセット</button>
+        </div>
+        <div class="chat-window" id="chatWin">${renderEngMessages()}</div>
+        <div class="chat-foot">
+          <textarea class="chat-input" id="chatIn" rows="1"
+            placeholder="英語で入力… (日本語でもOK)"
+            oninput="autoGrowInput(this)"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendEngMsg()}"
+          ></textarea>
+          <button class="send-btn" id="sendBtn" onclick="sendEngMsg()">${IC.send}</button>
+        </div>
+        <div class="chat-tip">Enterで送信 · Shift+Enterで改行</div>
+      </div>
+    `) : ''}
+  `;
+
+  scrollChat();
+}
+
+function renderEngMessages() {
+  if (!S.engConvo.length) {
+    return S.sierraMode
+      ? '<div style="color:#4a4a6a;font-size:12px;margin:auto;text-align:center;font-family:Nunito Sans,sans-serif">準備中…</div>'
+      : '<div style="color:var(--muted);font-size:12px;margin:auto;text-align:center">準備中…</div>';
+  }
+  return S.engConvo.map((msg, i) => {
+    const isReal = msg.role === 'assistant' && msg.content && msg.content !== '…';
+    const body = msg.role === 'assistant'
+      ? (msg.display || safeAnnotated(buildAnnotated(msg.content)))
+      : (msg.display || escHtml(msg.content));
+    const nextMsg = S.engConvo[i + 1];
+    const correctionHere = msg.role === 'user' && nextMsg?.correction
+      ? `<div class="msg-correction">↳ ${formatCorrection(nextMsg.correction)}</div>` : '';
+    const hasBd = isReal && msg.breakdown;
+
+    if (S.sierraMode) {
+      const portraitHtml = msg.role === 'assistant' && S.engScenario
+        ? `<div class="rpg-portrait-frame">${renderPortrait(S.engScenario)}</div>` : '';
+      const charName = S.engScenario ? escHtml((S.engScenario.charJp || S.engScenario.char).split(/[,—]/)[0].trim()) : '';
+      const nameHtml = msg.role === 'assistant'
+        ? `<div class="rpg-name">${charName}</div>`
+        : `<div class="rpg-name">あなた</div>`;
+      return `
+        <div class="rpg-msg msg ${msg.role}${hasBd ? ' has-breakdown' : ''}">
+          ${portraitHtml}
+          <div class="rpg-bubble">
+            ${nameHtml}
+            <div class="msg-body">${body}</div>
+            ${correctionHere}
+            ${isReal ? `
+            <div class="msg-foot rpg-foot">
+              <button class="speak-btn" data-mi="${i}" title="読み上げ">${IC.volume}</button>
+              <button class="breakdown-btn" data-mi="${i}" title="文法解説">${IC.book}</button>
+            </div>
+            <div class="audio-player" id="ap-${i}" style="display:none">
+              <button class="ap-btn" data-ap="${i}" title="再生/一時停止">${IC.play}</button>
+              <div class="ap-track" data-ap-track="${i}"><div class="ap-fill"></div></div>
+              <span class="ap-time">0:00</span>
+            </div>` : ''}
+            ${hasBd ? `<div class="msg-breakdown">${msg.breakdown}</div>` : ''}
+          </div>
+        </div>`;
+    }
+
+    // Classic style
+    const avatarHtml = msg.role === 'assistant' && S.engScenario
+      ? `<div class="msg-avatar">${getScenarioSprite(S.engScenario, 2)}</div>` : '';
+    const inner = `
+        <div class="msg-inner">
+          <div class="msg-body">${body}</div>
+          ${correctionHere}
+          ${isReal ? `
+          <div class="msg-foot">
+            <button class="speak-btn" data-mi="${i}" title="読み上げ">${IC.volume}</button>
+            <button class="breakdown-btn" data-mi="${i}" title="文法解説">${IC.book}</button>
+          </div>
+          <div class="audio-player" id="ap-${i}" style="display:none">
+            <button class="ap-btn" data-ap="${i}" title="再生/一時停止">${IC.play}</button>
+            <div class="ap-track" data-ap-track="${i}"><div class="ap-fill"></div></div>
+            <span class="ap-time">0:00</span>
+          </div>` : ''}
+        </div>
+        ${hasBd ? `<div class="msg-breakdown">${msg.breakdown}</div>` : ''}`;
+    return `
+      <div class="msg ${msg.role}${hasBd ? ' has-breakdown' : ''}">
+        ${avatarHtml}
+        ${msg.role === 'assistant' ? `<div class="msg-main">${inner}</div>` : inner}
+      </div>`;
+  }).join('');
+}
+
+function pickEngScenario(id) {
+  const fav = S.engFavorites.find(f => f.id === id);
+  if (fav && fav.convo && fav.convo.length) {
+    S.engScenario = fav;
+    S.engConvo = fav.convo;
+    renderEngRoleplay();
+    buildEngSysPrompt(S.engScenario);
+    scrollChat();
+    return;
+  }
+  S.engScenario = S.engScenarios.find(s => s.id === id) || S.engFavorites.find(f => f.id === id) || ENG_SCENARIO_POOL.find(s => s.id === id) || null;
+  S.engConvo = [];
+  renderEngRoleplay();
+  startEngChat();
+}
+
+function resetEngChat() {
+  S.engConvo = [];
+  renderEngRoleplay();
+  startEngChat();
+}
+
+function buildEngSysPrompt(sc) {
+  S.engSysPrompt = `You are playing the role of ${sc.char}. Context: ${sc.ctx}
+
+Rules:
+1. Respond in English only. IMPORTANT: Vary your reply length naturally — sometimes short (one word, a question, a brief reaction), sometimes 2–3 sentences. Do NOT always write the same length. Sound natural and conversational.
+2. Stay in character. Ask natural follow-up questions (but not every single turn — sometimes just react).
+3. Keep your English at a natural but accessible level for a beginner-intermediate Japanese learner. Avoid overly complex vocabulary or rare idioms unless they fit the character. Use common, everyday English.
+4. After your English response, if the student made errors in their MOST RECENT message ONLY (grammar, vocabulary, spelling, word order, unnatural phrasing, article usage, preposition mistakes, tense errors), add: [Correction: explain in Japanese what was wrong, what it should be, and briefly why. Cover every mistake in that message — don't skip any. Be specific: show wrong text → correct text. Use numbered points (1. 2. 3.) for multiple errors. Do NOT correct errors from earlier messages — only the latest one. Write the explanation entirely in Japanese. Example: "1. I go to school yesterday → I went to school yesterday（過去の出来事なので過去形 went を使います）"]
+5. Mark EVERY English word with [[word|カタカナ読み|日本語訳]] pipe markers. Include articles, prepositions, pronouns, and common words. Every single word must be annotated — do NOT leave any word unmarked. Example: [[Hello|ハロー|こんにちは]]! [[How|ハウ|どのように]] [[are|アー|〜です]] [[you|ユー|あなた]] [[doing|ドゥーイング|している]] [[today|トゥデイ|今日]]?
+6. The student may write in Japanese or broken English — understand their intent and respond naturally in English. Only correct actual English mistakes in the [Correction:] block, not Japanese input.
+7. If the student writes entirely in Japanese, that is fine — understand it and continue the conversation in English. Gently encourage them to try English by keeping your responses simple and inviting.`;
+}
+
+async function startEngChat() {
+  const chatWin = document.getElementById('chatWin');
+  if (!chatWin) return;
+  chatWin.innerHTML = '<div class="loading-row"><span class="spin"></span> シーンを準備中…</div>';
+
+  const sc = S.engScenario;
+  buildEngSysPrompt(sc);
+
+  try {
+    const opening = await claude(
+      [{ role: 'user', content: '[Open the scenario with a natural, brief English greeting or question — 1–2 sentences only. Remember to annotate every English word with [[word|katakana|japanese]] markers.]' }],
+      S.engSysPrompt
+    );
+    S.engConvo = [{ role: 'assistant', content: opening, _id: msgId() }];
+    updateEngChat();
+    saveEngConvoToFavorite();
+  } catch (e) {
+    chatWin.innerHTML = `<div style="color:var(--red);font-size:12px">エラー: ${e.message}</div>`;
+  }
+}
+
+function updateEngChat() {
+  const chatWin = document.getElementById('chatWin');
+  if (!chatWin) return;
+  chatWin.innerHTML = renderEngMessages();
+  restoreAudioPlayer();
+  scrollChat();
+}
+
+async function sendEngMsg() {
+  const inp = document.getElementById('chatIn');
+  const sendBtn = document.getElementById('sendBtn');
+  const raw = inp?.value.trim();
+  if (!raw) return;
+
+  inp.value = '';
+  inp.style.height = 'auto';
+  if (sendBtn) sendBtn.disabled = true;
+
+  S.engConvo.push({ role: 'user', content: raw, display: escHtml(raw), _id: msgId() });
+  S.engConvo.push({ role: 'assistant', content: '…', display: '<span class="spin"></span>', _id: 'spinner' });
+  updateEngChat();
+
+  try {
+    const msgs = S.engConvo
+      .filter(m => m.content !== '…')
+      .map(m => ({ role: m.role, content: m.content }));
+
+    const reply = await claude(msgs, S.engSysPrompt);
+
+    // Parse optional [Correction: ...] — greedy match to final ]
+    const corrRx = /\[Corrections?:\s*([\s\S]*?)\]?\s*$/i;
+    const corrMatch = reply.match(corrRx);
+    const clean = reply.replace(corrRx, '').trim();
+    const correction = corrMatch ? corrMatch[1].replace(/\[\[([^\[\]|]+)\|[^\[\]]+\]\]/g, '$1').trim() : null;
+
+    // Replace spinner
+    S.engConvo.pop();
+    S.engConvo.push({ role: 'assistant', content: clean, correction, _id: msgId() });
+    updateEngChat();
+    saveEngConvoToFavorite();
+  } catch (e) {
+    S.engConvo.pop();
+    S.engConvo.push({ role: 'assistant', content: `Error: ${e.message}`, display: `<span style="color:var(--red)">${escHtml(e.message)}</span>`, _id: msgId() });
+    updateEngChat();
+  }
+
+  const newSend = document.getElementById('sendBtn');
+  if (newSend) newSend.disabled = false;
+  const newInp = document.getElementById('chatIn');
+  if (newInp) newInp.focus();
+}
+
+// ── English TTS ──────────────────────────────────────────────────────────
+
+async function speakEnglish(rawText, btn, msgIdx) {
+  // Normalize undefined → null so guards like (_currentMsgId !== msgIdx) work consistently
+  if (msgIdx == null) msgIdx = null;
+  // Toggle play if already loaded for this message
+  if (msgIdx != null && _currentMsgId === msgIdx && _currentAudio) {
+    if (_currentAudio.paused) {
+      _currentAudio.play();
+      const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
+      if (apBtn) { apBtn.innerHTML = IC.pause; apBtn.classList.add('playing'); }
+      btn?.classList.add('speaking');
+      updatePlayer(msgIdx);
+    } else {
+      _currentAudio.pause();
+      const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
+      if (apBtn) { apBtn.innerHTML = IC.play; apBtn.classList.remove('playing'); }
+      btn?.classList.remove('speaking');
+    }
+    return;
+  }
+
+  cancelSpeech();
+  const text = stripMarkers(rawText);
+  if (!text.trim()) return;
+  _currentMsgId = msgIdx != null ? msgIdx : null;
+
+  // ── Azure Speech (premium) ──
+  if (window.SpeechSDK) {
+    btn?.classList.add('speaking');
+    try {
+      const az = await fetch('/.netlify/functions/azure-token').then(r => r.json());
+      if (az.error) throw new Error(az.error);
+      const cfg = SpeechSDK.SpeechConfig.fromAuthorizationToken(az.token, az.region);
+      const voiceName = S.engScenario?.voice || 'en-US-JennyNeural';
+      const lang = voiceName.startsWith('en-GB') ? 'en-GB' : voiceName.startsWith('en-AU') ? 'en-AU' : 'en-US';
+      cfg.speechSynthesisLanguage = lang;
+      cfg.speechSynthesisVoiceName = voiceName;
+      const speed = parseInt(localStorage.getItem('renshuu_speech_speed') || '100', 10);
+      const offset = speed - 100;
+      const rate = (offset >= 0 ? '+' : '') + offset + '%';
+      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${lang}">
+        <voice name="${voiceName}">
+          <prosody rate="${rate}">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</prosody>
+        </voice>
+      </speak>`;
+      const synth = new SpeechSDK.SpeechSynthesizer(cfg, null);
+      _azureSynth = synth;
+      const wordBounds = [];
+      synth.wordBoundary = (s, e) => {
+        wordBounds.push({ ms: e.audioOffset / 10000, text: e.text, ssmlOffset: e.textOffset, len: e.wordLength });
+      };
+      synth.speakSsmlAsync(ssml,
+        result => {
+          if (_currentMsgId !== msgIdx) { synth.close(); return; }
+          if (result.reason === SpeechSDK.ResultReason.SynthesizingAudioCompleted && result.audioData) {
+            const blob = new Blob([result.audioData], { type: 'audio/wav' });
+            const audio = new Audio(URL.createObjectURL(blob));
+            _currentAudio = audio;
+            audio.onended = audio.onerror = () => {
+              btn?.classList.remove('speaking');
+              if (_wordMap) _wordMap.forEach(m => m.el.classList.remove('w-active'));
+              if (msgIdx != null) {
+                const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
+                if (apBtn) { apBtn.innerHTML = IC.play; apBtn.classList.remove('playing'); }
+                updatePlayer(msgIdx);
+              } else { _currentAudio = null; }
+            };
+            // Build word map for karaoke highlighting
+            if (msgIdx != null && wordBounds.length) {
+              let plainPos = 0;
+              wordBounds.forEach(wb => {
+                const wbText = wb.text.trim();
+                const idx = text.indexOf(wbText, plainPos);
+                if (idx !== -1) { wb.plainOffset = idx; wb.plainLen = wbText.length; plainPos = idx + wbText.length; }
+                else {
+                  const fallback = text.indexOf(wbText);
+                  if (fallback !== -1) { wb.plainOffset = fallback; wb.plainLen = wbText.length; }
+                  else { wb.plainOffset = plainPos; wb.plainLen = wbText.length; }
+                }
+              });
+              _wordBounds = wordBounds;
+              const msgBody = document.getElementById('ap-' + msgIdx)?.closest('.msg')?.querySelector('.msg-body');
+              if (msgBody) _wordMap = buildWordMap(msgBody);
+            }
+            if (msgIdx != null) {
+              const player = document.getElementById('ap-' + msgIdx);
+              if (player) player.style.display = 'flex';
+              const apBtn = document.querySelector(`.ap-btn[data-ap="${msgIdx}"]`);
+              if (apBtn) { apBtn.innerHTML = IC.pause; apBtn.classList.add('playing'); }
+            }
+            audio.play();
+            if (msgIdx != null) updatePlayer(msgIdx);
+          } else { btn?.classList.remove('speaking'); }
+          synth.close();
+          _azureSynth = null;
+        },
+        err => {
+          if (_currentMsgId !== msgIdx) { synth.close(); return; }
+          console.warn('Azure English TTS failed, falling back to Web Speech:', err);
+          synth.close(); _azureSynth = null;
+          speakEnglishWebSpeech(text, btn);
+        }
+      );
+    } catch (e) {
+      console.warn('Azure English TTS error, falling back:', e);
+      speakEnglishWebSpeech(text, btn);
+    }
+    return;
+  }
+
+  // ── Web Speech (fallback) ──
+  speakEnglishWebSpeech(text, btn);
+}
+
+function speakEnglishWebSpeech(text, btn) {
+  if (!window.speechSynthesis) return;
+  const trySpeak = () => {
+    const voices = speechSynthesis.getVoices();
+    const engVoice =
+      voices.find(v => v.lang === 'en-US' && v.localService) ||
+      voices.find(v => v.lang.startsWith('en') && v.localService) ||
+      voices.find(v => v.lang.startsWith('en'));
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = 'en-US';
+    const speed = parseInt(localStorage.getItem('renshuu_speech_speed') || '100', 10);
+    utt.rate = speed / 100;
+    if (engVoice) utt.voice = engVoice;
+    btn?.classList.add('speaking');
+    utt.onend = utt.onerror = () => btn?.classList.remove('speaking');
+    speechSynthesis.speak(utt);
+  };
+  if (speechSynthesis.getVoices().length) trySpeak();
+  else { speechSynthesis.onvoiceschanged = () => { speechSynthesis.onvoiceschanged = null; trySpeak(); }; }
+}
+
+// ── English Grammar Breakdown (explained in Japanese) ────────────────────
+
+async function breakdownEngMessage(msg, btn, mi) {
+  // Toggle off if already shown
+  if (msg.breakdown) {
+    delete msg.breakdown;
+    updateEngChat();
+    return;
+  }
+
+  btn.classList.add('active');
+  btn.innerHTML = IC.loader;
+
+  const plain = stripMarkers(msg.content);
+  try {
+    const reply = await claude([
+      { role: 'user', content: `以下の英語のメッセージを初中級レベルの日本人学習者向けに分析してください。
+
+以下の形式を正確に使ってください（見出しもこの通りに）：
+
+翻訳:
+[自然な日本語訳]
+
+分析:
+[各文について以下の形式で:]
+
+文: [英文]
+意味: [日本語訳]
+語彙: [重要な単語・表現（日本語で説明）、・で箇条書き]
+文法: [文法ポイント（日本語で説明）、・で箇条書き]
+
+簡潔にまとめてください。メッセージ:
+${plain}` }
+    ], 'あなたは英語教師です。日本語話者の生徒に向けて、英語の文法や表現を日本語でわかりやすく説明してください。', 1500);
+
+    const html = formatEngBreakdown(reply);
+    msg.breakdown = html;
+  } catch (err) {
+    msg.breakdown = `<span style="color:var(--red)">エラー: ${escHtml(err.message)}</span>`;
+  }
+
+  const chatWin = document.getElementById('chatWin');
+  if (chatWin) {
+    chatWin.innerHTML = renderEngMessages();
+    restoreAudioPlayer();
+    const bdEl = chatWin.querySelector(`[data-mi="${mi}"]`)?.closest('.msg')?.querySelector('.msg-breakdown');
+    if (bdEl) bdEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+function formatEngBreakdown(text) {
+  const clean = text.replace(/\*\*/g, '');
+  const lines = clean.split('\n');
+  const parts = [];
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || line === '---') continue;
+    const stripped = line.replace(/^#{1,3}\s*/, '');
+    if (/^翻訳:/i.test(stripped)) {
+      const content = stripped.replace(/^翻訳:\s*/i, '').trim();
+      parts.push(`<div class="bd-heading">翻訳</div>`);
+      if (content) parts.push(`<div class="bd-item">${escHtml(content)}</div>`);
+    } else if (/^分析:/i.test(stripped)) {
+      parts.push(`<div class="bd-heading" style="margin-top:8px">分析</div>`);
+    } else if (/^文:/i.test(stripped)) {
+      parts.push(`<div class="bd-sentence">${escHtml(stripped.replace(/^文:\s*/i, ''))}</div>`);
+    } else if (/^意味:/i.test(stripped)) {
+      parts.push(`<div class="bd-meaning">${escHtml(stripped.replace(/^意味:\s*/i, ''))}</div>`);
+    } else if (/^語彙:/i.test(stripped)) {
+      const content = stripped.replace(/^語彙:\s*/i, '').trim();
+      parts.push(`<div class="bd-label">語彙</div>`);
+      if (content) parts.push(`<div class="bd-item">${escHtml(content)}</div>`);
+    } else if (/^文法:/i.test(stripped)) {
+      const content = stripped.replace(/^文法:\s*/i, '').trim();
+      parts.push(`<div class="bd-label">文法</div>`);
+      if (content) parts.push(`<div class="bd-item">${escHtml(content)}</div>`);
+    } else {
+      const bulletText = line.replace(/^[・•\-\*]\s*/, '');
+      const last = parts.length - 1;
+      if (last >= 0 && parts[last].includes('bd-item')) {
+        parts[last] = parts[last].replace(/<\/div>$/, `<br>${escHtml(bulletText)}</div>`);
+      } else {
+        parts.push(`<div class="bd-item">${escHtml(bulletText)}</div>`);
+      }
+    }
+  }
+  return parts.join('');
+}
+
+// ── RPG WORLD ENGINE ─────────────────────────────────────────────────────────
+// Sierra-style overworld: canvas-based, 320×200 virtual resolution scaled up
+(function() {
+  const VIRT_W = 320, VIRT_H = 200;
+  const TILE = 8; // 8px tiles in virtual space
+  const MAP_W = 80, MAP_H = 50; // map in tiles (640×400 pixels → scaled to 320×200)
+  // But we render at 320×200 and let CSS scale
+
+  // ── Player sprite (16×24 with walk frames) ──
+  // 4 directions × 3 frames (stand, walk1, walk2)
+  // Encoded as pixel rows: S=skin, H=hair, B=shirt(blue), P=pants, s=shoe, .=transparent
+  // ── Player sprite — dark hair, glasses, stubble, charcoal blazer ──
+  // G=glasses frame, J=stubble/jaw, B=blazer, b=black shirt
+  const PLAYER_FRAMES = {
+    down: [
+      [
+        '......HHHH......',
+        '....HHHHHHHHH...',
+        '....HSSSSSSH....',
+        '....HSGGSGGSH...',
+        '....HGEEGGEGH...',
+        '....HGSSGSSGH...',
+        '....HSSSSnSSH...',
+        '....HJJJJJJH....',
+        '....HJJmmJJH....',
+        '....HJJJJJJH....',
+        '.....JJJJJJ.....',
+        '....BBbbbbBB....',
+        '....BBBBBBBB....',
+        '...BBBBBBBBBB...',
+        '...BBBBBBBBBB...',
+        '....BBBBBBBB....',
+        '....BBbbbbBB....',
+        '....PPPPPPPP....',
+        '....PPPPPPPP....',
+        '....PPPPPPPP....',
+        '....PP....PP....',
+        '....PP....PP....',
+        '...sss...sss....',
+        '...sss...sss....',
+      ],
+      [
+        '......HHHH......',
+        '....HHHHHHHHH...',
+        '....HSSSSSSH....',
+        '....HSGGSGGSH...',
+        '....HGEEGGEGH...',
+        '....HGSSGSSGH...',
+        '....HSSSSnSSH...',
+        '....HJJJJJJH....',
+        '....HJJmmJJH....',
+        '....HJJJJJJH....',
+        '.....JJJJJJ.....',
+        '....BBbbbbBB....',
+        '....BBBBBBBB....',
+        '...BBBBBBBBBB...',
+        '...BBBBBBBBBB...',
+        '....BBBBBBBB....',
+        '....BBbbbbBB....',
+        '....PPPPPPPP....',
+        '...PPP....PP....',
+        '..PPP.....PP....',
+        '..PP......PP....',
+        '..sss.....PP....',
+        '..sss....sss....',
+        '.........sss....',
+      ],
+      [
+        '......HHHH......',
+        '....HHHHHHHHH...',
+        '....HSSSSSSH....',
+        '....HSGGSGGSH...',
+        '....HGEEGGEGH...',
+        '....HGSSGSSGH...',
+        '....HSSSSnSSH...',
+        '....HJJJJJJH....',
+        '....HJJmmJJH....',
+        '....HJJJJJJH....',
+        '.....JJJJJJ.....',
+        '....BBbbbbBB....',
+        '....BBBBBBBB....',
+        '...BBBBBBBBBB...',
+        '...BBBBBBBBBB...',
+        '....BBBBBBBB....',
+        '....BBbbbbBB....',
+        '....PPPPPPPP....',
+        '....PP....PPP...',
+        '....PP.....PPP..',
+        '....PP......PP..',
+        '....PP.....sss..',
+        '....sss....sss..',
+        '....sss.........',
+      ],
+    ],
+    up: [
+      [
+        '......HHHH......',
+        '....HHHHHHHHH...',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '.....HHHHHH.....',
+        '....BBBBBBBB....',
+        '....BBBBBBBB....',
+        '...BBBBBBBBBB...',
+        '...BBBBBBBBBB...',
+        '....BBBBBBBB....',
+        '....BBBBBBBB....',
+        '....PPPPPPPP....',
+        '....PPPPPPPP....',
+        '....PPPPPPPP....',
+        '....PP....PP....',
+        '....PP....PP....',
+        '...sss...sss....',
+        '...sss...sss....',
+      ],
+      [
+        '......HHHH......',
+        '....HHHHHHHHH...',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '.....HHHHHH.....',
+        '....BBBBBBBB....',
+        '....BBBBBBBB....',
+        '...BBBBBBBBBB...',
+        '...BBBBBBBBBB...',
+        '....BBBBBBBB....',
+        '....BBBBBBBB....',
+        '....PPPPPPPP....',
+        '...PPP....PP....',
+        '..PPP.....PP....',
+        '..PP......PP....',
+        '..sss.....PP....',
+        '..sss....sss....',
+        '.........sss....',
+      ],
+      [
+        '......HHHH......',
+        '....HHHHHHHHH...',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '....HHHHHHHH....',
+        '.....HHHHHH.....',
+        '....BBBBBBBB....',
+        '....BBBBBBBB....',
+        '...BBBBBBBBBB...',
+        '...BBBBBBBBBB...',
+        '....BBBBBBBB....',
+        '....BBBBBBBB....',
+        '....PPPPPPPP....',
+        '....PP....PPP...',
+        '....PP.....PPP..',
+        '....PP......PP..',
+        '....PP.....sss..',
+        '....sss....sss..',
+        '....sss.........',
+      ],
+    ],
+    left: [
+      [
+        '......HHHH......',
+        '....HHHHHHHH....',
+        '....HSSSGHH.....',
+        '....HSSSSGH.....',
+        '....HGEESGH.....',
+        '....HG.SSGH.....',
+        '....HSSSnSH.....',
+        '....HJJJJH......',
+        '....HJmJJH......',
+        '....HJJJJH......',
+        '....JJJJJJ......',
+        '....bBBBBBB.....',
+        '....BBBBBBB.....',
+        '...BBBBBBBBB....',
+        '...BBBBBBBBB....',
+        '....BBBBBBB.....',
+        '....BBBBBBB.....',
+        '....PPPPPPP.....',
+        '....PPPPPPP.....',
+        '....PPPPPPP.....',
+        '....PPP.PPP.....',
+        '....PPP.PPP.....',
+        '...sss..sss.....',
+        '...sss..sss.....',
+      ],
+      [
+        '......HHHH......',
+        '....HHHHHHHH....',
+        '....HSSSGHH.....',
+        '....HSSSSGH.....',
+        '....HGEESGH.....',
+        '....HG.SSGH.....',
+        '....HSSSnSH.....',
+        '....HJJJJH......',
+        '....HJmJJH......',
+        '....HJJJJH......',
+        '....JJJJJJ......',
+        '....bBBBBBB.....',
+        '....BBBBBBB.....',
+        '...BBBBBBBBB....',
+        '...BBBBBBBBB....',
+        '....BBBBBBB.....',
+        '....BBBBBBB.....',
+        '...PPPPPPPP.....',
+        '..PPPPPPPP......',
+        '..PPPP.PPP......',
+        '..sss..PPP......',
+        '..sss..sss......',
+        '.......sss......',
+        '................',
+      ],
+      [
+        '......HHHH......',
+        '....HHHHHHHH....',
+        '....HSSSGHH.....',
+        '....HSSSSGH.....',
+        '....HGEESGH.....',
+        '....HG.SSGH.....',
+        '....HSSSnSH.....',
+        '....HJJJJH......',
+        '....HJmJJH......',
+        '....HJJJJH......',
+        '....JJJJJJ......',
+        '....bBBBBBB.....',
+        '....BBBBBBB.....',
+        '...BBBBBBBBB....',
+        '...BBBBBBBBB....',
+        '....BBBBBBB.....',
+        '....BBBBBBB.....',
+        '....PPPPPPPP....',
+        '....PPPPPPPP....',
+        '....PPP.PPPP....',
+        '....PPP..sss....',
+        '....sss..sss....',
+        '....sss.........',
+        '................',
+      ],
+    ],
+    right: [
+      [
+        '......HHHH......',
+        '......HHHHHHHH..',
+        '.....HHGSSSSH...',
+        '.....HGSSSSH....',
+        '.....HGSEEGH....',
+        '.....HGSS.GH....',
+        '.....HSnSSSH....',
+        '......HJJJJH....',
+        '......HJJmJH....',
+        '......HJJJJH....',
+        '......JJJJJJ....',
+        '.....BBBBBBb....',
+        '.....BBBBBBB....',
+        '....BBBBBBBBB...',
+        '....BBBBBBBBB...',
+        '.....BBBBBBB....',
+        '.....BBBBBBB....',
+        '.....PPPPPPP....',
+        '.....PPPPPPP....',
+        '.....PPPPPPP....',
+        '.....PPP.PPP....',
+        '.....PPP.PPP....',
+        '.....sss..sss...',
+        '.....sss..sss...',
+      ],
+      [
+        '......HHHH......',
+        '......HHHHHHHH..',
+        '.....HHGSSSSH...',
+        '.....HGSSSSH....',
+        '.....HGSEEGH....',
+        '.....HGSS.GH....',
+        '.....HSnSSSH....',
+        '......HJJJJH....',
+        '......HJJmJH....',
+        '......HJJJJH....',
+        '......JJJJJJ....',
+        '.....BBBBBBb....',
+        '.....BBBBBBB....',
+        '....BBBBBBBBB...',
+        '....BBBBBBBBB...',
+        '.....BBBBBBB....',
+        '.....BBBBBBB....',
+        '.....PPPPPPPP...',
+        '......PPPPPPPP..',
+        '......PPP.PPPP..',
+        '......PPP..sss..',
+        '......sss..sss..',
+        '.......sss......',
+        '................',
+      ],
+      [
+        '......HHHH......',
+        '......HHHHHHHH..',
+        '.....HHGSSSSH...',
+        '.....HGSSSSH....',
+        '.....HGSEEGH....',
+        '.....HGSS.GH....',
+        '.....HSnSSSH....',
+        '......HJJJJH....',
+        '......HJJmJH....',
+        '......HJJJJH....',
+        '......JJJJJJ....',
+        '.....BBBBBBb....',
+        '.....BBBBBBB....',
+        '....BBBBBBBBB...',
+        '....BBBBBBBBB...',
+        '.....BBBBBBB....',
+        '.....BBBBBBB....',
+        '....PPPPPPPP....',
+        '....PPPPPPPP....',
+        '....PPPP.PPP....',
+        '....sss..PPP....',
+        '....sss..sss....',
+        '.........sss....',
+        '................',
+      ],
+    ],
+  };
+
+  const PLAYER_COLORS = {
+    '.': null,
+    'S': '#E8C098',   // fair skin
+    'H': '#2A1808',   // dark brown hair
+    'G': '#6B4226',   // tortoiseshell glasses
+    'E': '#1A0800',   // eyes
+    'n': '#C88860',   // nose
+    'm': '#8B4040',   // mouth
+    'J': '#C8A070',   // stubble/jaw
+    'B': '#3A3A42',   // charcoal blazer
+    'b': '#1A1A22',   // black shirt
+    'P': '#2A2A3A',   // dark pants
+    's': '#1A1A1A',   // black shoes
+  };
+
+  // ── Town map (rendered as colored rectangles on canvas) ──
+  // Ground layer + buildings + decorations
+  // Map is 320×200 virtual pixels
+  // ── Zone-based world: each zone is one 320×200 screen ──
+  // Zone 0 = favorites, zone -1 = can't go further left
+  // Walking right generates new zones from scenario pool.
+
+  // Building slot templates — 4 top slots, 4 bottom slots per zone
+  // Each slot: { x, y, w, h } for the building footprint
+  const BSLOTS_TOP = [
+    { x: 8,   y: 72, w: 50, h: 38 },
+    { x: 68,  y: 74, w: 56, h: 36 },
+    { x: 182, y: 74, w: 52, h: 36 },
+    { x: 248, y: 70, w: 60, h: 40 },
+  ];
+  const BSLOTS_BOT = [
+    { x: 10,  y: 142, w: 48, h: 36 },
+    { x: 68,  y: 142, w: 48, h: 36 },
+    { x: 182, y: 142, w: 52, h: 36 },
+    { x: 248, y: 142, w: 64, h: 40 },
+  ];
+  const NPC_TOP_Y = 108, NPC_BOT_Y = 135;
+
+  // Building color palettes (randomized per building)
+  const BLDG_PALETTES = [
+    { fill: '#3A2A1A', roof: '#8A2020' },  // dark wood / red roof
+    { fill: '#C8B898', roof: '#5A4830' },  // beige / brown roof
+    { fill: '#E8E8DD', roof: '#228844' },  // white / green roof
+    { fill: '#D8C8A0', roof: '#4A3A2A' },  // cream / dark roof
+    { fill: '#5A4038', roof: '#3A2A1A' },  // dark brown
+    { fill: '#C8B080', roof: '#6A5030' },  // tan / brown
+    { fill: '#2A1A0A', roof: '#1A1008' },  // very dark (izakaya)
+    { fill: '#D0C0A0', roof: '#6A4A30' },  // light wood
+    { fill: '#B8A888', roof: '#4A3A28' },  // stone
+    { fill: '#E0D0B0', roof: '#3A6828' },  // pale / green roof
+  ];
+
+  // Shared backdrop elements (sky, ground, road) for any zone
+  function baseBackdrop(seed) {
+    // Use seed to vary mountains/clouds slightly
+    const mOff = (seed * 37) % 40;
+    return [
+      { x: 0, y: 0, w: 320, h: 70, fill: '#4A78AA', type: 'sky' },
+      { x: (0 + mOff) % 60, y: 30, w: 60, h: 40, fill: '#5A7A5A', type: 'mountain' },
+      { x: (40 + mOff) % 320, y: 20, w: 80, h: 50, fill: '#4A6A4A', type: 'mountain' },
+      { x: (130 + mOff) % 320, y: 35, w: 50, h: 35, fill: '#5A7A5A', type: 'mountain' },
+      { x: (200 + mOff * 2) % 320, y: 25, w: 70, h: 45, fill: '#4A6A4A', type: 'mountain' },
+      { x: (260 + mOff) % 320, y: 35, w: 70, h: 35, fill: '#5A8A5A', type: 'mountain' },
+      { x: (50 + mOff * 3) % 280, y: 10, w: 30, h: 8, fill: '#C8D8E8', type: 'cloud' },
+      { x: (55 + mOff * 3) % 280, y: 8, w: 20, h: 6, fill: '#D8E8F8', type: 'cloud' },
+      { x: (180 + mOff * 2) % 300, y: 14, w: 24, h: 7, fill: '#C8D8E8', type: 'cloud' },
+      { x: 0, y: 70, w: 320, h: 130, fill: '#8A7858', type: 'ground' },
+      { x: 0, y: 115, w: 320, h: 24, fill: '#6A6A5A', type: 'road' },
+      { x: 0, y: 126, w: 320, h: 2, fill: '#8A8A6A', type: 'road_line' },
+      // Vertical side road (varied position)
+      { x: 148, y: 70, w: 24, h: 130, fill: '#6A6A5A', type: 'road' },
+      { x: 159, y: 70, w: 2, h: 130, fill: '#8A8A6A', type: 'road_line' },
+      // Grass
+      { x: 0, y: 70, w: 148, h: 45, fill: '#4A7838', type: 'grass' },
+      { x: 172, y: 70, w: 148, h: 45, fill: '#4A7838', type: 'grass' },
+      { x: 0, y: 139, w: 148, h: 61, fill: '#4A7838', type: 'grass' },
+      { x: 172, y: 139, w: 148, h: 61, fill: '#4A7838', type: 'grass' },
+      // Street lamps
+      { x: 46, y: 108, w: 2, h: 12, fill: '#4A4A4A', type: 'decor' },
+      { x: 44, y: 106, w: 6, h: 3, fill: '#CCCC88', type: 'decor' },
+      { x: 135, y: 108, w: 2, h: 12, fill: '#4A4A4A', type: 'decor' },
+      { x: 133, y: 106, w: 6, h: 3, fill: '#CCCC88', type: 'decor' },
+      { x: 240, y: 108, w: 2, h: 12, fill: '#4A4A4A', type: 'decor' },
+      { x: 238, y: 106, w: 6, h: 3, fill: '#CCCC88', type: 'decor' },
+      // Vending machine
+      { x: 175, y: 108, w: 6, h: 10, fill: '#2244AA', type: 'decor' },
+      { x: 176, y: 109, w: 4, h: 4, fill: '#AACCEE', type: 'decor' },
+    ];
+  }
+
+  // Generate a zone from a list of scenarios (up to 8)
+  function buildZone(scenarios, zoneIdx, zoneName) {
+    const buildings = [...baseBackdrop(zoneIdx)];
+    const npcs = [];
+    const collisions = [
+      { x: -10, y: -10, w: 340, h: 12 },  // top
+      { x: -10, y: 195, w: 340, h: 20 },  // bottom
+      { x: 175, y: 108, w: 6, h: 10 },    // vending machine
+      // No left/right walls — allow zone transitions
+    ];
+    const slots = [...BSLOTS_TOP, ...BSLOTS_BOT];
+    const npcYs = [NPC_TOP_Y, NPC_TOP_Y, NPC_TOP_Y, NPC_TOP_Y, NPC_BOT_Y, NPC_BOT_Y, NPC_BOT_Y, NPC_BOT_Y];
+    const npcDirs = ['down','down','down','down','up','up','up','up'];
+
+    scenarios.forEach((sc, i) => {
+      if (i >= 8) return;
+      const slot = slots[i];
+      const pal = BLDG_PALETTES[(zoneIdx * 3 + i * 7) % BLDG_PALETTES.length];
+      const isBottom = i >= 4;
+      const isPark = i === 7; // last bottom-right slot can be a park
+
+      if (isPark && sc) {
+        buildings.push({ x: slot.x, y: slot.y, w: slot.w, h: slot.h, fill: '#3A6828', type: 'park',
+          label: sc.jp, scenarioId: sc.id });
+        // Cherry tree
+        buildings.push({ x: slot.x + 20, y: slot.y - 2, w: 20, h: 16, fill: '#DD88AA', type: 'decor' });
+        buildings.push({ x: slot.x + 22, y: slot.y - 4, w: 16, h: 8, fill: '#EE99BB', type: 'decor' });
+        buildings.push({ x: slot.x + 28, y: slot.y + 14, w: 4, h: 16, fill: '#5A3A20', type: 'decor' });
+      } else if (sc) {
+        buildings.push({ x: slot.x, y: slot.y, w: slot.w, h: slot.h, fill: pal.fill, type: 'building',
+          roof: pal.roof, door: { x: slot.x + Math.floor(slot.w/2) - 6, y: slot.y + slot.h - 10, w: 12, h: 10 },
+          label: sc.jp, scenarioId: sc.id });
+      }
+
+      // Collision for building
+      if (sc) {
+        collisions.push({ x: slot.x, y: slot.y - (slot.y < 115 ? 4 : 0), w: slot.w, h: slot.h + (slot.y < 115 ? 4 : 0) });
+      }
+
+      // NPC
+      if (sc) {
+        const npcX = slot.x + Math.floor(slot.w / 2);
+        const npcY = npcYs[i];
+        // Extract character name only — never show descriptions
+        let charName = '';
+        if (sc.char) {
+          const before = sc.char.split(',')[0].trim();
+          // Only use it if it looks like a name (short, contains -san/-kun/-chan/etc or is capitalized name)
+          if (before.length <= 18 && !before.startsWith('A ') && !before.startsWith('An ') && !before.startsWith('The ')) {
+            charName = before;
+          }
+        }
+        if (!charName) charName = sc.jp; // fall back to Japanese place name
+        npcs.push({ x: npcX, y: npcY, scenarioId: sc.id, dir: npcDirs[i], label: charName });
+      }
+    });
+
+    return { buildings, npcs, collisions, name: zoneName || `Zone ${zoneIdx}` };
+  }
+
+  // ── Gather scenarios for zone 0 (favorites first) ──
+  function buildZone0() {
+    const favs = [...S.favorites];
+    // Fill remaining slots with hardcoded scenarios not in favorites
+    const favIds = new Set(favs.map(f => f.id));
+    const defaults = ['ramen_ichi','sento','konbini3','temple','kissa','furuhon','izakaya','hanami'];
+    const fillers = defaults.filter(id => !favIds.has(id)).map(id => SCENARIO_POOL.find(s => s.id === id)).filter(Boolean);
+    const allSc = [...favs, ...fillers].slice(0, 8);
+    const zone = buildZone(allSc, 0, '★ お気に入り通り — Favorites Street');
+    // Mark favorite buildings and NPCs
+    zone.buildings.forEach(b => { if (b.scenarioId && favIds.has(b.scenarioId)) b.isFav = true; });
+    zone.npcs.forEach(n => { if (favIds.has(n.scenarioId)) n.isFav = true; });
+    return zone;
+  }
+
+  // Build zone N (N >= 1) from remaining scenario pool
+  function buildZoneN(n) {
+    // Gather all scenarios not already used in other zones
+    const usedIds = new Set();
+    Object.values(rpg.zones).forEach(z => {
+      z.npcs.forEach(npc => usedIds.add(npc.scenarioId));
+    });
+    // Combine pool + generated scenarios, skip used
+    const pool = [...SCENARIO_POOL, ...S.scenarios].filter(s => !usedIds.has(s.id));
+    // Shuffle deterministically based on zone index
+    const shuffled = [...pool];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.abs((n * 7919 + i * 31) % (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    const zoneSc = shuffled.slice(0, 8);
+    const streetNames = [
+      '桜通り — Sakura Street', '神社通り — Shrine Avenue', '夜市 — Night Market',
+      '港町 — Harbor District', '下町 — Shitamachi', '学生街 — Student Quarter',
+      '温泉通り — Onsen Road', '商店街 — Shopping Arcade', '裏路地 — Back Alley',
+      '祭り通り — Festival Lane',
+    ];
+    return buildZone(zoneSc, n, streetNames[(n - 1) % streetNames.length]);
+  }
+
+  // Get or create zone
+  function getZone(idx) {
+    if (!rpg.zones[idx]) {
+      rpg.zones[idx] = idx === 0 ? buildZone0() : buildZoneN(idx);
+    }
+    return rpg.zones[idx];
+  }
+
+  // Current zone accessor
+  function currentZone() { return getZone(rpg.zoneIdx); }
+
+  // ── RPG Game State ──
+  const rpg = {
+    active: false,
+    canvas: null,
+    ctx: null,
+    player: { x: 160, y: 126, dir: 'down', frame: 0, walking: false, speed: 1.5 },
+    keys: {},
+    walkTimer: 0,
+    animFrame: 0,
+    nearNpc: null,
+    inDialogue: false,
+    showingDesc: false,
+    dialogueState: null,
+    score: 0,
+    zoneIdx: 0,
+    zones: {},  // cached zone data by index
+    speedMultiplier: 1,
+    npcSprites: {},
+  };
+
+  // ── Render an NPC sprite from scenario data ──
+  function renderNpcToImageData(sc) {
+    if (!sc?.voice) return null;
+    const baseType = VOICE_SPRITE_MAP[sc.voice] || 'adult_male';
+    const sp = CHAR_SPRITES[baseType];
+    const acc = inferAccessory(sc);
+    let mod = {};
+    if (acc === 'chef_hat') {
+      mod = baseType === 'mature_male'
+        ? {hatRows:['....KKKKKKKK....','...KKSSSSSSSKK..'], hatColor:'#F0F0F0', hatHl:'#D8D8D8'}
+        : {hatRows:['..KKKKKKKKKKKK..','..KSSSSSSSSSSK..'], hatColor:'#F0F0F0', hatHl:'#D8D8D8'};
+    } else if (acc) {
+      mod = ACCESSORY_KIT[acc] || {};
+    }
+    let rows = [...sp.pixels];
+    if (mod.hatRows) { rows[0] = mod.hatRows[0]; rows[1] = mod.hatRows[1]; }
+    const cm = {
+      '.':null,'S':'#EFC090','s':'#C89060',
+      'H':sp.hair,'h':sp.hairHl,
+      'K':mod.hatColor||sp.hair,'k':mod.hatHl||sp.hairHl,
+      'E':'#1A0800','W':'#F8F8F8','m':'#8B3030','n':'#D09060',
+      'B':sp.shirt,'b':sp.shirtHl,
+    };
+    return { rows, cm, overlay: mod.overlay || [] };
+  }
+
+  // ── Draw a pixel sprite on canvas ──
+  // ── Crisp pixel text — no anti-aliasing ──
+  const _txtCache = {};
+  function drawCrispText(ctx, text, cx, cy, font, hexColor) {
+    const key = text + '|' + font + '|' + hexColor;
+    if (!_txtCache[key]) {
+      const tmp = document.createElement('canvas');
+      const tc = tmp.getContext('2d');
+      tc.font = font;
+      const m = tc.measureText(text);
+      const w = Math.ceil(m.width) + 2;
+      const h = parseInt(font) + 4;
+      tmp.width = w; tmp.height = h;
+      tc.font = font;
+      tc.fillStyle = hexColor;
+      tc.textBaseline = 'top';
+      tc.fillText(text, 1, 1);
+      // Threshold — snap to fully opaque or fully transparent
+      const img = tc.getImageData(0, 0, w, h);
+      const d = img.data;
+      const r = parseInt(hexColor.slice(1,3),16)||255;
+      const g = parseInt(hexColor.slice(3,5),16)||255;
+      const b = parseInt(hexColor.slice(5,7),16)||255;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i+3] > 100) { d[i]=r; d[i+1]=g; d[i+2]=b; d[i+3]=255; }
+        else { d[i]=0; d[i+1]=0; d[i+2]=0; d[i+3]=0; }
+      }
+      tc.putImageData(img, 0, 0);
+      _txtCache[key] = tmp;
+    }
+    const bmp = _txtCache[key];
+    ctx.drawImage(bmp, Math.round(cx - bmp.width / 2), Math.round(cy));
+  }
+
+  function drawPixelSprite(ctx, data, x, y, scale) {
+    if (!data) return;
+    const { rows, cm, overlay } = data;
+    rows.forEach((row, ry) => {
+      [...row].forEach((ch, rx) => {
+        const c = cm[ch];
+        if (c) {
+          ctx.fillStyle = c;
+          ctx.fillRect(Math.floor(x + rx * scale), Math.floor(y + ry * scale), scale, scale);
+        }
+      });
+    });
+    overlay.forEach(({ x: ox, y: oy, c }) => {
+      ctx.fillStyle = c;
+      ctx.fillRect(Math.floor(x + ox * scale), Math.floor(y + oy * scale), scale, scale);
+    });
+  }
+
+  // ── Draw player sprite ──
+  function drawPlayer(ctx) {
+    const p = rpg.player;
+    const frames = PLAYER_FRAMES[p.dir];
+    const frameIdx = p.walking ? (rpg.animFrame % 2) + 1 : 0;
+    const frame = frames[frameIdx];
+    const scale = 1; // 1:1 in virtual pixels (16×24 sprite)
+    const drawX = p.x - 8; // center sprite
+    const drawY = p.y - 20; // feet at player position
+    frame.forEach((row, ry) => {
+      [...row].forEach((ch, rx) => {
+        const c = PLAYER_COLORS[ch];
+        if (c) {
+          ctx.fillStyle = c;
+          ctx.fillRect(Math.floor(drawX + rx * scale), Math.floor(drawY + ry * scale), scale, scale);
+        }
+      });
+    });
+  }
+
+  // ── Draw the town map ──
+  function drawMap(ctx) {
+    // Clear
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, VIRT_W, VIRT_H);
+
+    // Draw all map elements
+    const zone = currentZone();
+    zone.buildings.forEach(b => {
+      ctx.fillStyle = b.fill;
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+
+      // Building roofs
+      if (b.roof) {
+        ctx.fillStyle = b.roof;
+        ctx.fillRect(b.x - 2, b.y - 4, b.w + 4, 6);
+      }
+
+      // Doors
+      if (b.door) {
+        ctx.fillStyle = '#2A1A0A';
+        ctx.fillRect(b.door.x, b.door.y, b.door.w, b.door.h);
+        // Door light
+        ctx.fillStyle = '#AA8844';
+        ctx.fillRect(b.door.x + 1, b.door.y + 1, b.door.w - 2, b.door.h - 2);
+      }
+
+      // Windows for buildings
+      if (b.type === 'building' && b.w >= 40) {
+        // Favorite buildings get warm golden windows
+        const winColor = b.isFav ? '#DDAA44' : '#6088AA';
+        const winGlow  = b.isFav ? '#FFCC66' : '#88AACC';
+        ctx.fillStyle = winColor;
+        ctx.fillRect(b.x + 4, b.y + 8, 8, 8);
+        ctx.fillRect(b.x + b.w - 12, b.y + 8, 8, 8);
+        ctx.fillStyle = winGlow;
+        ctx.fillRect(b.x + 5, b.y + 9, 6, 6);
+        ctx.fillRect(b.x + b.w - 11, b.y + 9, 6, 6);
+        ctx.fillStyle = '#4A3A2A';
+        ctx.fillRect(b.x + 7, b.y + 8, 2, 8);
+        ctx.fillRect(b.x + b.w - 9, b.y + 8, 2, 8);
+      }
+
+      // Favorite glow border — pulsing golden outline
+      if (b.isFav && (b.type === 'building' || b.type === 'park')) {
+        const pulse = Math.sin(Date.now() / 400) * 0.25 + 0.75;
+        // Outer glow (dithered golden pixels)
+        ctx.fillStyle = '#FFCC44';
+        ctx.globalAlpha = pulse * 0.5;
+        for (let gx = -2; gx < b.w + 2; gx += 2) {
+          ctx.fillRect(b.x + gx, b.y - 2, 1, 1);
+          ctx.fillRect(b.x + gx, b.y + b.h + 1, 1, 1);
+        }
+        for (let gy = -2; gy < b.h + 2; gy += 2) {
+          ctx.fillRect(b.x - 2, b.y + gy, 1, 1);
+          ctx.fillRect(b.x + b.w + 1, b.y + gy, 1, 1);
+        }
+        // Solid inner border
+        ctx.globalAlpha = pulse * 0.8;
+        // Top
+        ctx.fillRect(b.x - 1, b.y - 1, b.w + 2, 1);
+        // Bottom
+        ctx.fillRect(b.x - 1, b.y + b.h, b.w + 2, 1);
+        // Left
+        ctx.fillRect(b.x - 1, b.y - 1, 1, b.h + 2);
+        // Right
+        ctx.fillRect(b.x + b.w, b.y - 1, 1, b.h + 2);
+        ctx.globalAlpha = 1;
+      }
+    });
+
+    // Dithered shadows under buildings (Sierra-style)
+    zone.buildings.forEach(b => {
+      if (b.type !== 'building' && b.type !== 'park') return;
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      for (let sx = 0; sx < b.w + 6; sx += 2) {
+        for (let sy = 0; sy < 4; sy += 2) {
+          ctx.fillRect(b.x - 2 + sx, b.y + b.h + sy, 1, 1);
+        }
+      }
+    });
+
+    // Draw building labels — wooden sign style with crisp pixel text
+    const signFont = '8px monospace';
+    zone.buildings.forEach(b => {
+      if (!b.label) return;
+      ctx.font = signFont;
+      const labelText = b.isFav ? '★ ' + b.label : b.label;
+      const signY = Math.round(b.type === 'park' ? b.y + 2 : b.y - 12);
+      const tw = ctx.measureText(labelText).width;
+      const signW = Math.round(tw + 8);
+      const signX = Math.round(b.x + b.w / 2 - signW / 2);
+      // Sign board — golden tint for favorites
+      const signBg = b.isFav ? '#3A2A10' : '#3A2A18';
+      const signFg = b.isFav ? '#4A3820' : '#4A3A28';
+      const signHi = b.isFav ? '#5A4828' : '#5A4A38';
+      ctx.fillStyle = signBg;
+      ctx.fillRect(signX, signY, signW, 11);
+      ctx.fillStyle = signFg;
+      ctx.fillRect(signX + 1, signY + 1, signW - 2, 9);
+      ctx.fillStyle = signHi;
+      ctx.fillRect(signX + 1, signY + 1, signW - 2, 1);
+      // Crisp text — golden for favorites
+      const textColor = b.isFav ? '#FFD866' : '#F0E0C0';
+      drawCrispText(ctx, labelText, Math.round(b.x + b.w / 2), signY + 1, signFont, textColor);
+    });
+
+    // Draw zone transition arrows
+    ctx.fillStyle = '#C0A060';
+    ctx.font = 'bold 12px monospace';
+    // Right arrow — always show (infinite world)
+    ctx.textAlign = 'center';
+    const arrowPulse = Math.sin(Date.now() / 300) * 0.3 + 0.7;
+    ctx.globalAlpha = arrowPulse;
+    ctx.fillText('▶', 314, 128);
+    // Left arrow — only if not zone 0
+    if (rpg.zoneIdx > 0) {
+      ctx.fillText('◀', 6, 128);
+    }
+    ctx.globalAlpha = 1;
+
+    // Draw NPCs
+    zone.npcs.forEach(npc => {
+      const sc = findScenario(npc.scenarioId);
+      if (!sc) return;
+      const key = npc.scenarioId;
+      if (!rpg.npcSprites[key]) {
+        rpg.npcSprites[key] = renderNpcToImageData(sc);
+      }
+      const spriteData = rpg.npcSprites[key];
+      if (spriteData) {
+        drawPixelSprite(ctx, spriteData, npc.x - 8, npc.y - 14, 1);
+      }
+      // NPC name label — crisp pixel text
+      let nameText = npc.label.length > 16 ? npc.label.slice(0, 14) + '..' : npc.label;
+      if (npc.isFav) nameText = '★ ' + nameText;
+      const isNear = rpg.nearNpc === npc;
+      const npcFont = '7px monospace';
+      ctx.font = npcFont;
+      const tw = ctx.measureText(nameText).width + 6;
+      const labelY = Math.round(npc.y - 22);
+      const lx = Math.round(npc.x - tw/2);
+      // Background
+      ctx.fillStyle = isNear ? '#C0A060' : '#000000';
+      ctx.globalAlpha = isNear ? 0.9 : 0.7;
+      ctx.fillRect(lx, labelY, Math.round(tw), 10);
+      ctx.globalAlpha = 1;
+      // Border for nearby
+      if (isNear) {
+        ctx.strokeStyle = '#C0A060';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(lx, labelY, Math.round(tw), 10);
+      }
+      // Crisp text
+      const txtColor = isNear ? '#1A1008' : '#E8D8C0';
+      drawCrispText(ctx, nameText, Math.round(npc.x), labelY + 1, npcFont, txtColor);
+
+      // Show speech bubble indicator if there's a saved conversation
+      if (!rpg._convoCache) rpg._convoCache = loadAllConvos();
+      if (rpg._convoCache[npc.scenarioId]) {
+        const bx = Math.round(npc.x + 6);
+        const by = Math.round(npc.y - 18);
+        // Tiny speech bubble
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(bx, by, 5, 4);
+        ctx.fillRect(bx + 1, by + 4, 1, 1);
+        ctx.fillStyle = '#4488CC';
+        ctx.fillRect(bx + 1, by + 1, 3, 2);
+      }
+    });
+  }
+
+  // ── Find scenario by ID (from pool or generated) ──
+  function findScenario(id) {
+    return S.scenarios.find(s => s.id === id)
+      || S.favorites.find(s => s.id === id)
+      || SCENARIO_POOL.find(s => s.id === id);
+  }
+
+  // ── Collision detection ──
+  function canMove(nx, ny) {
+    // Player hitbox: 8×4 pixels at feet
+    const hx = nx - 4, hy = ny - 2, hw = 8, hh = 4;
+    for (const c of currentZone().collisions) {
+      if (hx < c.x + c.w && hx + hw > c.x && hy < c.y + c.h && hy + hh > c.y) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // ── Check if near an NPC ──
+  function checkNpcProximity() {
+    const p = rpg.player;
+    let closest = null;
+    let closestDist = 22; // interaction radius in virtual pixels
+    currentZone().npcs.forEach(npc => {
+      const dx = p.x - npc.x;
+      const dy = p.y - npc.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closest = npc;
+      }
+    });
+    rpg.nearNpc = closest;
+    const prompt = document.getElementById('rpgInteract');
+    if (closest && !rpg.inDialogue && !rpg.showingDesc) {
+      prompt.classList.add('active');
+    } else {
+      prompt.classList.remove('active');
+    }
+    // Hide description if we walk away
+    if (!closest && rpg.showingDesc) {
+      hideDescription();
+    }
+  }
+
+  // ── Show NPC description (Space key) ──
+  function showDescription(npc) {
+    const sc = findScenario(npc.scenarioId);
+    if (!sc) return;
+    rpg.showingDesc = true;
+    const overlay = document.getElementById('rpgDescOverlay');
+    document.getElementById('rpgDescTitle').textContent = sc.jp + ' — ' + sc.en;
+    document.getElementById('rpgDescChar').textContent = sc.char;
+    document.getElementById('rpgDescText').textContent = sc.ctx;
+    overlay.classList.add('active');
+    document.getElementById('rpgInteract').classList.remove('active');
+  }
+
+  function hideDescription() {
+    rpg.showingDesc = false;
+    document.getElementById('rpgDescOverlay').classList.remove('active');
+  }
+
+  // ── Game loop ──
+  function gameLoop() {
+    if (!rpg.active) return;
+    const ctx = rpg.ctx;
+
+    // Player movement
+    if (!rpg.inDialogue) {
+      let dx = 0, dy = 0;
+      const spd = rpg.player.speed * rpg.speedMultiplier;
+      if (rpg.keys['ArrowLeft'] || rpg.keys['KeyA']) { dx = -spd; rpg.player.dir = 'left'; }
+      if (rpg.keys['ArrowRight'] || rpg.keys['KeyD']) { dx = spd; rpg.player.dir = 'right'; }
+      if (rpg.keys['ArrowUp'] || rpg.keys['KeyW']) { dy = -spd; rpg.player.dir = 'up'; }
+      if (rpg.keys['ArrowDown'] || rpg.keys['KeyS']) { dy = spd; rpg.player.dir = 'down'; }
+
+      rpg.player.walking = dx !== 0 || dy !== 0;
+
+      if (dx !== 0 || dy !== 0) {
+        const nx = rpg.player.x + dx;
+        const ny = rpg.player.y + dy;
+        if (canMove(nx, rpg.player.y)) rpg.player.x = nx;
+        if (canMove(rpg.player.x, ny)) rpg.player.y = ny;
+
+        rpg.walkTimer++;
+        if (rpg.walkTimer % 8 === 0) {
+          rpg.animFrame = (rpg.animFrame + 1) % 4;
+        }
+      } else {
+        rpg.walkTimer = 0;
+      }
+
+      // Zone transitions — check every frame
+      if (rpg.player.x > 312) {
+        rpg.zoneIdx++;
+        rpg.player.x = 16;
+        rpg.nearNpc = null;
+        rpg.npcSprites = {};
+      } else if (rpg.player.x < 8 && rpg.zoneIdx > 0) {
+        rpg.zoneIdx--;
+        rpg.player.x = 304;
+        rpg.nearNpc = null;
+        rpg.npcSprites = {};
+      }
+
+      checkNpcProximity();
+    }
+
+    // Only draw the streetscape when not in splitscreen chat
+    if (!rpg.inDialogue) {
+      drawMap(ctx);
+      drawPlayer(ctx);
+      updateLocationLabel();
+    }
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  // ── Location label ──
+  function updateLocationLabel() {
+    const label = document.getElementById('rpgLocationLabel');
+    label.textContent = currentZone().name;
+  }
+
+  // ── Start dialogue with NPC (splitscreen mode) ──
+  function startNpcDialogue(npc) {
+    const sc = findScenario(npc.scenarioId);
+    if (!sc) return;
+
+    rpg.inDialogue = true;
+    hideDescription();
+
+    // Load any saved conversation for this scenario
+    const savedConvo = loadConvo(npc.scenarioId);
+    rpg.dialogueState = {
+      scenarioId: npc.scenarioId,
+      scenario: sc,
+      convo: [],
+      phase: 'loading',
+    };
+
+    document.getElementById('rpgInteract').classList.remove('active');
+    document.getElementById('rpgLocationLabel').style.display = 'none';
+
+    // Show splitscreen view — scene background on left, chat on right
+    const sceneView = document.getElementById('rpgSceneView');
+    const sceneHalf = document.getElementById('rpgSceneHalf');
+    const chatName = document.getElementById('rpgChatCharName');
+    const chatMessages = document.getElementById('rpgChatMessages');
+    const chatInput = document.getElementById('rpgChatInput');
+
+    // Render the scenario background SVG into the scene half
+    sceneHalf.innerHTML = renderScene(sc) +
+      `<div class="rpg-scene-label">${escHtml(sc.jp)} — ${escHtml(sc.en)}</div>`;
+    chatName.textContent = escHtml(sc.char);
+    chatInput.value = '';
+
+    sceneView.classList.add('active');
+    updateFavBtn();
+
+    // Build system prompt — buildSysPrompt sets S.sysPrompt (no return value)
+    buildSysPrompt(sc);
+    rpg.dialogueState.sysPrompt = S.sysPrompt;
+
+    if (savedConvo && savedConvo.length > 0) {
+      // Restore saved conversation — rebuild display annotations
+      rpg.dialogueState.convo = savedConvo.map(m => {
+        const o = { role: m.role, content: m.content };
+        if (m.divider) o.divider = true;
+        else if (m.role === 'assistant') o.display = safeAnnotated(buildAnnotated(m.content));
+        return o;
+      });
+      // If conversation has episodes, rebuild system prompt with continuity
+      if (savedConvo.some(m => m.divider)) {
+        const lastDivIdx = savedConvo.reduce((acc, m, i) => m.divider ? i : acc, -1);
+        const preEpisode = savedConvo.slice(0, lastDivIdx).filter(m => !m.divider);
+        if (preEpisode.length > 0) {
+          const recentPre = preEpisode.slice(-10).map(m => `${m.role}: ${m.content}`).join('\n');
+          rpg.dialogueState.sysPrompt += `\n\nEPISODE CONTINUITY — This is NOT the first meeting. The student and your character have an ongoing relationship.\nPrevious conversation excerpt:\n${recentPre}\nReference previous interactions naturally. Show that the relationship has progressed.`;
+        }
+      }
+      rpg.dialogueState.phase = 'chat';
+      rpgRenderChatMessages();
+      setTimeout(() => document.getElementById('rpgChatInput').focus(), 100);
+    } else {
+      // Fresh conversation — get opening line
+      chatMessages.innerHTML = '<div style="color:#5a5a7a;font-size:12px;text-align:center;padding:20px;font-family:Nunito Sans,sans-serif">Starting conversation...</div>';
+
+      claude(
+        [{ role: 'user', content: 'Start the scene. Greet me in character.' }],
+        rpg.dialogueState.sysPrompt,
+        800
+      ).then(reply => {
+        const { correction: corr, clean } = extractCorrection(reply);
+        const msg = { role: 'assistant', content: clean, correction: corr, display: safeAnnotated(buildAnnotated(clean)) };
+        rpg.dialogueState.convo.push(msg);
+        rpg.dialogueState.phase = 'chat';
+        rpgRenderChatMessages();
+        saveConvo(npc.scenarioId, rpg.dialogueState.convo);
+        setTimeout(() => document.getElementById('rpgChatInput').focus(), 100);
+      }).catch(err => {
+        chatMessages.innerHTML = '<div style="color:#cc4444;font-size:12px;text-align:center;padding:20px;font-family:Nunito Sans,sans-serif">Connection error. Press ESC to go back.</div>';
+      });
+    }
+  }
+
+  // ── Render chat messages in splitscreen ──
+  window.rpgRenderChatMessages = function rpgRenderChatMessages() {
+    const ds = rpg.dialogueState;
+    if (!ds) return;
+    const chatMessages = document.getElementById('rpgChatMessages');
+
+    // Temporarily swap global state so renderMessages() renders RPG conversation
+    const savedConvo = S.convo;
+    const savedScenario = S.scenario;
+    const savedSierra = S.sierraMode;
+    S.convo = ds.convo;
+    S.scenario = ds.scenario;
+    S.sierraMode = true;
+
+    chatMessages.innerHTML = renderMessages();
+    restoreAudioPlayer();
+
+    // Restore global state
+    S.convo = savedConvo;
+    S.scenario = savedScenario;
+    S.sierraMode = savedSierra;
+
+    // Auto-scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  };
+
+  // Helper: extract correction from Claude reply
+  function extractCorrection(reply) {
+    const corrRx = /\[Corrections?:\s*([\s\S]*?)\]?\s*$/i;
+    const match = reply.match(corrRx);
+    return {
+      correction: match ? match[1].replace(/\[\[([^\[\]|]+)\|[^\[\]]+\]\]/g, '$1').trim() : null,
+      clean: reply.replace(corrRx, '').trim(),
+    };
+  }
+
+  // ── Send player message in splitscreen chat ──
+  window.rpgSendChatMsg = function() {
+    const input = document.getElementById('rpgChatInput');
+    let txt = input.value.trim();
+    if (!txt || !rpg.dialogueState) return;
+
+    // Convert romaji to hiragana
+    if (/^[a-zA-Z\s.,!?]+$/.test(txt) && typeof wanakana !== 'undefined') {
+      txt = wanakana.toHiragana(txt, { IMEMode: true });
+    }
+
+    const ds = rpg.dialogueState;
+    ds.convo.push({ role: 'user', content: txt });
+    input.value = '';
+    saveConvo(ds.scenarioId, ds.convo);
+
+    // Show user message + loading indicator
+    rpgRenderChatMessages();
+    const chatMessages = document.getElementById('rpgChatMessages');
+    chatMessages.innerHTML += '<div style="color:#5a5a7a;font-size:12px;padding:8px;font-family:Nunito Sans,sans-serif"><span class="spin" style="display:inline-block;width:12px;height:12px;border:1px solid #2a2a3a;border-top-color:#5a5a7a;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;margin-right:6px"></span>...</div>';
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    // Build messages for Claude — send last 30 real messages (skip episode dividers)
+    const recentConvo = ds.convo.filter(m => !m.divider).slice(-30);
+    const messages = recentConvo.map(m => ({ role: m.role, content: m.content }));
+
+    // Vocab reinforcement — same logic as regular sendMsg
+    const reinforceOn = localStorage.getItem('renshuu_vocab_reinforce') !== '0';
+    if (reinforceOn && S.sessionWords?.length) {
+      const allText = ds.convo.filter(m => m.role === 'assistant' && m.content !== '…').map(m => m.content).join(' ');
+      for (const w of S.sessionWords) {
+        if (allText.includes(w.jp)) S.usedWords.add(w.jp);
+      }
+      const unused = S.sessionWords.filter(w => !S.usedWords.has(w.jp));
+      if (unused.length > 0) {
+        const nudge = `[System: You haven't used these vocab words yet — try to work them in naturally: ${unused.map(w => `${w.jp}（${w.en}）`).join('、')}]`;
+        messages.push({ role: 'user', content: nudge });
+      }
+    }
+
+    claude(messages, ds.sysPrompt, 500).then(reply => {
+      const { correction: corr, clean } = extractCorrection(reply);
+      if (corr) logMistake({ src: 'r', wrote: txt, fix: corr });
+      const msg = { role: 'assistant', content: clean, correction: corr, display: safeAnnotated(buildAnnotated(clean)) };
+      ds.convo.push(msg);
+      // Rolling trim — keep last MAX_MSGS_PER_CONVO in memory
+      if (ds.convo.length > MAX_MSGS_PER_CONVO) {
+        ds.convo = ds.convo.slice(-MAX_MSGS_PER_CONVO);
+      }
+      rpgRenderChatMessages();
+      saveConvo(ds.scenarioId, ds.convo);
+    }).catch(err => {
+      ds.convo.push({ role: 'assistant', content: 'すみません、エラーが発生しました。もう一度お願いします。', display: '<span style="color:#cc4444">Error — try again</span>' });
+      rpgRenderChatMessages();
+    });
+  };
+
+  // ── Fast forward — skip to next meeting/episode ──
+  window.rpgFastForward = function() {
+    const ds = rpg.dialogueState;
+    if (!ds || ds.phase !== 'chat') return;
+    fastForward({
+      sc: ds.scenario,
+      btnId: 'rpgFfBtn',
+      getConvo: () => ds.convo,
+      pushMsg: msg => {
+        const full = { ...msg };
+        if (msg.role === 'assistant' && msg.content) {
+          full.display = safeAnnotated(buildAnnotated(msg.content));
+        }
+        ds.convo.push(full);
+        if (ds.convo.length > MAX_MSGS_PER_CONVO) ds.convo = ds.convo.slice(-MAX_MSGS_PER_CONVO);
+        if (!msg.divider) ds.sysPrompt = S.sysPrompt;
+      },
+      updateView: () => {
+        rpgRenderChatMessages();
+        saveConvo(ds.scenarioId, ds.convo);
+        setTimeout(() => document.getElementById('rpgChatInput')?.focus(), 100);
+      },
+    });
+  };
+
+  // ── Leave chat / close splitscreen ──
+  // Update the ☆/★ favourite button to reflect current state
+  function updateFavBtn() {
+    const btn = document.getElementById('rpgFavBtn');
+    if (!btn || !rpg.dialogueState) return;
+    const isFav = S.favorites.some(f => f.id === rpg.dialogueState.scenarioId);
+    btn.innerHTML = IC.star;
+    btn.classList.toggle('active', isFav);
+    btn.title = isFav ? 'Remove from favourites' : 'Add to favourites';
+  }
+
+  window.rpgToggleFavorite = function() {
+    if (!rpg.dialogueState) return;
+    const sc = rpg.dialogueState.scenario;
+    const id = rpg.dialogueState.scenarioId;
+    // Temporarily set S.scenario so toggleFavorite can capture convo
+    const prevScenario = S.scenario;
+    const prevConvo = S.convo;
+    S.scenario = sc;
+    S.convo = rpg.dialogueState.convo;
+    toggleFavorite(id);
+    S.scenario = prevScenario;
+    S.convo = prevConvo;
+    updateFavBtn();
+    // Regenerate zone 0 so the favourite star appears in town
+    if (rpg.zones) delete rpg.zones[0];
+  };
+
+  window.rpgLeaveChat = function() {
+    closeDialogue();
+  };
+
+  // ── Close dialogue ──
+  function closeDialogue() {
+    cancelSpeech();
+    rpg.inDialogue = false;
+    rpg.dialogueState = null;
+    document.getElementById('rpgSceneView').classList.remove('active');
+    document.getElementById('rpgLocationLabel').style.display = '';
+    document.getElementById('rpgStatusMsg').textContent = 'Use arrow keys to walk. Approach characters to talk.';
+  }
+
+  // ── Keyboard handling ──
+  function onKeyDown(e) {
+    if (!rpg.active) return;
+
+    // Don't capture keys when typing in chat input
+    if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+      if (e.code === 'Escape') {
+        e.target.blur();
+        e.preventDefault();
+      }
+      return;
+    }
+
+    rpg.keys[e.code] = true;
+
+    if (e.code === 'Escape') {
+      if (rpg.showingDesc) {
+        hideDescription();
+      } else if (rpg.inDialogue) {
+        closeDialogue();
+      } else {
+        rpgExit();
+      }
+      e.preventDefault();
+      return;
+    }
+
+    // Space: show character description
+    if (e.code === 'Space') {
+      if (rpg.showingDesc) {
+        hideDescription();
+      } else if (rpg.nearNpc && !rpg.inDialogue) {
+        showDescription(rpg.nearNpc);
+      }
+      e.preventDefault();
+      return;
+    }
+
+    // Enter: start conversation (from description or proximity)
+    if (e.code === 'Enter' && !e.shiftKey) {
+      if (rpg.showingDesc && rpg.nearNpc) {
+        hideDescription();
+        startNpcDialogue(rpg.nearNpc);
+      } else if (rpg.nearNpc && !rpg.inDialogue) {
+        startNpcDialogue(rpg.nearNpc);
+      }
+      e.preventDefault();
+      return;
+    }
+
+    // Prevent page scroll
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) {
+      e.preventDefault();
+    }
+  }
+
+  function onKeyUp(e) {
+    rpg.keys[e.code] = false;
+  }
+
+  // ── Conversation persistence ──
+  // Store only role+content, cap at 50 messages per scenario to manage size
+  const CONVO_KEY = 'renshuu_rpg_convos';
+  const MAX_MSGS_PER_CONVO = 50;
+
+  function loadAllConvos() {
+    try { return JSON.parse(localStorage.getItem(CONVO_KEY)) || {}; }
+    catch { return {}; }
+  }
+
+  function saveConvo(scenarioId, convo) {
+    const all = loadAllConvos();
+    // Store only role + content (strip display, correction, etc to save space)
+    const trimmed = convo.slice(-MAX_MSGS_PER_CONVO).map(m => {
+      const o = { role: m.role, content: m.content };
+      if (m.divider) o.divider = true;
+      return o;
+    });
+    all[scenarioId] = trimmed;
+    localStorage.setItem(CONVO_KEY, JSON.stringify(all));
+    rpg._convoCache = all; // refresh cache for speech bubble indicators
+    // Sync back to favorite if one exists (keeps regular mode in sync)
+    const fav = S.favorites && S.favorites.find(f => f.id === scenarioId);
+    if (fav) {
+      fav.convo = trimmed;
+      saveFavorites();
+    }
+  }
+
+  function loadConvo(scenarioId) {
+    // Favorite conversations from regular mode always take priority
+    const fav = S.favorites && S.favorites.find(f => f.id === scenarioId);
+    if (fav && fav.convo && fav.convo.length > 0) {
+      const imported = fav.convo.map(m => ({ role: m.role, content: m.content }));
+      // Sync into RPG storage so it stays current
+      const all = loadAllConvos();
+      all[scenarioId] = imported.slice(-MAX_MSGS_PER_CONVO);
+      localStorage.setItem(CONVO_KEY, JSON.stringify(all));
+      rpg._convoCache = all;
+      return imported;
+    }
+    const all = loadAllConvos();
+    return all[scenarioId] || null;
+  }
+
+  function clearAllConvos() {
+    localStorage.removeItem(CONVO_KEY);
+    rpg._convoCache = {};
+  }
+
+  // ── Reset: wipe conversations, regenerate scenarios & zones ──
+  window.rpgReset = function() {
+    if (!confirm('Reset all conversations and regenerate the town?')) return;
+    clearAllConvos();
+    // Clear session scenarios so they regenerate
+    sessionStorage.removeItem('renshuu_scenarios');
+    sessionStorage.removeItem('renshuu_eng_scenarios');
+    // Reset zone cache and NPC sprite cache
+    rpg.zones = {};
+    rpg.zoneIdx = 0;
+    rpg.npcSprites = {};
+    rpg.nearNpc = null;
+    _txtCache && Object.keys(_txtCache).forEach(k => delete _txtCache[k]);
+    // Reset player
+    rpg.player.x = 160;
+    rpg.player.y = 126;
+    rpg.player.dir = 'down';
+    if (rpg.inDialogue) closeDialogue();
+    updateLocationLabel();
+  };
+
+  // ── Dithering dissolve transition ──
+  const BAYER8 = [
+     0,32, 8,40, 2,34,10,42,
+    48,16,56,24,50,18,58,26,
+    12,44, 4,36,14,46, 6,38,
+    60,28,52,20,62,30,54,22,
+     3,35,11,43, 1,33, 9,41,
+    51,19,59,27,49,17,57,25,
+    15,47, 7,39,13,45, 5,37,
+    63,31,55,23,61,29,53,21
+  ];
+
+  function ditherDissolve(onComplete) {
+    const cvs = document.createElement('canvas');
+    cvs.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:10000;image-rendering:pixelated;pointer-events:none';
+    const W = 160, H = 100;
+    cvs.width = W;
+    cvs.height = H;
+    document.body.appendChild(cvs);
+    const ctx = cvs.getContext('2d');
+
+    const totalSteps = 64;
+    let step = 0;
+    const img = ctx.createImageData(W, H);
+
+    function frame() {
+      const threshold = step;
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const bval = BAYER8[(y & 7) * 8 + (x & 7)];
+          if (bval < threshold) {
+            const idx = (y * W + x) * 4;
+            img.data[idx] = 0;
+            img.data[idx + 1] = 0;
+            img.data[idx + 2] = 0;
+            img.data[idx + 3] = 255;
+          }
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      step += 2;
+      if (step <= totalSteps) {
+        requestAnimationFrame(frame);
+      } else {
+        onComplete();
+        setTimeout(() => cvs.remove(), 400);
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ── Launch RPG world ──
+  function rpgInit() {
+    const world = document.getElementById('rpgWorld');
+    world.classList.add('active');
+    rpg.active = true;
+    window._rpg = rpg;
+
+    rpg.canvas = document.getElementById('rpgCanvas');
+    rpg.ctx = rpg.canvas.getContext('2d');
+    rpg.canvas.width = VIRT_W;
+    rpg.canvas.height = VIRT_H;
+
+    rpg.player.x = 160;
+    rpg.player.y = 126;
+    rpg.player.dir = 'down';
+    rpg.player.walking = false;
+    rpg.score = 0;
+    rpg.npcSprites = {};
+    rpg.zones = {};
+    rpg.zoneIdx = 0;
+    updateLocationLabel();
+
+    document.getElementById('rpgScore').textContent = 'Score: 0 of 100';
+    document.getElementById('rpgStatusMsg').textContent = 'Use arrow keys to walk. Approach characters to talk.';
+
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keyup', onKeyUp);
+
+    gameLoop();
+  }
+
+  window.rpgLaunch = function() {
+    ditherDissolve(rpgInit);
+  };
+
+  // ── Exit RPG world ──
+  window.rpgExit = function() {
+    rpg.active = false;
+    rpg.keys = {};
+    const world = document.getElementById('rpgWorld');
+    world.classList.remove('active');
+    document.removeEventListener('keydown', onKeyDown);
+    document.removeEventListener('keyup', onKeyUp);
+    if (rpg.inDialogue) closeDialogue();
+  };
+
+  // ── Toggle speed ──
+  window.rpgToggleSpeed = function() {
+    rpg.speedMultiplier = rpg.speedMultiplier === 1 ? 2.5 : 1;
+    document.getElementById('rpgStatusMsg').textContent =
+      rpg.speedMultiplier > 1 ? 'Speed: FAST' : 'Speed: Normal';
+  };
+
+})();
