@@ -130,7 +130,6 @@ aside {
   background: var(--surface);
   border-radius: var(--radius);
   border: 1px solid var(--border);
-  border-left: 2px solid transparent;
   cursor: pointer;
   transition: opacity 0.15s;
 }
@@ -138,9 +137,9 @@ aside {
   opacity: 0.35;
 }
 .count-row:hover { filter: brightness(0.96); }
-.count-row.n { border-left-color: var(--red); }
-.count-row.y { border-left-color: var(--blue); }
-.count-row.m { border-left-color: var(--green); }
+.count-row.n { background: rgba(201,79,60,0.07); }
+.count-row.y { background: rgba(46,114,160,0.07); }
+.count-row.m { background: rgba(61,136,80,0.07); }
 .count-label { display: flex; align-items: center; gap: 7px; }
 .kanji { font-family: 'Shippori Mincho', serif; font-size: 15px; }
 .count-num { font-size: 17px; font-weight: 500; }
@@ -291,6 +290,9 @@ main {
   overflow-y: auto;
 }
 
+/* Keep drill & compose batches to a comfortable reading width, centered */
+#drillZone, #composeZone, main > .row-between { width: 100%; max-width: 820px; margin-inline: auto; }
+
 /* Empty */
 .empty {
   flex: 1;
@@ -344,7 +346,9 @@ pre.code {
 .score-close { background: rgba(168,110,26,0.12); color: var(--amber,#a86e1a); border: 1px solid rgba(168,110,26,0.25); }
 .score-wrong { background: rgba(201,79,60,0.12); color: var(--red); border: 1px solid rgba(201,79,60,0.25); }
 .score-total { margin-left: auto; font-size: 11px; color: var(--muted); }
-.drill-head { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 6px; }
+.drill-head { display: flex; align-items: center; gap: 8px; flex: none; }
+.drill-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 10px; }
+.drill-top .jp-sentence { flex: 1; margin-bottom: 0; }
 .tier-badge {
   display: inline-flex;
   align-items: center;
@@ -384,12 +388,11 @@ pre.code {
   background: var(--surface2);
   font-size: 12px;
   line-height: 1.6;
-  border-left: 2px solid transparent;
   display: flow-root;
 }
-.feedback.ok { border-color: var(--green); }
-.feedback.no { border-color: var(--red); }
-.feedback.partial { border-color: var(--gold); }
+.feedback.ok { background: rgba(61,136,80,0.09); }
+.feedback.no { background: rgba(201,79,60,0.09); }
+.feedback.partial { background: rgba(168,110,26,0.09); }
 .retry-btn { margin-top: 8px; font-size: 11px; padding: 4px 14px; float: right; }
 .tl { color: var(--muted); margin-top: 4px; font-size: 11px; }
 

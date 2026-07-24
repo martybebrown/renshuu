@@ -2029,11 +2029,13 @@ function drillHTML(d) {
 
   return `
     <div class="drill-card${cardClass}" id="dc-${d.i}">
-      <div class="drill-head">
-        <span class="tier-badge ${tClass}">${tLabel}</span>
-        <span class="num">${d.i + 1} / ${S.drills.length}</span>
+      <div class="drill-top">
+        <div class="jp-sentence">${displaySentence}</div>
+        <div class="drill-head">
+          <span class="tier-badge ${tClass}">${tLabel}</span>
+          <span class="num">${d.i + 1} / ${S.drills.length}</span>
+        </div>
       </div>
-      <div class="jp-sentence">${displaySentence}</div>
       <div style="margin:4px 0 2px"><button class="speak-btn drill-speak" data-sentence="${escHtml(stripMarkers(d.sentence))}" title="Listen">${IC.volume}</button></div>
       <div class="hint-text">Fill in: ${d.meaning}${d.hint ? ` · ${d.hint}` : ''}</div>
       <div class="answer-row">
