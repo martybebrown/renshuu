@@ -4918,7 +4918,7 @@ Rules:
 1. Respond in Japanese only. STRICT LIMIT: 1–3 sentences. Most replies should be 1–2 sentences — like a real conversation, not a monologue. One-word or one-phrase reactions (え？本当？ / そうだね / いいね！) are great. NEVER write 4+ sentences. This is a back-and-forth dialogue, not a speech.
 2. Weave in vocab from the list, especially the priority young words.
 3. Stay in character. Ask a natural follow-up question each turn (but not every single turn — sometimes just react).
-4. After your Japanese, if the student made errors in their MOST RECENT message ONLY (grammar, vocab, particle, conjugation, word choice, unnatural phrasing), add: [Correction: explain what was wrong, what it should be, and briefly why. Cover every mistake in that message — don't skip any. Be specific: show the wrong text → correct text. Use numbered points (1. 2. 3.) for multiple errors so each is clear. Do NOT correct errors from earlier messages — only the latest one. Then, on the LAST line, write a full corrected version of what the student should have said, entirely in romaji, prefixed exactly with "✓ ". Example: "1. だれごらい → どのくらい (dono kurai) — だれごらい isn't a word; どのくらい means 'about how much/long'\n✓ kore wa dono kurai desu ka?"]
+4. After your Japanese, if the student made errors in their MOST RECENT message ONLY (grammar, vocab, particle, conjugation, word choice, unnatural phrasing), add: [Correction: explain what was wrong, what it should be, and briefly why. Cover every mistake in that ONE message — don't skip any. Be specific: show the wrong text → correct text. Use numbered points (1. 2. 3.) for multiple errors so each is clear. CRITICAL: correct ONLY the student's single newest message. Every earlier message has already been reviewed in a previous turn — never correct, re-correct, or reference anything from before, even if those messages still contain mistakes. If the newest message alone is error-free, omit the [Correction] block entirely. Then, on the LAST line, write a full corrected version of what the student should have said, entirely in romaji, prefixed exactly with "✓ ". Example: "1. だれごらい → どのくらい (dono kurai) — だれごらい isn't a word; どのくらい means 'about how much/long'\n✓ kore wa dono kurai desu ka?"]
 5. Aim for N4–N3 level.
 6. Mark EVERY Japanese word with [[word|reading|english]] pipe markers — this includes kanji compounds (with okurigana), katakana words, AND hiragana words/phrases (2+ chars). Use hiragana as the reading for both katakana and hiragana-only words. Do NOT leave any word unmarked — every content word needs a tooltip. Example: [[日本語|にほんご|Japanese]]は[[面白い|おもしろい|interesting]]し、[[コーヒー|こーひー|coffee]]も[[やっぱり|やっぱり|as expected]][[美味しい|おいしい|delicious]]。[[でも|でも|but]][[ちょっと|ちょっと|a little]][[むずかしい|むずかしい|difficult]][[ですね|ですね|isn't it]]。
 7. The student may write in rōmaji (e.g. "watashi wa gakusei desu") — understand it as Japanese and respond naturally. Only correct it if there is an actual grammar or vocab mistake, not just for using romaji.
@@ -5085,6 +5085,11 @@ async function sendMsg() {
         msgs.push({ role: 'user', content: nudge });
       }
     }
+
+    // Pin the correction scope to the newest message. Earlier user turns have
+    // already been reviewed in prior turns, so re-correcting them (a recurring
+    // bug) just repeats old feedback. Quote the target so it's unambiguous.
+    msgs.push({ role: 'user', content: `[System: For the [Correction: ...] block, evaluate ONLY the student's newest message, quoted here: "${text}". Every earlier student message has ALREADY been reviewed in previous turns — do NOT correct, re-correct, or even mention them. If this newest message alone has no real errors, omit the [Correction] block entirely.]` });
 
     const reply = await claude(msgs, S.sysPrompt, 500);
 
@@ -5578,7 +5583,7 @@ Rules:
 1. Respond in English only. IMPORTANT: Vary your reply length naturally — sometimes short (one word, a question, a brief reaction), sometimes 2–3 sentences. Do NOT always write the same length. Sound natural and conversational.
 2. Stay in character. Ask natural follow-up questions (but not every single turn — sometimes just react).
 3. Keep your English at a natural but accessible level for a beginner-intermediate Japanese learner. Avoid overly complex vocabulary or rare idioms unless they fit the character. Use common, everyday English.
-4. After your English response, if the student made errors in their MOST RECENT message ONLY (grammar, vocabulary, spelling, word order, unnatural phrasing, article usage, preposition mistakes, tense errors), add: [Correction: explain in Japanese what was wrong, what it should be, and briefly why. Cover every mistake in that message — don't skip any. Be specific: show wrong text → correct text. Use numbered points (1. 2. 3.) for multiple errors. Do NOT correct errors from earlier messages — only the latest one. Write the explanation entirely in Japanese. Example: "1. I go to school yesterday → I went to school yesterday（過去の出来事なので過去形 went を使います）"]
+4. After your English response, if the student made errors in their MOST RECENT message ONLY (grammar, vocabulary, spelling, word order, unnatural phrasing, article usage, preposition mistakes, tense errors), add: [Correction: explain in Japanese what was wrong, what it should be, and briefly why. Cover every mistake in that ONE message — don't skip any. Be specific: show wrong text → correct text. Use numbered points (1. 2. 3.) for multiple errors. Write the explanation entirely in Japanese. CRITICAL: correct ONLY the student's single newest message. Every earlier message has already been reviewed in a previous turn — never correct, re-correct, or reference anything from before, even if those messages still contain mistakes. If the newest message alone is error-free, omit the [Correction] block entirely. Example: "1. I go to school yesterday → I went to school yesterday（過去の出来事なので過去形 went を使います）"]
 5. Mark EVERY English word with [[word|カタカナ読み|日本語訳]] pipe markers. Include articles, prepositions, pronouns, and common words. Every single word must be annotated — do NOT leave any word unmarked. Example: [[Hello|ハロー|こんにちは]]! [[How|ハウ|どのように]] [[are|アー|〜です]] [[you|ユー|あなた]] [[doing|ドゥーイング|している]] [[today|トゥデイ|今日]]?
 6. The student may write in Japanese or broken English — understand their intent and respond naturally in English. Only correct actual English mistakes in the [Correction:] block, not Japanese input.
 7. If the student writes entirely in Japanese, that is fine — understand it and continue the conversation in English. Gently encourage them to try English by keeping your responses simple and inviting.`;
@@ -5631,6 +5636,10 @@ async function sendEngMsg() {
     const msgs = S.engConvo
       .filter(m => m.content !== '…')
       .map(m => ({ role: m.role, content: m.content }));
+
+    // Pin the correction scope to the newest message so earlier turns (already
+    // reviewed in prior turns) aren't re-corrected.
+    msgs.push({ role: 'user', content: `[System: For the [Correction: ...] block, evaluate ONLY the student's newest message, quoted here: "${raw}". Every earlier student message has ALREADY been reviewed in previous turns — do NOT correct, re-correct, or even mention them. If this newest message alone has no real errors, omit the [Correction] block entirely.]` });
 
     const reply = await claude(msgs, S.engSysPrompt);
 
