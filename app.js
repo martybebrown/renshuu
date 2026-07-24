@@ -2667,6 +2667,10 @@ The student may write in romaji, kana, or kanji — these are ALL equally accept
 - NEVER treat a romaji-spelled particle (o for を, wa for は, e for へ) as an error.
 - NEVER flag "use kanji" or "kana should be kanji" (or vice versa) as a correction.
 - Do not let script/orthography choice affect the verdict at all.
+TRANSCRIPTION / HOMOPHONES: The student may be dictating with speech-to-text, which frequently mis-hears a word as a HOMOPHONE — a different word with the same (or nearly the same) reading, e.g. 番/晩 (ban), 貴社/帰社/記者 (kisha), 橋/箸/端 (hashi), 雨/飴 (ame). Treat these as transcription artifacts, NOT vocabulary mistakes:
+- If a wrong word is CLEARLY a same-reading homophone of the word the sentence obviously intends, do NOT count it as a word-choice error and do NOT lower the verdict for it.
+- Put the intended word in "correction", and in "note" gently flag that it looks like a voice-transcription slip (e.g. "番 was likely mis-transcribed by voice input from 晩 (ban)"), rather than calling it wrong.
+- This ONLY covers genuine same-sound homophones. Real grammar errors, wrong particles, wrong conjugation, missing words, or non-homophone wrong words are still graded normally and still affect the verdict.
 Judge ONLY the actual Japanese: grammar, particle choice, conjugation, word choice, and whether it naturally expresses the intended meaning. Do not penalise valid alternative phrasings.
 Return ONLY a JSON object, no markdown fences:
 {
@@ -2678,7 +2682,7 @@ Return ONLY a JSON object, no markdown fences:
 }
 If the exercise specifies a REQUIRED grammar pattern, the answer must use it: if the Japanese is otherwise fine but does not use the required pattern, the verdict is "minor" and the note should nudge them toward it (rewrite the correction to use it). Wrong/unnatural Japanese is still "wrong".
 Whenever the note mentions a Japanese word or phrase as a suggestion or example, append its romaji in parentheses, e.g. 洗濯をしなければならない (sentaku o shinakereba naranai).
-verdict guide: "correct" = grammatical and natural meaning (correction may equal their sentence, just written in normal orthography); "minor" = small grammar fixes (particle, conjugation, word choice); "wrong" = wrong meaning, ungrammatical, not Japanese, or empty. Choosing romaji or kana is never a reason to drop below "correct".
+verdict guide: "correct" = grammatical and natural meaning (correction may equal their sentence, just written in normal orthography); "minor" = small grammar fixes (particle, conjugation, word choice); "wrong" = wrong meaning, ungrammatical, not Japanese, or empty. Choosing romaji or kana is never a reason to drop below "correct". A pure homophone/voice-transcription slip alone (the intended word is obvious and the sentence is otherwise fine) does NOT drop the verdict below "correct" — just note the likely mis-transcription.
 CONSISTENCY (when earlier attempts are shown): This is a multi-attempt exercise. You MUST stay consistent with feedback you already gave for the SAME prompt:
 - Keep the SAME target/"correction" sentence you established earlier. Do NOT switch to a different equally-valid phrasing or re-word the ideal answer between attempts.
 - If the student has now correctly applied a fix you previously asked for, that issue is RESOLVED — do not raise it again.
