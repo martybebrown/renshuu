@@ -329,8 +329,10 @@ pre.code {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 20px;
+  margin-bottom: 16px;
   transition: border-color 0.2s;
 }
+.drill-card:last-child { margin-bottom: 0; }
 .drill-card.correct-card { border-color: rgba(90,158,106,0.4); }
 .drill-card.wrong-card { border-color: rgba(201,79,60,0.4); }
 .drill-card.partial-card { border-color: rgba(168,110,26,0.4); }
@@ -466,6 +468,29 @@ pre.code {
 .hint-chip .hc-en { color: var(--muted); font-size: 11px; }
 .compose-input { min-height: 38px; resize: vertical; line-height: 1.5; }
 .compose-correction { font-family: 'Shippori Mincho', serif; font-size: 18px; line-height: 1.7; margin: 2px 0 4px; }
+
+/* Revision chain — repeated entry → correction below the first attempt */
+.compose-revisions {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.compose-revision { display: flex; flex-direction: column; gap: 8px; }
+.compose-revision-entry {
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: 14px; line-height: 1.5;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 9px 12px;
+}
+.compose-revision-entry .crev-arrow { color: var(--muted); flex: none; font-weight: 700; }
+.compose-revision-open { display: flex; flex-direction: column; gap: 8px; }
+.compose-revision-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.03em;
+  text-transform: uppercase; color: var(--muted);
+}
 
 /* Toast */
 /* Speech-to-text mic button — one modular class, sized by its container */
@@ -1429,29 +1454,57 @@ pre.code {
   gap: 2px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 999px;
   padding: 3px;
+  position: relative;
+}
+.header-mode-indicator {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  width: 0;
+  border-radius: 999px;
+  background: var(--surface2);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  transition: left 0.32s cubic-bezier(0.4, 0, 0.15, 1),
+              width 0.32s cubic-bezier(0.4, 0, 0.15, 1);
+  z-index: 0;
+  pointer-events: none;
 }
 @media (min-width: 768px) {
   .header-mode-toggle { display: flex; }
   .sidebar-mode { display: none; }
 }
 .header-mode {
+  position: relative;
+  z-index: 1;
   background: none;
   border: none;
-  border-radius: var(--radius);
+  border-radius: 999px;
   cursor: pointer;
   color: var(--muted);
   font-family: 'Nunito Sans', sans-serif;
   font-size: 12px;
   padding: 5px 14px;
-  transition: all 0.15s;
+  transition: color 0.2s ease;
 }
 .header-mode:hover { color: var(--text); }
 .header-mode.active {
-  background: var(--surface2);
   color: var(--text);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+/* Mode switch content transition */
+@keyframes modeSwitchIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+#mainContent.mode-switching {
+  animation: modeSwitchIn 0.34s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .header-mode-indicator { transition: none; }
+  #mainContent.mode-switching { animation: none; }
 }
 
 /* Hamburger — hidden on desktop */

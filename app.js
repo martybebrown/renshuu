@@ -72,6 +72,10 @@ document.addEventListener('click', e => {
   const cBtn = e.target.closest('.compose-submit[data-ci]');
   if (cBtn) { submitCompose(parseInt(cBtn.dataset.ci, 10)); return; }
 
+  // Compose revision (retry) submit button
+  const rBtn = e.target.closest('.compose-revise-submit[data-cri]');
+  if (rBtn) { submitRevision(parseInt(rBtn.dataset.cri, 10)); return; }
+
   // Drill speak button
   const drillSpeak = e.target.closest('.drill-speak[data-sentence]');
   if (drillSpeak) { speakJapanese(drillSpeak.dataset.sentence, drillSpeak); return; }
@@ -193,6 +197,15 @@ document.addEventListener('keydown', e => {
     if (!e.shiftKey) {
       e.preventDefault();
       submitCompose(parseInt(cInp.dataset.ci, 10));
+    }
+    return;
+  }
+  // Compose revision textarea: Enter submits the revised attempt.
+  const rInp = e.target.closest('.compose-revision-textarea[data-cri]');
+  if (rInp) {
+    if (!e.shiftKey) {
+      e.preventDefault();
+      submitRevision(parseInt(rInp.dataset.cri, 10));
     }
     return;
   }
@@ -1779,8 +1792,35 @@ function switchMode(m) {
   document.getElementById(`tab-${m}`)?.classList.add('active');
   document.querySelectorAll('[id^="hm-"]').forEach(t => t.classList.remove('active'));
   document.getElementById(`hm-${m}`)?.classList.add('active');
+  moveModeIndicator();
+  animateMainContent();
   if (m === 'eng_roleplay' || total() > 0) renderMode();
 }
+
+// Slide the header toggle's pill indicator under the active mode button.
+function moveModeIndicator() {
+  const toggle = document.getElementById('headerModeToggle');
+  const indicator = document.getElementById('headerModeIndicator');
+  const active = toggle?.querySelector('.header-mode.active');
+  if (!toggle || !indicator || !active) return;
+  const tRect = toggle.getBoundingClientRect();
+  const aRect = active.getBoundingClientRect();
+  indicator.style.left = `${aRect.left - tRect.left}px`;
+  indicator.style.width = `${aRect.width}px`;
+}
+
+// Re-trigger the fade/slide-in animation on the main content area.
+function animateMainContent() {
+  const m = document.getElementById('mainContent');
+  if (!m) return;
+  m.classList.remove('mode-switching');
+  void m.offsetWidth; // force reflow so the animation restarts
+  m.classList.add('mode-switching');
+}
+
+// Keep the indicator aligned on load and when the viewport resizes.
+window.addEventListener('load', () => moveModeIndicator());
+window.addEventListener('resize', () => moveModeIndicator());
 
 // Roleplay conversation view uses a full-page dark theme (not the scenario picker).
 function setPageTheme() {
@@ -2349,6 +2389,8 @@ Rules:
       submitted: false,
       loading: false,
       review: null,
+      revisions: [],
+      draft: '',
     }));
     paintCompose();
   } catch (e) {
@@ -2362,6 +2404,10 @@ function syncComposeInputs() {
   document.querySelectorAll('.compose-input[data-ci]').forEach(el => {
     const p = S.compose.prompts[parseInt(el.dataset.ci, 10)];
     if (p) p.input = el.value;
+  });
+  document.querySelectorAll('.compose-revision-textarea[data-cri]').forEach(el => {
+    const p = S.compose.prompts[parseInt(el.dataset.cri, 10)];
+    if (p) p.draft = el.value;
   });
 }
 
@@ -2476,8 +2522,47 @@ function composeCardHTML(p) {
         <button class="btn compose-submit" data-ci="${p.i}">${IC.send}</button>
       </div>
       ${p.submitted ? `<div class="feedback ${p.review ? (p.review.verdict === 'correct' ? 'ok' : p.review.verdict === 'minor' ? 'partial' : 'no') : ''}" id="cfb-${p.i}">${composeReviewHTML(p)}</div>` : ''}
+      ${composeRevisionsHTML(p)}
     </div>
   `;
+}
+
+// Chain of revision attempts shown below the first correction. Each entry the
+// student submits gets its own correction; while the latest verdict is not
+// "correct", a fresh input is offered so the card grows entry→correction→…
+function composeRevisionsHTML(p) {
+  if (!p.submitted || !p.review) return '';
+  const revs = p.revisions || [];
+  // The most recent verdict decides whether we keep offering another attempt.
+  const lastReview = revs.length ? revs[revs.length - 1].review : p.review;
+  const lastLoading = revs.length ? revs[revs.length - 1].loading : p.loading;
+  const solved = lastReview && lastReview.verdict === 'correct';
+
+  const attempts = revs.map((rev, ri) => `
+    <div class="compose-revision">
+      <div class="compose-revision-entry"><span class="crev-arrow">↳</span> ${escHtml(rev.input)}</div>
+      <div class="feedback ${rev.review ? (rev.review.verdict === 'correct' ? 'ok' : rev.review.verdict === 'minor' ? 'partial' : 'no') : ''}" id="crfb-${p.i}-${ri}">${composeReviewHTML(rev)}</div>
+    </div>`).join('');
+
+  // Offer a fresh input only when nothing is mid-review and it isn't solved yet.
+  const openInput = (!solved && !lastLoading) ? `
+    <div class="compose-revision-open">
+      <div class="compose-revision-label">Revise and try again</div>
+      <div class="answer-row">
+        <textarea
+          class="answer-input compose-input compose-revision-textarea"
+          id="cri-${p.i}"
+          data-cri="${p.i}"
+          placeholder="type your revised sentence…"
+          autocomplete="off"
+        >${escHtml(p.draft || '')}</textarea>
+        ${micButtonHTML(`cri-${p.i}`)}
+        <button class="btn compose-revise-submit" data-cri="${p.i}">${IC.send}</button>
+      </div>
+    </div>` : '';
+
+  if (!attempts && !openInput) return '';
+  return `<div class="compose-revisions">${attempts}${openInput}</div>`;
 }
 
 function composeReviewHTML(p) {
@@ -2509,6 +2594,71 @@ async function submitCompose(i) {
   p.review = null;
   paintCompose();
 
+  try {
+    p.review = await reviewCompose(p, ans);
+    // Record corrected mistakes for weak-point analysis
+    if (p.review.verdict !== 'correct' && p.review.correction) {
+      logMistake({ src: 'c', wrote: ans, fix: stripMarkers(p.review.correction), note: p.review.note, idea: p.idea, constraint: p.constraint });
+    }
+  } catch (e) {
+    p.review = { verdict: 'minor', correction: '', annotated: '', translation: '', note: `Couldn't load review: ${e.message}` };
+  }
+  p.loading = false;
+
+  // Full repaint so the card state, feedback, and score row all refresh together.
+  // syncComposeInputs preserves anything typed in other cards during the await.
+  syncComposeInputs();
+  paintCompose();
+  if (p.review && p.review.correction) speakJapanese(stripMarkers(p.review.correction));
+}
+
+// Submit a revised attempt for prompt i. Appends a new entry→correction pair
+// to the card, reviewed exactly like the first try (same idea/constraint/hints).
+async function submitRevision(i) {
+  const p = S.compose.prompts[i];
+  if (!p || !p.submitted) return;
+  const revs = p.revisions || (p.revisions = []);
+  if (revs.some(r => r.loading)) return; // one revision in flight at a time
+  const el = document.getElementById(`cri-${i}`);
+  const ans = (el ? el.value : (p.draft || '')).trim();
+  if (!ans) return;
+  syncComposeInputs();
+
+  const rev = { input: ans, loading: true, review: null };
+  revs.push(rev);
+  p.draft = '';
+  paintCompose();
+
+  // Build the feedback history (first attempt + every prior revision) so the
+  // reviewer stays consistent and credits fixes it already asked for.
+  const priorRevs = revs.slice(0, -1);
+  const history = [
+    { wrote: p.input, correction: stripMarkers(p.review.correction || ''), note: p.review.note },
+    ...priorRevs.map(r => ({ wrote: r.input, correction: stripMarkers(r.review?.correction || ''), note: r.review?.note })),
+  ].filter(h => h.correction);
+
+  try {
+    rev.review = await reviewCompose(p, ans, history);
+    if (rev.review.verdict !== 'correct' && rev.review.correction) {
+      logMistake({ src: 'c', wrote: ans, fix: stripMarkers(rev.review.correction), note: rev.review.note, idea: p.idea, constraint: p.constraint });
+    }
+  } catch (e) {
+    rev.review = { verdict: 'minor', correction: '', annotated: '', translation: '', note: `Couldn't load review: ${e.message}` };
+  }
+  rev.loading = false;
+
+  syncComposeInputs();
+  paintCompose();
+  if (rev.review && rev.review.correction) speakJapanese(stripMarkers(rev.review.correction));
+}
+
+// Ask Claude to review one composed sentence against a prompt's idea/constraint.
+// Shared by the first submission and every subsequent revision so corrections
+// are graded identically. `history` carries earlier attempts + the corrections
+// already shown, so revisions stay consistent with prior feedback instead of
+// inventing a fresh "ideal" sentence each round. Returns a normalised review
+// object (may throw).
+async function reviewCompose(p, ans, history = []) {
   const hintBlock = (p.hints || []).map(h => `${h.jp}（${h.reading}）= ${h.en}`).join('; ');
   const sys = `You are a warm but precise Japanese tutor. A student was asked to write ONE Japanese sentence expressing a given idea.
 The student may write in romaji, kana, or kanji — these are ALL equally acceptable. Script and orthography are NOT graded:
@@ -2526,35 +2676,31 @@ Return ONLY a JSON object, no markdown fences:
 }
 If the exercise specifies a REQUIRED grammar pattern, the answer must use it: if the Japanese is otherwise fine but does not use the required pattern, the verdict is "minor" and the note should nudge them toward it (rewrite the correction to use it). Wrong/unnatural Japanese is still "wrong".
 Whenever the note mentions a Japanese word or phrase as a suggestion or example, append its romaji in parentheses, e.g. 洗濯をしなければならない (sentaku o shinakereba naranai).
-verdict guide: "correct" = grammatical and natural meaning (correction may equal their sentence, just written in normal orthography); "minor" = small grammar fixes (particle, conjugation, word choice); "wrong" = wrong meaning, ungrammatical, not Japanese, or empty. Choosing romaji or kana is never a reason to drop below "correct".`;
+verdict guide: "correct" = grammatical and natural meaning (correction may equal their sentence, just written in normal orthography); "minor" = small grammar fixes (particle, conjugation, word choice); "wrong" = wrong meaning, ungrammatical, not Japanese, or empty. Choosing romaji or kana is never a reason to drop below "correct".
+CONSISTENCY (when earlier attempts are shown): This is a multi-attempt exercise. You MUST stay consistent with feedback you already gave for the SAME prompt:
+- Keep the SAME target/"correction" sentence you established earlier. Do NOT switch to a different equally-valid phrasing or re-word the ideal answer between attempts.
+- If the student has now correctly applied a fix you previously asked for, that issue is RESOLVED — do not raise it again.
+- If the student's new sentence matches (or is grammatically equivalent to) the correction you previously gave, the verdict MUST be "correct".
+- Only report errors that genuinely REMAIN unfixed or are NEWLY introduced in the latest attempt; grade against the guidance you already gave.`;
+
+  const historyBlock = history.length ? `Earlier attempts at THIS SAME prompt (oldest first) with the feedback you already gave:
+${history.map((h, i) => `${i + 1}. Student wrote: "${h.wrote}"
+   You corrected it to: "${h.correction}"${h.note ? `\n   You explained: ${h.note}` : ''}`).join('\n')}
+
+` : '';
 
   const msg = `Idea to express (in English): ${p.idea}
-${p.constraint ? `REQUIRED grammar pattern the answer must use: ${p.constraint}\n` : ''}${hintBlock ? `Suggested vocab (optional): ${hintBlock}\n` : ''}Student wrote: "${ans}"`;
+${p.constraint ? `REQUIRED grammar pattern the answer must use: ${p.constraint}\n` : ''}${hintBlock ? `Suggested vocab (optional): ${hintBlock}\n` : ''}${historyBlock}Student wrote: "${ans}"`;
 
-  try {
-    const raw = await claude([{ role: 'user', content: msg }], sys, 600);
-    const r = parseLooseJSON(raw);
-    p.review = {
-      verdict: ['correct', 'minor', 'wrong'].includes(r.verdict) ? r.verdict : 'minor',
-      correction: r.correction || '',
-      annotated: r.annotated || r.correction || '',
-      translation: r.translation || '',
-      note: r.note || '',
-    };
-    // Record corrected mistakes for weak-point analysis
-    if (p.review.verdict !== 'correct' && p.review.correction) {
-      logMistake({ src: 'c', wrote: ans, fix: stripMarkers(p.review.correction), note: p.review.note, idea: p.idea, constraint: p.constraint });
-    }
-  } catch (e) {
-    p.review = { verdict: 'minor', correction: '', annotated: '', translation: '', note: `Couldn't load review: ${e.message}` };
-  }
-  p.loading = false;
-
-  // Full repaint so the card state, feedback, and score row all refresh together.
-  // syncComposeInputs preserves anything typed in other cards during the await.
-  syncComposeInputs();
-  paintCompose();
-  if (p.review && p.review.correction) speakJapanese(stripMarkers(p.review.correction));
+  const raw = await claude([{ role: 'user', content: msg }], sys, 600);
+  const r = parseLooseJSON(raw);
+  return {
+    verdict: ['correct', 'minor', 'wrong'].includes(r.verdict) ? r.verdict : 'minor',
+    correction: r.correction || '',
+    annotated: r.annotated || r.correction || '',
+    translation: r.translation || '',
+    note: r.note || '',
+  };
 }
 
 function toggleComposeHint(i) {
@@ -2669,9 +2815,32 @@ const JP_SCENARIO_THEMES = [
   'rural Japan & countryside', 'temples, shrines & spirituality', 'shopping & markets',
   'technology & modern life', 'music, art & performance', 'animals & pets',
   'housing & moving', 'childhood nostalgia & memories',
+  'convenience stores & vending-machine culture', 'onsen & bathhouse etiquette',
+  'anime, manga & otaku subculture', 'idol & fan culture', 'retro arcades & video games',
+  'weather, earthquakes & disaster preparedness', 'superstitions, fortune-telling & omens',
+  'ghosts, yokai & urban legends', 'love, dating & awkward confessions', 'breakups & heartbreak',
+  'aging, retirement & elderly life', 'startups, side hustles & big ambitions',
+  'gardening, bonsai & houseplants', 'cars, motorcycles & road trips',
+  'fashion, thrift shops & street style', 'baseball & die-hard sports fandom',
+  'martial arts & discipline', 'cooking disasters & home kitchens',
+  'cleaning, minimalism & decluttering', 'money troubles & extreme frugality',
+  'lost & found situations', 'rush-hour commuting chaos', 'part-time jobs (arubaito)',
+  'exam stress & cram schools', 'moving to the big city', 'homesickness & living far away',
+  'unexpected reunions with old friends', 'mistaken identity & misunderstandings',
+  'small kindnesses from strangers', 'rivalry, competition & one-upmanship',
+  'sake, craft beer & bar-counter confessions', 'street performers & buskers',
+  'photography & chasing the perfect shot', 'obsessive collectors & niche hobbies',
+  'DIY, repairs & fixing broken things', 'birthdays, anniversaries & gift-giving mishaps',
+  'snow country & deep-winter life', 'sweltering summer & cicada nights',
+  'convenience & modern gadgets breaking down', 'secondhand shops & buried treasure',
 ];
 
+// A fully-open theme, injected occasionally for maximum unpredictability.
+const WILDCARD_JP_THEME = 'anything goes — completely unexpected, surreal, or wildly varied settings anywhere in Japan (surprise the learner, avoid the obvious)';
+
 function pickJpTheme() {
+  // ~30% of the time, go fully random for variety.
+  if (Math.random() < 0.3) return WILDCARD_JP_THEME;
   const used = JSON.parse(sessionStorage.getItem('renshuu_used_jp_themes') || '[]');
   const available = JP_SCENARIO_THEMES.filter(t => !used.includes(t));
   const pool = available.length > 0 ? available : JP_SCENARIO_THEMES;
@@ -4945,9 +5114,25 @@ const ENG_SCENARIO_THEMES = [
   'entertainment, music & nightlife', 'education & campus life', 'family, relationships & celebrations',
   'transportation & getting around', 'technology & modern life', 'small talk & everyday encounters',
   'volunteering & community', 'art, museums & galleries', 'nature, wildlife & environment',
+  'airports, customs & immigration', 'hotels & check-in mishaps', 'cafés & coffee culture',
+  'dating & relationships abroad', 'networking & career fairs', 'group projects & study sessions',
+  'roommates & shared housing', 'pharmacies & minor illnesses', 'road trips & renting cars',
+  'phone calls & customer service', 'complaints, refunds & returns', 'concerts, festivals & fandom',
+  'homestays & host families', 'tech support & broken gadgets', 'banking & money abroad',
+  'asking for help in an emergency', 'making excuses & apologizing', 'negotiating & haggling',
+  'getting lost & giving directions', 'weather & seasons chit-chat', 'pets & animal encounters',
+  'clubs, teams & joining in', 'first day at a new job', 'moving to a new city abroad',
+  'homesickness & culture shock', 'unexpected reunions', 'mistaken identity & mix-ups',
+  'small kindnesses from strangers', 'awkward parties & social blunders', 'street food & markets abroad',
+  'gyms, fitness & wellness', 'job you did not expect to love',
 ];
 
+// A fully-open theme, injected occasionally for maximum unpredictability.
+const WILDCARD_ENG_THEME = 'anything goes — completely unexpected or wildly varied English-speaking situations (surprise the learner, avoid the obvious)';
+
 function pickEngTheme() {
+  // ~30% of the time, go fully random for variety.
+  if (Math.random() < 0.3) return WILDCARD_ENG_THEME;
   const used = JSON.parse(sessionStorage.getItem('renshuu_used_eng_themes') || '[]');
   const available = ENG_SCENARIO_THEMES.filter(t => !used.includes(t));
   const pool = available.length > 0 ? available : ENG_SCENARIO_THEMES;
