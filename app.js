@@ -76,6 +76,10 @@ document.addEventListener('click', e => {
   const rBtn = e.target.closest('.compose-revise-submit[data-cri]');
   if (rBtn) { submitRevision(parseInt(rBtn.dataset.cri, 10)); return; }
 
+  // Drill revision (retry) submit button
+  const drBtn = e.target.closest('.drill-revise-submit[data-dri]');
+  if (drBtn) { submitDrillRevision(parseInt(drBtn.dataset.dri, 10)); return; }
+
   // Drill speak button
   const drillSpeak = e.target.closest('.drill-speak[data-sentence]');
   if (drillSpeak) { speakJapanese(drillSpeak.dataset.sentence, drillSpeak); return; }
@@ -207,6 +211,13 @@ document.addEventListener('keydown', e => {
       e.preventDefault();
       submitRevision(parseInt(rInp.dataset.cri, 10));
     }
+    return;
+  }
+  // Drill revision input: Enter submits the revised answer.
+  const drInp = e.target.closest('.drill-revision-input[data-dri]');
+  if (drInp) {
+    e.preventDefault();
+    submitDrillRevision(parseInt(drInp.dataset.dri, 10));
     return;
   }
   const inp = e.target.closest('.answer-input[data-di]');
@@ -487,6 +498,7 @@ async function loadCards() {
     showBanner(e.message.includes('fetch')
       ? 'Cannot reach AnkiConnect. Is Anki running? Check CORS config.'
       : e.message);
+    markSplashReady();
   }
 
   btn.disabled = false; btn.textContent = 'Reload from Anki';
@@ -1822,6 +1834,24 @@ function animateMainContent() {
 window.addEventListener('load', () => moveModeIndicator());
 window.addEventListener('resize', () => moveModeIndicator());
 
+// Dismiss the loading splash once the app's first content is ready. We keep it
+// up while drills/compose are generated in the background, with a brief minimum
+// show so it never just flashes, and a safety timeout so it can't get stuck.
+const _splash = { start: Date.now(), done: false, MIN_MS: 900, MAX_MS: 20000 };
+function markSplashReady() {
+  if (_splash.done) return;
+  _splash.done = true;
+  const splash = document.getElementById('splash');
+  if (!splash) return;
+  const wait = Math.max(0, _splash.MIN_MS - (Date.now() - _splash.start));
+  setTimeout(() => {
+    splash.classList.add('hide');
+    setTimeout(() => splash.remove(), 700);
+  }, wait);
+}
+// Safety net: never let the splash hang if generation stalls or errors silently.
+setTimeout(markSplashReady, _splash.MAX_MS);
+
 // Roleplay conversation view uses a full-page dark theme (not the scenario picker).
 function setPageTheme() {
   const dark = (S.mode === 'roleplay' && S.scenario) || (S.mode === 'eng_roleplay' && S.engScenario);
@@ -1832,8 +1862,8 @@ function renderMode() {
   setPageTheme();
   if (S.mode === 'drill') renderDrills();
   else if (S.mode === 'compose') renderCompose();
-  else if (S.mode === 'roleplay') renderRoleplay();
-  else if (S.mode === 'eng_roleplay') renderEngRoleplay();
+  else if (S.mode === 'roleplay') { renderRoleplay(); markSplashReady(); }
+  else if (S.mode === 'eng_roleplay') { renderEngRoleplay(); markSplashReady(); }
 }
 
 // ── Claude ────────────────────────────────────────────────────────────────────
@@ -1964,10 +1994,11 @@ Rules:
     );
     const clean = raw.replace(/```json|```/g, '').trim();
     const { drills } = JSON.parse(clean);
-    S.drills = drills.map((d, i) => ({ ...d, i, answered: false, correct: null, input: '' }));
+    S.drills = drills.map((d, i) => ({ ...d, i, answered: false, correct: null, input: '', revisions: [], draft: '' }));
     paintDrills();
   } catch (e) {
     zone.innerHTML = `<div style="color:var(--red);font-size:12px">Error: ${e.message}</div>`;
+    markSplashReady();
   }
   if (btn) btn.disabled = false;
 }
@@ -1994,6 +2025,7 @@ function paintDrills() {
     </div>`;
 
   zone.innerHTML = S.drills.map(d => drillHTML(d)).join('') + scoreHTML + bottomBtn;
+  markSplashReady();
 }
 
 function drillHTML(d) {
@@ -2036,8 +2068,10 @@ function drillHTML(d) {
           <span class="num">${d.i + 1} / ${S.drills.length}</span>
         </div>
       </div>
-      <div style="margin:4px 0 2px"><button class="speak-btn drill-speak" data-sentence="${escHtml(stripMarkers(d.sentence))}" title="Listen">${IC.volume}</button></div>
-      <div class="hint-text">Fill in: ${d.meaning}${d.hint ? ` · ${d.hint}` : ''}</div>
+      <div class="hint-text" style="display:flex;align-items:center;gap:6px">
+        <button class="speak-btn drill-speak" data-sentence="${escHtml(stripMarkers(d.sentence))}" title="Listen">${IC.volume}</button>
+        <span>Fill in: ${d.meaning}${d.hint ? ` · ${d.hint}` : ''}</span>
+      </div>
       <div class="answer-row">
         <input
           class="answer-input"
@@ -2059,9 +2093,9 @@ function drillHTML(d) {
             : d.aiFeedback
               ? `✗ &nbsp;${d.aiFeedback}`
               : `<span class="spin"></span>`}
-          ${(!d.correct && d.aiFeedback) ? `<button class="btn retry-btn" onclick="retryDrill(${d.i})">Try again</button>` : ''}
           <div class="tl">${d.translation}</div>
-        </div>` : ''}
+        </div>
+        ${drillRevisionsHTML(d)}` : ''}
     </div>
   `;
 }
@@ -2073,7 +2107,18 @@ function checkDrill(i) {
   const ans = (inputEl ? inputEl.value : d.input).trim();
   if (!ans) return;
   d.input = ans;
+  const { correct, partial } = gradeDrillAnswer(d, ans);
+  d.correct  = correct;
+  d.partial  = partial;
+  d.answered = true;
+  paintDrills();
+  speakJapanese(stripMarkers(d.sentence));
+  if (!d.correct) fetchDrillFeedback(d, d);
+}
 
+// Grade a single typed answer against the drill's target: exact match on target,
+// reading, meaning, or romaji, plus one-character typo tolerance for partials.
+function gradeDrillAnswer(d, ans) {
   const ansLow     = ans.toLowerCase();
   const ansHira    = inputToHira(ans);
   const rdRomaji   = readingToRomaji(d.reading);
@@ -2085,7 +2130,6 @@ function checkDrill(i) {
     ansHira === d.reading ||
     (rdRomaji && ansLow === rdRomaji)
   );
-  // Partial credit: one-character typo on any matching field (min 3 chars)
   const close = (a, b) => a.length >= 3 && b.length >= 3 && levenshtein(a, b) === 1;
   const almost = !exact && (
     close(ans,    d.target)  ||
@@ -2093,63 +2137,113 @@ function checkDrill(i) {
     close(ansHira, d.reading) ||
     (rdRomaji && close(ansLow, rdRomaji))
   );
-  d.correct  = exact || almost;
-  d.partial  = almost;
-  d.answered = true;
-  paintDrills();
-  speakJapanese(stripMarkers(d.sentence));
-  if (!d.correct) getWrongFeedback(i);
+  return { correct: exact || almost, partial: almost };
 }
 
-async function getWrongFeedback(i) {
-  const d = S.drills[i];
+// Ask Claude why an answer was wrong. Shared by the first attempt (attempt === d)
+// and every revision (attempt === a revision object); writes the feedback onto
+// the attempt and repaints so the correction + revision chain refresh together.
+async function fetchDrillFeedback(d, attempt) {
   const sys = `You are a concise Japanese tutor giving feedback on fill-in-the-blank drill answers. Respond with ONLY a JSON object, no other text.
 If the student's answer is just a spelling/romaji typo of the correct answer, respond: {"correct":true,"feedback":"Just a typo — close enough!"}
 Otherwise explain in one short sentence what's wrong. Example: {"correct":false,"feedback":"おそく is the adverbial form; the adjective form おそい is needed here."}`;
   const msg = `Sentence: ${d.sentence}
 Target: ${d.target}（${d.reading}）= ${d.meaning}
-Student answered: "${d.input}"`;
+Student answered: "${attempt.input}"`;
   try {
     const raw = await claude([{ role: 'user', content: msg }], sys, 150);
     // Extract JSON even if Claude wraps it in backticks or adds surrounding text
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const result = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
-    if (result.correct) {
-      d.correct = true;
-      d.partial = true;
-    }
-    d.aiFeedback = result.feedback;
-  } catch(e) {
-    d.aiFeedback = `Correct answer: ${d.target}（${d.reading}）`;
+    if (result.correct) { attempt.correct = true; attempt.partial = true; }
+    attempt.aiFeedback = result.feedback;
+  } catch (e) {
+    attempt.aiFeedback = `Correct answer: ${d.target}（${d.reading}）`;
   }
-  // Update just this card's feedback div
-  const fb = document.getElementById(`fb-${i}`);
-  if (fb) {
-    fb.className = `feedback ${d.partial ? 'partial' : d.correct ? 'ok' : 'no'}`;
-    const retryHtml = !d.correct ? `<button class="btn retry-btn" onclick="retryDrill(${i})">Try again</button>` : '';
-    fb.innerHTML = (d.correct
-      ? `△ &nbsp;${d.aiFeedback}`
-      : `✗ &nbsp;${d.aiFeedback}`) + retryHtml + `<div class="tl">${d.translation}</div>`;
-    const card = document.getElementById(`dc-${i}`);
-    if (card) {
-      card.className = `drill-card ${d.partial ? 'partial-card' : d.correct ? 'correct-card' : 'wrong-card'}`;
-    }
-  }
+  attempt.loading = false;
+  syncDrillInputs();
+  paintDrills();
 }
 
-function retryDrill(i) {
+// Chain of revision attempts shown below the first correction — mirrors compose.
+// Each retry the student types gets its own check; while the latest attempt is
+// still wrong, a fresh input keeps the card growing entry→correction→entry→…
+function drillRevisionsHTML(d) {
+  if (!d.answered || d.correct) return '';
+  const revs = d.revisions || [];
+  // The most recent attempt decides whether we keep offering another go.
+  const last = revs.length ? revs[revs.length - 1] : d;
+  const lastLoading = revs.length ? last.loading : !d.aiFeedback;
+  const solved = !!last.correct;
+
+  const attempts = revs.map((rev, ri) => `
+    <div class="compose-revision">
+      <div class="compose-revision-entry"><span class="crev-arrow">↳</span> ${escHtml(rev.input)}</div>
+      <div class="feedback ${rev.correct ? (rev.partial ? 'partial' : 'ok') : 'no'}" id="drfb-${d.i}-${ri}">${drillRevisionFeedbackHTML(d, rev)}</div>
+    </div>`).join('');
+
+  // Offer a fresh input only when nothing is mid-check and it isn't solved yet.
+  const openInput = (!solved && !lastLoading) ? `
+    <div class="compose-revision-open">
+      <div class="compose-revision-label">Revise and try again</div>
+      <div class="answer-row">
+        <input
+          class="answer-input drill-revision-input"
+          id="dri-${d.i}"
+          data-dri="${d.i}"
+          placeholder="try again…"
+          value="${escHtml(d.draft || '')}"
+          autocomplete="off"
+        />
+        <button class="btn drill-revise-submit" data-dri="${d.i}">${IC.send}</button>
+      </div>
+    </div>` : '';
+
+  if (!attempts && !openInput) return '';
+  return `<div class="compose-revisions">${attempts}${openInput}</div>`;
+}
+
+function drillRevisionFeedbackHTML(d, rev) {
+  if (rev.loading) return '<span class="spin"></span> checking…';
+  if (rev.correct && !rev.partial) return `✓ Correct`;
+  if (rev.partial) return `△ &nbsp;${rev.aiFeedback || `Close! &nbsp;→&nbsp; ${d.target}（${d.reading}）`}`;
+  return `✗ &nbsp;${rev.aiFeedback || `Correct answer: ${d.target}（${d.reading}）`}`;
+}
+
+// Submit a revised drill answer for prompt i. Appends a new entry→correction
+// pair, graded exactly like the first attempt — but revisions never change the
+// score (that stays fixed on the first try, matching compose).
+async function submitDrillRevision(i) {
   const d = S.drills[i];
-  if (!d) return;
-  d.answered = false;
-  d.correct = false;
-  d.partial = false;
-  d.aiFeedback = null;
-  d.input = '';
+  if (!d || !d.answered) return;
+  const revs = d.revisions || (d.revisions = []);
+  if (revs.some(r => r.loading)) return; // one revision in flight at a time
+  const el = document.getElementById(`dri-${i}`);
+  const ans = (el ? el.value : (d.draft || '')).trim();
+  if (!ans) return;
+  syncDrillInputs();
+
+  const { correct, partial } = gradeDrillAnswer(d, ans);
+  const rev = { input: ans, correct, partial, aiFeedback: null, loading: !correct };
+  revs.push(rev);
+  d.draft = '';
+  syncDrillInputs();
   paintDrills();
-  setTimeout(() => {
-    const inp = document.getElementById(`ai-${i}`);
-    if (inp) inp.focus();
-  }, 50);
+  speakJapanese(stripMarkers(d.sentence));
+
+  if (!correct) await fetchDrillFeedback(d, rev);
+}
+
+// Preserve in-progress drill text back into state before any repaint.
+function syncDrillInputs() {
+  document.querySelectorAll('.answer-input[data-di]').forEach(el => {
+    const d = S.drills[parseInt(el.dataset.di, 10)];
+    if (d && !d.answered) d.input = el.value;
+  });
+  document.querySelectorAll('.drill-revision-input[data-dri]').forEach(el => {
+    const d = S.drills[parseInt(el.dataset.dri, 10)];
+    if (d) d.draft = el.value;
+  });
 }
 
 // ── COMPOSE MODE ──────────────────────────────────────────────────────────────
@@ -2397,6 +2491,7 @@ Rules:
     paintCompose();
   } catch (e) {
     if (zone) zone.innerHTML = `<div style="color:var(--red);font-size:12px">Error: ${e.message}</div>`;
+    markSplashReady();
   }
   if (btn) btn.disabled = false;
 }
@@ -2444,6 +2539,7 @@ function paintCompose() {
     </div>`;
 
   zone.innerHTML = themeBar + c.prompts.map(p => composeCardHTML(p)).join('') + scoreHTML + bottomBtn;
+  markSplashReady();
 }
 
 // "Teacher's notes" — the AI-distilled weak-point profile, shown above the batch.
