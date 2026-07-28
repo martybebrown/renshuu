@@ -4674,6 +4674,14 @@ function renderScene(sc) {
     const baseType = VOICE_SPRITE_MAP[sc.voice] || 'salaryman';
     const c = CHAR_SPRITES_HD[baseType] || CHAR_SPRITES_HD.salaryman;
     const localBottom = (50 - bg.charY) * 2;
+    // Nudge the figure slightly off-center so it doesn't feel posed dead-centre.
+    // Deterministic per scene: stable left/right lean of 6–9 units. The sprite is
+    // 32 wide in an 80-wide scene, so keep charX within [2, 46] to stay in frame.
+    const key = String(sc.id || sc.jp || sc.en || sc.voice || '');
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) & 0x7fffffff;
+    const offset = (hash & 1 ? 1 : -1) * (6 + (hash % 4));
+    const charX = Math.max(2, Math.min(46, bg.charX + offset));
     let ext = '';
     if (c.torso && localBottom > 64) {
       const t = c.torso, eh = Math.ceil(localBottom) - 62;
@@ -4683,7 +4691,7 @@ function renderScene(sc) {
         [t.x + t.w - 3, 62, 3, eh, t.ocs],
       ]);
     }
-    svg += `<g transform="translate(${bg.charX},${bg.charY}) scale(0.5)">${ext}${charRects}</g>`;
+    svg += `<g transform="translate(${charX},${bg.charY}) scale(0.5)">${ext}${charRects}</g>`;
   }
   svg += '</svg>';
   return svg;
