@@ -538,6 +538,8 @@ pre.code {
 .sc-en { color: var(--muted); font-size: 10px; }
 .sc-char { color: var(--muted); font-size: 9px; margin-top: 4px; line-height: 1.35; font-style: italic; }
 .sc-sprite { display: flex; justify-content: center; margin-bottom: 6px; image-rendering: pixelated; }
+.sc-sprite svg { animation: bob 2.7s ease-in-out infinite; }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
 .sc-fav {
   position: absolute; top: 6px; right: 7px;
   background: none; border: none; cursor: pointer;

@@ -3219,22 +3219,30 @@ const CHAR_SPRITES = {
 };
 
 const VOICE_SPRITE_MAP = {
-  'ja-JP-DaichiNeural': 'mature_male',
-  'ja-JP-NaokiNeural':  'adult_male',
-  'ja-JP-KeitaNeural':  'young_male',
-  'ja-JP-NanamiNeural': 'adult_female',
-  'ja-JP-MayuNeural':   'adult_female',
-  'ja-JP-ShioriNeural': 'young_female',
-  'ja-JP-AoiNeural':    'young_female',
+  'ja-JP-DaichiNeural': 'exec_man',
+  'ja-JP-NaokiNeural':  'salaryman',
+  'ja-JP-KeitaNeural':  'student_boy',
+  'ja-JP-NanamiNeural': 'office_woman',
+  'ja-JP-MayuNeural':   'cool_woman',
+  'ja-JP-ShioriNeural': 'student_girl',
+  'ja-JP-AoiNeural':    'child',
   // English voices (for reverse roleplay)
-  'en-US-GuyNeural':      'adult_male',
-  'en-US-DavisNeural':    'young_male',
-  'en-US-JennyNeural':    'adult_female',
-  'en-US-AriaNeural':     'young_female',
-  'en-GB-RyanNeural':     'mature_male',
-  'en-GB-SoniaNeural':    'adult_female',
-  'en-AU-WilliamNeural':  'adult_male',
-  'en-AU-NatashaNeural':  'young_female',
+  'en-US-GuyNeural':      'burly_man',
+  'en-US-DavisNeural':    'student_boy',
+  'en-US-JennyNeural':    'office_woman',
+  'en-US-AriaNeural':     'cool_woman',
+  'en-GB-RyanNeural':     'elder_man',
+  'en-GB-SoniaNeural':    'elder_woman',
+  'en-AU-WilliamNeural':  'salaryman',
+  'en-AU-NatashaNeural':  'student_girl',
+};
+
+// Maps the HD archetypes to the legacy 16×16 overworld sprites (canvas NPCs).
+const HD_TO_LEGACY = {
+  exec_man:'mature_male', salaryman:'adult_male', student_boy:'young_male',
+  office_woman:'adult_female', student_girl:'young_female', elder_man:'mature_male',
+  elder_woman:'adult_female', burly_man:'adult_male', cool_woman:'adult_female',
+  child:'young_female',
 };
 
 function renderSprite(type, px) {
@@ -3502,219 +3510,334 @@ const ACCESSORY_KIT = {
   },
 };
 
-// ── HD (64×64) sprite data for SVG portraits/avatars/scenes ────────────
-// Rect format: [x, y, width, height, color]
-// `head` rects are replaced by accessory `head` rects when the accessory
-// covers the hair (hats). `body` rects are always drawn. `overlay` rects
-// from accessories draw on top.
-const CHAR_SPRITES_HD = {
-  mature_male: {
-    head: [
-      [14,6,36,2,'#7A7A7A'],
-      [12,8,40,2,'#8C8C8C'],
-      [11,10,42,2,'#9A9A9A'],
-      [10,12,44,2,'#9A9A9A'],
-      [14,9,14,2,'#B4B4B4'],[36,9,10,2,'#B4B4B4'],
-      [10,14,3,18,'#8C8C8C'],[51,14,3,18,'#8C8C8C'],
-      [9,14,1,18,'#6A6A6A'],[54,14,1,18,'#6A6A6A'],
-    ],
-    body: [
-      [14,13,36,1,'#E8B888'],
-      [13,14,38,26,'#EFC090'],
-      [14,40,36,2,'#E8B888'],
-      [16,42,32,2,'#D8A878'],
-      [18,14,14,3,'#F5D0A0'],
-      [11,22,3,8,'#D8A878'],[50,22,3,8,'#D8A878'],
-      [12,24,1,4,'#C09060'],[51,24,1,4,'#C09060'],
-      [17,20,10,1,'#5A5A5A'],[17,21,10,1,'#707070'],
-      [36,20,10,1,'#5A5A5A'],[36,21,10,1,'#707070'],
-      [18,23,9,5,'#FFFFFF'],[36,23,9,5,'#FFFFFF'],
-      [18,23,9,1,'#1A0800'],[36,23,9,1,'#1A0800'],
-      [20,24,4,4,'#3A5A6A'],[38,24,4,4,'#3A5A6A'],
-      [21,25,2,2,'#1A0800'],[39,25,2,2,'#1A0800'],
-      [21,24,1,1,'#FFFFFF'],[39,24,1,1,'#FFFFFF'],
-      [14,25,2,1,'#C09060'],[48,25,2,1,'#C09060'],
-      [13,26,3,1,'#C09060'],[48,26,3,1,'#C09060'],
-      [30,29,2,1,'#D8A878'],
-      [29,30,1,3,'#D8A878'],[32,30,1,3,'#D8A878'],
-      [30,33,3,1,'#C09060'],
-      [29,34,2,1,'#C09060'],[33,34,2,1,'#C09060'],
-      [30,34,1,1,'#A07050'],[33,34,1,1,'#A07050'],
-      [22,36,20,1,'#A06050'],
-      [23,37,18,1,'#C07060'],
-      [24,38,16,1,'#E08070'],
-      [26,42,12,1,'#C09060'],
-      [22,44,20,4,'#C89060'],
-      [22,44,20,1,'#A07040'],
-      [6,48,52,16,'#2E4A6A'],
-      [6,48,52,2,'#1A2A40'],
-      [4,48,4,16,'#1A2A40'],[56,48,4,16,'#1A2A40'],
-    ],
-  },
-  adult_male: {
-    head: [
-      [12,4,40,2,'#1A0800'],
-      [10,6,44,3,'#1A0800'],
-      [9,9,46,3,'#1A0800'],
-      [9,12,3,16,'#1A0800'],[52,12,3,16,'#1A0800'],
-      [14,5,8,3,'#3A2010'],[34,6,8,2,'#3A2010'],
-      [12,12,12,5,'#1A0800'],[40,12,12,5,'#1A0800'],
-      [22,12,20,2,'#1A0800'],
-    ],
-    body: [
-      [14,11,36,2,'#E8B888'],
-      [13,13,38,27,'#EFC090'],
-      [14,40,36,2,'#E8B888'],
-      [16,42,32,3,'#D8A878'],
-      [20,44,24,2,'#C89060'],
-      [20,14,12,3,'#F5D0A0'],
-      [11,22,3,7,'#D8A878'],[50,22,3,7,'#D8A878'],
-      [17,19,10,2,'#1A0800'],[36,19,10,2,'#1A0800'],
-      [18,23,9,5,'#FFFFFF'],[36,23,9,5,'#FFFFFF'],
-      [18,23,9,1,'#1A0800'],[36,23,9,1,'#1A0800'],
-      [20,24,4,4,'#3A4A2A'],[38,24,4,4,'#3A4A2A'],
-      [21,25,2,2,'#1A0800'],[39,25,2,2,'#1A0800'],
-      [22,24,1,1,'#FFFFFF'],[40,24,1,1,'#FFFFFF'],
-      [30,29,3,1,'#D8A878'],
-      [29,30,1,4,'#D8A878'],[33,30,1,4,'#D8A878'],
-      [29,34,5,1,'#C09060'],
-      [22,36,20,1,'#A06050'],
-      [23,37,18,1,'#C07060'],
-      [24,38,16,1,'#D87060'],
-      [2,46,60,18,'#1A3A6A'],
-      [2,46,60,2,'#0A2A50'],
-      [22,46,20,4,'#0A2A50'],
-    ],
-  },
-  young_male: {
-    head: [
-      [14,2,3,4,'#1A0800'],
-      [20,0,3,6,'#1A0800'],
-      [27,2,3,4,'#1A0800'],
-      [34,0,3,6,'#1A0800'],
-      [41,2,3,4,'#1A0800'],
-      [47,0,3,6,'#1A0800'],
-      [11,6,42,3,'#1A0800'],
-      [9,9,46,3,'#1A0800'],
-      [9,12,3,10,'#1A0800'],[52,12,3,10,'#1A0800'],
-      [14,7,6,3,'#3A2010'],[28,7,6,3,'#4A2010'],[42,7,6,3,'#3A2010'],
-      [14,12,6,4,'#1A0800'],[44,12,6,4,'#1A0800'],
-      [22,12,20,2,'#1A0800'],
-    ],
-    body: [
-      [14,11,36,2,'#E8B888'],
-      [13,13,38,27,'#EFC090'],
-      [14,40,36,2,'#E8B888'],
-      [16,42,32,3,'#D8A878'],
-      [20,44,24,2,'#C89060'],
-      [20,14,12,3,'#F5D5A8'],
-      [11,22,3,7,'#D8A878'],[50,22,3,7,'#D8A878'],
-      [17,19,10,2,'#1A0800'],[36,19,10,2,'#1A0800'],
-      [18,21,8,1,'#0A0400'],[37,21,8,1,'#0A0400'],
-      [18,23,9,5,'#FFFFFF'],[36,23,9,5,'#FFFFFF'],
-      [18,23,9,1,'#1A0800'],[36,23,9,1,'#1A0800'],
-      [20,24,4,4,'#3A7A30'],[38,24,4,4,'#3A7A30'],
-      [21,25,2,2,'#1A0800'],[39,25,2,2,'#1A0800'],
-      [22,24,1,1,'#aaffaa'],[40,24,1,1,'#aaffaa'],
-      [30,29,3,1,'#D8A878'],
-      [29,30,1,4,'#D8A878'],[33,30,1,4,'#D8A878'],
-      [29,34,5,1,'#C09060'],
-      [30,35,3,1,'#A07050'],
-      [22,37,2,2,'#A06050'],[40,37,2,2,'#A06050'],
-      [23,38,18,2,'#A06050'],
-      [24,39,16,1,'#E08080'],
-      [25,38,14,1,'#FFFFFF'],
-      [2,46,60,18,'#1A6030'],
-      [2,46,60,2,'#0A3010'],
-      [22,46,20,4,'#0A3010'],
-    ],
-  },
-  adult_female: {
-    head: [
-      [6,22,4,42,'#1A0800'],[54,22,4,42,'#1A0800'],
-      [5,30,1,34,'#0A0400'],[58,30,1,34,'#0A0400'],
-      [12,4,40,2,'#1A0800'],
-      [10,6,44,3,'#1A0800'],
-      [9,9,46,3,'#1A0800'],
-      [9,12,3,14,'#1A0800'],[52,12,3,14,'#1A0800'],
-      [14,6,6,3,'#3A2010'],[22,5,4,3,'#3A2010'],[36,6,6,3,'#3A2010'],
-      [12,12,6,6,'#1A0800'],[46,12,6,6,'#1A0800'],
-      [13,13,3,2,'#3A2010'],
-    ],
-    body: [
-      [14,11,36,2,'#E8B888'],
-      [13,13,38,26,'#EFC090'],
-      [14,39,36,2,'#E8B888'],
-      [16,41,32,3,'#D8A878'],
-      [18,13,14,3,'#F5D5A8'],
-      [11,22,3,6,'#D8A878'],[50,22,3,6,'#D8A878'],
-      [11,28,3,2,'#FFD700'],[50,28,3,2,'#FFD700'],
-      [17,19,10,1,'#1A0800'],[36,19,10,1,'#1A0800'],
-      [18,20,8,1,'#3A2010'],[37,20,8,1,'#3A2010'],
-      [17,22,10,6,'#FFFFFF'],[36,22,10,6,'#FFFFFF'],
-      [17,22,10,2,'#1A0800'],[36,22,10,2,'#1A0800'],
-      [19,23,6,5,'#5A3A20'],[38,23,6,5,'#5A3A20'],
-      [21,24,3,3,'#1A0800'],[40,24,3,3,'#1A0800'],
-      [22,24,2,2,'#FFFFFF'],[41,24,2,2,'#FFFFFF'],
-      [17,28,10,1,'#3A2010'],[36,28,10,1,'#3A2010'],
-      [31,30,2,3,'#D8A878'],
-      [30,32,1,2,'#D8A878'],[33,32,1,2,'#D8A878'],
-      [30,34,4,1,'#C09060'],
-      [14,31,6,3,'#F5A0B0'],[44,31,6,3,'#F5A0B0'],
-      [24,36,16,1,'#A04050'],
-      [22,37,20,2,'#C05060'],
-      [23,38,18,1,'#D87080'],
-      [24,39,16,1,'#A04050'],
-      [26,38,3,1,'#E89098'],
-      [2,44,60,20,'#8A2050'],
-      [2,44,60,2,'#6A1030'],
-      [20,44,24,6,'#6A1030'],
-      [22,46,20,4,'#8A2050'],
-    ],
-  },
-  young_female: {
-    head: [
-      [2,22,8,30,'#1A0800'],[54,22,8,30,'#1A0800'],
-      [0,22,2,30,'#0A0400'],[62,22,2,30,'#0A0400'],
-      [3,22,3,6,'#3A2010'],[58,22,3,6,'#3A2010'],
-      [2,20,8,3,'#FF6090'],[54,20,8,3,'#FF6090'],
-      [3,20,2,1,'#FFB0C0'],[55,20,2,1,'#FFB0C0'],
-      [12,4,40,2,'#1A0800'],
-      [10,6,44,3,'#1A0800'],
-      [9,9,46,3,'#1A0800'],
-      [9,12,3,10,'#1A0800'],[52,12,3,10,'#1A0800'],
-      [16,5,6,2,'#3A2010'],[30,5,4,2,'#3A2010'],
-      [12,12,8,5,'#1A0800'],[44,12,8,5,'#1A0800'],
-      [20,12,24,2,'#1A0800'],
-      [29,12,6,3,'#3A2010'],
-    ],
-    body: [
-      [14,11,36,2,'#E8B888'],
-      [13,13,38,26,'#EFC090'],
-      [14,39,36,2,'#E8B888'],
-      [16,41,32,3,'#D8A878'],
-      [20,14,14,3,'#F5D5A8'],
-      [11,22,3,6,'#D8A878'],[50,22,3,6,'#D8A878'],
-      [17,19,10,1,'#1A0800'],[36,19,10,1,'#1A0800'],
-      [17,21,10,8,'#FFFFFF'],[36,21,10,8,'#FFFFFF'],
-      [17,21,10,2,'#1A0800'],[36,21,10,2,'#1A0800'],
-      [18,22,8,6,'#6030A0'],[37,22,8,6,'#6030A0'],
-      [19,23,6,5,'#1A0800'],[38,23,6,5,'#1A0800'],
-      [20,23,3,2,'#FFFFFF'],[39,23,3,2,'#FFFFFF'],
-      [17,29,10,1,'#1A0800'],[36,29,10,1,'#1A0800'],
-      [13,31,7,4,'#F5A0B0'],[44,31,7,4,'#F5A0B0'],
-      [31,32,2,2,'#D8A878'],
-      [30,34,4,1,'#C09060'],
-      [24,36,2,1,'#A04050'],[38,36,2,1,'#A04050'],
-      [25,37,14,2,'#A04050'],
-      [26,38,12,1,'#FFFFFF'],
-      [27,38,10,1,'#E08090'],
-      [2,44,60,20,'#6030A0'],
-      [2,44,60,2,'#402070'],
-      [22,44,20,5,'#402070'],
-    ],
-  },
+// ── HD (64×64) parametric character system ──────────────────────────────
+// Sierra / semi-realistic. A character = skin × hair colour × hairstyle ×
+// eyes × outfit × features × body. Rect format: [x, y, width, height, color].
+// `head` rects (hair/hat) are swapped by accessory hats; `body` holds the
+// face + features + shirt; accessory `overlay` rects draw on top.
+const SKIN = {
+  fair:   {b:'#EFC79A', s:'#D6A575', h:'#F8DCB4'},
+  light:  {b:'#F3D0A6', s:'#DBAE80', h:'#FCE6C4'},
+  medium: {b:'#E0A870', s:'#BE854A', h:'#EEC496'},
+  tan:    {b:'#C88A5A', s:'#A46A3C', h:'#DCA878'},
+  deep:   {b:'#9E6842', s:'#7A4E30', h:'#BC885C'},
 };
+const HAIR = {
+  black:      {b:'#20161C', h:'#3E2E36', s:'#100A0E'},
+  darkbrown:  {b:'#33200F', h:'#54371C', s:'#1E1208'},
+  brown:      {b:'#5E3E20', h:'#835733', s:'#3E2814'},
+  auburn:     {b:'#6E2E1A', h:'#9A4526', s:'#4A1D0F'},
+  blonde:     {b:'#C9A44E', h:'#EACB7C', s:'#997731'},
+  grey:       {b:'#8E8E90', h:'#B8B8BA', s:'#69696B'},
+  white:      {b:'#DCDCDE', h:'#F3F3F4', s:'#B1B1B3'},
+  saltpepper: {b:'#6F6A66', h:'#948E88', s:'#4C4844'},
+};
+const OUTFIT = {
+  navy:         {b:'#28374E', s:'#18233A'},
+  blue:         {b:'#2E5CA2', s:'#1F3F72'},
+  hoodie_green: {b:'#2F6E3A', s:'#1E4A26'},
+  maroon:       {b:'#7E2246', s:'#561530'},
+  purple:       {b:'#573A8A', s:'#3A265E'},
+  cardigan_tan: {b:'#9A7B4A', s:'#6E5732'},
+  kimono_teal:  {b:'#2A6E68', s:'#194A46'},
+  work_orange:  {b:'#C06A24', s:'#8A4A16'},
+  teal:         {b:'#1F7A72', s:'#155450'},
+  tee_orange:   {b:'#E08030', s:'#B05E1E'},
+};
+
+// ── Face + features (geometry kept constant across everyone) ──────────────
+function face(sk){
+  return [
+    [14,11,36,2, sk.s],
+    [13,13,38,24, sk.b],                    // main face y13-36
+    // full jaw, only the bottom corners rounded off
+    [13,37,38,1, sk.b],
+    [14,38,36,1, sk.b],
+    [16,39,32,1, sk.b],
+    [19,40,26,1, sk.b],                     // chin (kept wide)
+    [20,14,14,3, sk.h],                     // forehead highlight
+    [11,22,3,7, sk.s],[50,22,3,7, sk.s],    // ears
+    [12,24,1,3, sk.b],[51,24,1,3, sk.b],
+    // soft jaw shading — faint corner hints + a single subtle under-chin line
+    [16,39,2,1, sk.s],[46,39,2,1, sk.s],
+    [21,40,22,1, sk.s],                     // gentle under-chin
+    // neck
+    [28,41,8,3, sk.s],
+    [29,41,6,2, sk.b],
+  ];
+}
+function eyesStd(iris){
+  return [
+    [18,23,8,5,'#F3F3F0'],[38,23,8,5,'#F3F3F0'],
+    [18,23,8,1,'#20161C'],[38,23,8,1,'#20161C'],
+    [20,24,4,4, iris],[40,24,4,4, iris],
+    [21,25,2,3,'#120A08'],[41,25,2,3,'#120A08'],
+    [21,24,1,1,'#FFFFFF'],[41,24,1,1,'#FFFFFF'],
+    [18,28,8,1, iris],[38,28,8,1, iris],
+  ];
+}
+function eyesBig(iris){
+  return [
+    [18,22,8,6,'#F5F5F2'],[38,22,8,6,'#F5F5F2'],
+    [18,22,8,1,'#20161C'],[38,22,8,1,'#20161C'],
+    [20,23,5,5, iris],[39,23,5,5, iris],
+    [21,24,3,3,'#120A08'],[40,24,3,3,'#120A08'],
+    [21,23,1,1,'#FFFFFF'],[40,23,1,1,'#FFFFFF'],
+    [22,26,1,1,'#FFFFFF'],[41,26,1,1,'#FFFFFF'],
+  ];
+}
+function eyesNarrow(iris){
+  return [
+    [18,24,8,3,'#EDEDEA'],[38,24,8,3,'#EDEDEA'],
+    [18,24,8,1,'#20161C'],[38,24,8,1,'#20161C'],
+    [20,24,4,3, iris],[40,24,4,3, iris],
+    [21,25,2,2,'#120A08'],[41,25,2,2,'#120A08'],
+  ];
+}
+function eyesFem(iris){
+  return [
+    [18,23,8,5,'#F5F5F2'],[38,23,8,5,'#F5F5F2'],
+    [17,22,10,1,'#20161C'],[37,22,10,1,'#20161C'],  // liner + wing
+    [20,24,4,4, iris],[40,24,4,4, iris],
+    [21,25,2,3,'#120A08'],[41,25,2,3,'#120A08'],
+    [21,24,1,1,'#FFFFFF'],[41,24,1,1,'#FFFFFF'],
+    [26,22,1,1,'#20161C'],[37,22,1,1,'#20161C'],     // outer lash
+    [18,28,8,1, iris],[38,28,8,1, iris],
+  ];
+}
+const EYESFN = { std:eyesStd, big:eyesBig, narrow:eyesNarrow, fem:eyesFem };
+
+function brows(col, style){
+  if (style === 'big') return [[19,20,7,1,col],[38,20,7,1,col]];
+  if (style === 'narrow') return [[18,21,8,1,col],[38,21,8,1,col]];
+  return [[18,20,8,1,col],[38,20,8,1,col]];
+}
+function nose(sk){
+  return [[31,29,2,5, sk.s],[30,33,4,1, sk.s],[33,30,1,3, sk.s],[31,28,1,1, sk.h]];
+}
+function mouth(sk){
+  return [[27,37,10,1,'#9A5850'],[28,38,8,1,'#B5695E'],[29,39,6,1, sk.s]];
+}
+function shirt(oc, sk, body){
+  if (body === 'broad') return [
+    [28,42,8,2, sk.b],[26,44,12,1, sk.s],
+    [20,44,24,1, oc.b],
+    [14,45,36,1, oc.b],
+    [9,46,46,1, oc.b],
+    [5,47,54,1, oc.b],
+    [2,48,60,1, oc.b],
+    [0,49,64,15, oc.b],
+    [0,49,3,15, oc.s],[61,49,3,15, oc.s],
+    [26,45,12,2, oc.s],
+  ];
+  if (body === 'small') return [
+    [28,45,8,2, sk.b],[27,46,10,1, sk.s],
+    [22,47,20,1, oc.b],
+    [17,48,30,1, oc.b],
+    [13,49,38,1, oc.b],
+    [11,50,42,1, oc.b],
+    [11,51,42,13, oc.b],
+    [11,51,2,13, oc.s],[51,51,2,13, oc.s],
+    [26,47,12,2, oc.s],
+  ];
+  return [
+    [28,43,8,2, sk.b],[27,44,10,1, sk.s],
+    [23,45,18,1, oc.b],
+    [18,46,28,1, oc.b],
+    [13,47,38,1, oc.b],
+    [9,48,46,1, oc.b],
+    [6,49,52,1, oc.b],
+    [4,50,56,1, oc.b],
+    [3,51,58,13, oc.b],
+    [3,51,3,13, oc.s],[58,51,3,13, oc.s],
+    [27,45,10,2, oc.s],
+  ];
+}
+
+const FEATURE = {
+  mustache: (hp)=>[[27,35,10,1, hp.b],[28,36,8,1, hp.s]],
+  mustache_white: ()=>[[27,35,10,1, HAIR.white.b],[28,36,8,1, HAIR.white.s]],
+  beard: (hp)=>[
+    [14,33,4,11, hp.b],[46,33,4,11, hp.b],
+    [16,40,32,4, hp.b],[18,44,28,3, hp.b],
+    [15,37,3,4, hp.s],[46,37,3,4, hp.s],
+    [27,35,10,1, hp.b],
+  ],
+  wrinkles: (hp, sk)=>[
+    [17,16,10,1, sk.s],[30,16,13,1, sk.s],
+    [16,31,4,1, sk.s],[44,31,4,1, sk.s],
+    [14,34,2,4, sk.s],[48,34,2,4, sk.s],
+  ],
+  glasses: ()=>[
+    [17,22,10,1,'#3A3A42'],[37,22,10,1,'#3A3A42'],
+    [17,22,1,6,'#3A3A42'],[26,22,1,6,'#3A3A42'],
+    [37,22,1,6,'#3A3A42'],[46,22,1,6,'#3A3A42'],
+    [17,28,10,1,'#3A3A42'],[37,28,10,1,'#3A3A42'],
+    [27,24,10,1,'#3A3A42'],
+  ],
+};
+
+// ── Hair styles (silhouette drivers) — return head rects ───────────────────
+const HAIRFN = {
+  short: (hp)=>[
+    [12,4,40,3, hp.b],[10,7,44,3, hp.b],[9,10,46,3, hp.b],
+    [9,13,3,13, hp.b],[52,13,3,13, hp.b],
+    [12,13,10,4, hp.b],[42,13,10,4, hp.b],
+    [22,12,20,2, hp.b],
+    [14,5,11,3, hp.h],[35,6,10,2, hp.h],
+    [10,8,44,1, hp.s],
+  ],
+  sidepart: (hp)=>[
+    [12,4,40,3, hp.b],[10,7,44,3, hp.b],[9,10,46,3, hp.b],
+    [9,13,3,12, hp.b],[52,13,3,12, hp.b],
+    [12,13,9,4, hp.b],[43,13,9,4, hp.b],
+    [26,12,18,2, hp.b],
+    [15,5,8,11, hp.h],
+    [25,6,1,7, hp.s],
+    [10,8,42,1, hp.s],
+  ],
+  messy: (hp)=>[
+    [13,3,4,4, hp.b],[18,1,4,6, hp.b],[24,3,4,4, hp.b],[30,0,5,6, hp.b],
+    [37,3,4,4, hp.b],[43,1,4,6, hp.b],[48,3,3,4, hp.b],
+    [11,7,42,3, hp.b],[9,10,46,3, hp.b],
+    [9,13,3,9, hp.b],[52,13,3,9, hp.b],
+    [12,13,9,3, hp.b],[43,13,9,3, hp.b],[20,12,24,2, hp.b],
+    [19,3,3,4, hp.h],[31,2,3,4, hp.h],[43,3,3,4, hp.h],
+  ],
+  buzz: (hp)=>[
+    [13,7,38,2, hp.b],[11,9,42,3, hp.b],[10,12,44,2, hp.b],
+    [10,14,3,7, hp.b],[51,14,3,7, hp.b],
+    [14,13,8,2, hp.b],[42,13,8,2, hp.b],[20,12,24,1, hp.b],
+    [16,9,5,1, hp.h],[30,8,6,1, hp.h],[40,9,5,1, hp.h],
+    [18,11,1,1, hp.h],[26,10,1,1, hp.h],[36,11,1,1, hp.h],[44,10,1,1, hp.h],
+  ],
+  bald: (hp, sk)=>[
+    [17,4,30,3, sk.b],[13,7,38,3, sk.b],[11,10,42,3, sk.b],
+    [18,5,16,2, sk.h],[15,8,10,1, sk.h],
+    [10,14,3,12, hp.b],[51,14,3,12, hp.b],
+    [11,22,4,5, hp.b],[49,22,4,5, hp.b],
+    [12,13,4,2, hp.b],[48,13,4,2, hp.b],
+  ],
+  bun: (hp)=>[
+    [26,1,12,7, hp.b],[28,0,8,2, hp.h],[27,2,3,3, hp.h],
+    [12,7,40,3, hp.b],[10,10,44,3, hp.b],
+    [9,13,4,14, hp.b],[51,13,4,14, hp.b],
+    [12,13,9,3, hp.b],[43,13,9,3, hp.b],[20,12,24,2, hp.b],
+    [14,8,10,2, hp.h],
+  ],
+  twintails: (hp)=>[
+    [12,5,40,3, hp.b],[10,8,44,3, hp.b],[9,11,46,3, hp.b],
+    [9,14,3,7, hp.b],[52,14,3,7, hp.b],
+    [12,13,9,3, hp.b],[43,13,9,3, hp.b],[22,12,20,2, hp.b],
+    [3,18,6,20, hp.b],[2,22,3,12, hp.s],
+    [55,18,6,20, hp.b],[59,22,3,12, hp.s],
+    [7,17,5,2,'#D8425C'],[52,17,5,2,'#D8425C'],
+    [14,5,9,3, hp.h],[34,6,9,2, hp.h],
+  ],
+  bob: (hp)=>[
+    [12,4,40,3, hp.b],[9,7,46,3, hp.b],[8,10,48,4, hp.b],
+    [8,14,5,25, hp.b],[51,14,5,25, hp.b],
+    [12,13,10,3, hp.b],[42,13,10,3, hp.b],[22,12,20,2, hp.b],
+    [14,5,11,3, hp.h],[34,6,10,2, hp.h],
+    [8,36,5,3, hp.s],[51,36,5,3, hp.s],
+  ],
+  long: (hp)=>[
+    [5,19,4,44, hp.b],[55,19,4,44, hp.b],
+    [4,26,2,36, hp.s],[58,26,2,36, hp.s],
+    [9,15,5,30, hp.b],[50,15,5,30, hp.b],
+    [12,4,40,3, hp.b],[10,7,44,3, hp.b],[9,10,46,3, hp.b],
+    [12,13,9,3, hp.b],[43,13,9,3, hp.b],[22,12,20,2, hp.b],
+    [14,5,9,3, hp.h],[34,6,9,2, hp.h],
+  ],
+  bowl: (hp)=>[
+    [12,5,40,3, hp.b],[10,8,44,3, hp.b],[9,11,46,4, hp.b],
+    [10,14,44,2, hp.b],
+    [9,15,4,9, hp.b],[51,15,4,9, hp.b],
+    [14,6,13,3, hp.h],
+    [10,13,44,1, hp.s],
+  ],
+};
+
+// ── Assemble a character ───────────────────────────────────────────────────
+function buildCharSpec(spec){
+  const sk = SKIN[spec.skin];
+  const hp = HAIR[spec.hair];
+  const oc = OUTFIT[spec.outfit];
+  const iris = spec.iris || '#3A2A1A';
+  const head = HAIRFN[spec.style](hp, sk);
+  const feats = [];
+  (spec.feature ? spec.feature.split(',') : []).forEach(f => feats.push(...FEATURE[f](hp, sk)));
+  const body = [
+    ...face(sk),
+    ...shirt(oc, sk, spec.body),
+    ...EYESFN[spec.eyes || 'std'](iris),
+    ...brows(hp.s, spec.eyes),
+    ...nose(sk),
+    ...mouth(sk),
+    ...feats,
+  ];
+  const tb = { broad:{x:0,w:64}, small:{x:11,w:42} }[spec.body] || {x:3,w:58};
+  return { head, body, sk, torso:{ x:tb.x, w:tb.w, ocb:oc.b, ocs:oc.s } };
+}
+
+const CHAR_SPRITES_HD = {
+  exec_man:    buildCharSpec({skin:'fair',   hair:'grey',      style:'sidepart', iris:'#3A2A1A', outfit:'navy',         feature:'mustache'}),
+  salaryman:   buildCharSpec({skin:'medium', hair:'black',     style:'short',    iris:'#2A1A12', outfit:'blue'}),
+  student_boy: buildCharSpec({skin:'light',  hair:'darkbrown', style:'messy',    iris:'#3A2A1A', outfit:'hoodie_green'}),
+  office_woman:buildCharSpec({skin:'fair',   hair:'black',     style:'long',     iris:'#3A2A1A', outfit:'maroon',       eyes:'fem'}),
+  student_girl:buildCharSpec({skin:'light',  hair:'brown',     style:'twintails',iris:'#5A3A1A', outfit:'purple',       eyes:'big'}),
+  elder_man:   buildCharSpec({skin:'tan',    hair:'white',     style:'bald',     iris:'#464040', outfit:'cardigan_tan', feature:'mustache_white,wrinkles,glasses', eyes:'narrow'}),
+  elder_woman: buildCharSpec({skin:'fair',   hair:'grey',      style:'bun',      iris:'#464040', outfit:'kimono_teal',  feature:'wrinkles',                        eyes:'narrow'}),
+  burly_man:   buildCharSpec({skin:'deep',   hair:'black',     style:'buzz',     iris:'#2A1A12', outfit:'work_orange',  feature:'beard',                           body:'broad'}),
+  cool_woman:  buildCharSpec({skin:'tan',    hair:'blonde',    style:'bob',      iris:'#3A5A8A', outfit:'teal',         eyes:'fem'}),
+  child:       buildCharSpec({skin:'light',  hair:'brown',     style:'bowl',     iris:'#5A3A1A', outfit:'tee_orange',   eyes:'big',  body:'small'}),
+};
+
+const CHAR_LABELS = {
+  exec_man:'Executive', salaryman:'Salaryman', student_boy:'Student (m)', office_woman:'Office worker',
+  student_girl:'Student (f)', elder_man:'Elderly man', elder_woman:'Elderly woman', burly_man:'Tradesman',
+  cool_woman:'Stylist', child:'Child',
+};
+
+// ── Expression + blink overlays (skin-correct, geometry-aligned) ───────────
+function _hdRects(list){
+  return list.map(r=>`<rect x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}" fill="${r[4]}"/>`).join('');
+}
+function buildExpr(expr, sk){
+  if (expr === 'talking') return [
+    [28,36,8,4,'#5A2A2A'],[30,37,4,3,'#3A1414'],[29,40,6,1, sk.s],
+  ];
+  if (expr === 'happy') return [
+    [16,22,11,6, sk.b],[37,22,11,6, sk.b],           // cover eyes w/ skin
+    [18,25,3,1,'#20161C'],[21,24,3,1,'#20161C'],[24,25,3,1,'#20161C'],
+    [38,25,3,1,'#20161C'],[41,24,3,1,'#20161C'],[44,25,3,1,'#20161C'],
+    [25,37,14,1,'#9A4050'],[24,36,2,1,'#9A4050'],[38,36,2,1,'#9A4050'],
+    [27,38,10,1,'#D87080'],
+    [15,31,4,2,'rgba(224,120,120,0.38)'],[45,31,4,2,'rgba(224,120,120,0.38)'],
+  ];
+  if (expr === 'surprised') return [
+    [18,17,8,1,'#20161C'],[38,17,8,1,'#20161C'],
+    [21,24,2,2,'#120A08'],[41,24,2,2,'#120A08'],
+    [29,36,6,6,'#3A1414'],[30,37,4,4,'#5A2020'],[31,41,2,1, sk.s],
+  ];
+  return [];
+}
+function blinkGroup(sk, seed){
+  const lids = _hdRects([
+    [16,22,11,6, sk.b],[37,22,11,6, sk.b],
+    [16,27,11,1, sk.s],[37,27,11,1, sk.s],
+  ]);
+  const begin = (0.3 + (seed % 5) * 0.7).toFixed(2);
+  return `<g opacity="0">${lids}<animate attributeName="opacity" values="0;0;1;0;0" keyTimes="0;0.90;0.94;0.97;1" dur="4.2s" begin="${begin}s" repeatCount="indefinite"/></g>`;
+}
+let _hdFxSeed = 0;
+// Build the inner rects for a character + accessory + expression (no <svg>).
+function buildCharInner(type, mod, expr){
+  const c = CHAR_SPRITES_HD[type] || CHAR_SPRITES_HD.salaryman;
+  const head = (mod && mod.head) || c.head;
+  const overlay = (mod && mod.overlay) || [];
+  return _hdRects([...head, ...c.body, ...overlay, ...buildExpr(expr, c.sk)]);
+}
 
 // HD accessories — match keys with ACCESSORY_KIT. `head` rects replace
 // the character's `head` rects (used for hats); `overlay` rects draw on top.
@@ -4020,14 +4143,9 @@ const ACCESSORY_KIT_HD = {
   },
 };
 
-// Build the rect SVG markup for a character + accessory at HD (64×64).
-function buildHdRects(baseType, mod) {
-  const char = CHAR_SPRITES_HD[baseType] || CHAR_SPRITES_HD.adult_male;
-  const head = (mod && mod.head) || char.head;
-  const body = char.body;
-  const overlay = (mod && mod.overlay) || [];
-  const all = [...head, ...body, ...overlay];
-  return all.map(r => `<rect x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}" fill="${r[4]}"/>`).join('');
+// Build the rect SVG markup for a character + accessory + expression at HD.
+function buildHdRects(baseType, mod, expr) {
+  return buildCharInner(baseType, mod, expr || 'neutral');
 }
 
 // Resolve the HD accessory mod for a scenario (incl. dynamic chef_hat).
@@ -4534,7 +4652,7 @@ function inferBackground(sc) {
 // Returns SVG rect markup for a scenario's character sprite at HD (64×64 grid).
 function getScenarioSpriteRects(sc) {
   if (!sc?.voice) return '';
-  const baseType = VOICE_SPRITE_MAP[sc.voice] || 'adult_male';
+  const baseType = VOICE_SPRITE_MAP[sc.voice] || 'salaryman';
   const mod = resolveHdMod(sc, baseType);
   return buildHdRects(baseType, mod);
 }
@@ -4548,11 +4666,24 @@ function renderScene(sc) {
   let svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 50" shape-rendering="crispEdges" preserveAspectRatio="xMidYMid slice">';
   // Background layers
   svg += bg.r.map(([x,y,w,h,c]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`).join('');
-  // Character sprite (HD: native 64×64). Scale to match prior visual size of
-  // 16-grid × 2 = 32 units → 64-grid × 0.5 = 32 units.
+  // Character sprite (HD 64×64) scaled 0.5 into the scene.
   const charRects = getScenarioSpriteRects(sc);
   if (charRects) {
-    svg += `<g transform="translate(${bg.charX},${bg.charY}) scale(0.5)">${charRects}</g>`;
+    // Extend the torso down to the scene floor so the figure stands in the
+    // scene rather than floating as a bust. sceneBottom(50) -> localY (50-charY)*2.
+    const baseType = VOICE_SPRITE_MAP[sc.voice] || 'salaryman';
+    const c = CHAR_SPRITES_HD[baseType] || CHAR_SPRITES_HD.salaryman;
+    const localBottom = (50 - bg.charY) * 2;
+    let ext = '';
+    if (c.torso && localBottom > 64) {
+      const t = c.torso, eh = Math.ceil(localBottom) - 62;
+      ext = _hdRects([
+        [t.x, 62, t.w, eh, t.ocb],
+        [t.x, 62, 3, eh, t.ocs],
+        [t.x + t.w - 3, 62, 3, eh, t.ocs],
+      ]);
+    }
+    svg += `<g transform="translate(${bg.charX},${bg.charY}) scale(0.5)">${ext}${charRects}</g>`;
   }
   svg += '</svg>';
   return svg;
@@ -4570,7 +4701,10 @@ function getScenarioSprite(sc, px) {
   px = px || 2;
   const size = 16 * px; // preserve previous on-screen size; HD content uses 64×64 viewBox
   const rects = getScenarioSpriteRects(sc);
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 64 64" shape-rendering="crispEdges">${rects}</svg>`;
+  const baseType = VOICE_SPRITE_MAP[sc.voice] || 'salaryman';
+  const c = CHAR_SPRITES_HD[baseType] || CHAR_SPRITES_HD.salaryman;
+  const blink = c.sk ? blinkGroup(c.sk, _hdFxSeed++) : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 64 64" shape-rendering="crispEdges">${rects}${blink}</svg>`;
 }
 
 function favAvatar(sc) {
@@ -6451,7 +6585,7 @@ function formatEngBreakdown(text) {
   // ── Render an NPC sprite from scenario data ──
   function renderNpcToImageData(sc) {
     if (!sc?.voice) return null;
-    const baseType = VOICE_SPRITE_MAP[sc.voice] || 'adult_male';
+    const baseType = HD_TO_LEGACY[VOICE_SPRITE_MAP[sc.voice]] || 'adult_male';
     const sp = CHAR_SPRITES[baseType];
     const acc = inferAccessory(sc);
     let mod = {};
