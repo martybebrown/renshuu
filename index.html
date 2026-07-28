@@ -24,6 +24,7 @@
 
 <header>
   <div style="display:flex;align-items:center;gap:10px">
+    <button class="sidebar-toggle active" id="sidebarToggle" onclick="toggleSidebar()" title="Hide sidebar"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
     <button class="menu-btn" id="menuBtn" onclick="toggleMenu()" title="Menu"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg></button>
     <div class="logo">練<em>習</em> · Renshuu</div>
   </div>
@@ -124,7 +125,6 @@
 </div>
 
 <div class="layout" id="layout">
-  <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Collapse sidebar"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg></button>
   <aside>
     <!-- Deck filter -->
     <div>
@@ -136,7 +136,10 @@
 
     <!-- Counts (clickable as focus toggles) -->
     <div>
-      <div class="label">Vocabulary · Focus</div>
+      <div class="label label-row">
+        <span>Vocabulary · Focus</span>
+        <button class="icon-btn" id="loadBtn" onclick="loadCards()" title="Reload from Anki" aria-label="Reload from Anki"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button>
+      </div>
       <div class="counts">
         <div class="count-row n active" id="focus-n" onclick="toggleFocus('n')">
           <div class="count-label">
@@ -158,8 +161,6 @@
         </div>
       </div>
     </div>
-
-    <button class="btn red w100" id="loadBtn" onclick="loadCards()">Load from Anki</button>
 
     <!-- Mode (mobile only — desktop uses header toggle) -->
     <div class="sidebar-mode">

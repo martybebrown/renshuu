@@ -407,7 +407,7 @@ async function fetchBatch(ids) {
 
 async function loadCards() {
   const btn = document.getElementById('loadBtn');
-  btn.disabled = true; btn.textContent = 'Loading…';
+  btn.disabled = true; btn.classList.add('spinning');
   setDot('', 'connecting…');
 
   try {
@@ -482,7 +482,7 @@ async function loadCards() {
           localStorage.setItem('renshuu_favorites', JSON.stringify(S.favorites));
         }
         loadFromData(gistData);
-        btn.disabled = false; btn.textContent = 'Reload from Anki';
+        btn.disabled = false; btn.classList.remove('spinning');
         return;
       }
     } catch (_) {}
@@ -490,7 +490,7 @@ async function loadCards() {
     if (cached) {
       try {
         loadFromData(JSON.parse(cached));
-        btn.disabled = false; btn.textContent = 'Reload from Anki';
+        btn.disabled = false; btn.classList.remove('spinning');
         return;
       } catch (_) {}
     }
@@ -501,7 +501,7 @@ async function loadCards() {
     markSplashReady();
   }
 
-  btn.disabled = false; btn.textContent = 'Reload from Anki';
+  btn.disabled = false; btn.classList.remove('spinning');
 }
 
 function setDot(cls, txt) {
@@ -813,14 +813,15 @@ function toggleSidebar() {
   const btn = document.getElementById('sidebarToggle');
   layout.classList.toggle('sidebar-collapsed');
   const collapsed = layout.classList.contains('sidebar-collapsed');
-  btn.innerHTML = collapsed ? IC.chevRR : IC.chevLL;
+  btn.classList.toggle('active', !collapsed);
+  btn.title = collapsed ? 'Show sidebar' : 'Hide sidebar';
   localStorage.setItem('renshuu_sidebar', collapsed ? '0' : '1');
 }
 // Restore sidebar state on load
 if (localStorage.getItem('renshuu_sidebar') === '0') {
   document.getElementById('layout')?.classList.add('sidebar-collapsed');
   const tb = document.getElementById('sidebarToggle');
-  if (tb) tb.innerHTML = IC.chevRR;
+  if (tb) { tb.classList.remove('active'); tb.title = 'Show sidebar'; }
 }
 
 // Strip all HTML except <span data-rt="...">, preserving data-en and data-new
@@ -1772,7 +1773,7 @@ function toggleLangMode() {
     if (localStorage.getItem('renshuu_sidebar') !== '0') {
       layout.classList.remove('sidebar-collapsed');
       const tb = document.getElementById('sidebarToggle');
-      if (tb) tb.innerHTML = IC.chevLL;
+      if (tb) { tb.classList.add('active'); tb.title = 'Hide sidebar'; }
     }
     document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.remove('active'));
     document.getElementById('tab-drill').classList.add('active');
@@ -1789,7 +1790,7 @@ function toggleLangMode() {
     if (!layout.classList.contains('sidebar-collapsed')) {
       layout.classList.add('sidebar-collapsed');
       const tb = document.getElementById('sidebarToggle');
-      if (tb) tb.innerHTML = IC.chevRR;
+      if (tb) { tb.classList.remove('active'); tb.title = 'Show sidebar'; }
     }
     document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.remove('active'));
     renderMode();
@@ -1994,7 +1995,7 @@ Rules:
     );
     const clean = raw.replace(/```json|```/g, '').trim();
     const { drills } = JSON.parse(clean);
-    S.drills = drills.map((d, i) => ({ ...d, i, answered: false, correct: null, input: '', revisions: [], draft: '' }));
+    S.drills = drills.map((d, i) => ({ ...d, i, answered: false, correct: null, input: '', revisions: [], draft: '', hintLevel: 0 }));
     paintDrills();
   } catch (e) {
     zone.innerHTML = `<div style="color:var(--red);font-size:12px">Error: ${e.message}</div>`;
@@ -2082,6 +2083,7 @@ function drillHTML(d) {
           autocomplete="off"
           ${d.answered ? 'disabled' : ''}
         />
+        <button class="btn drill-hint-btn" onclick="revealDrillHint(${d.i})" title="Reveal next character" ${d.answered ? 'disabled' : ''}>${IC.bulb} Hint</button>
         <button class="btn drill-submit" data-di="${d.i}" ${d.answered ? 'disabled' : ''}>${IC.send}</button>
       </div>
       ${d.answered ? `
@@ -2114,6 +2116,25 @@ function checkDrill(i) {
   paintDrills();
   speakJapanese(stripMarkers(d.sentence));
   if (!d.correct) fetchDrillFeedback(d, d);
+}
+
+// Progressive hint: each press fills in one more character of the target's
+// hiragana reading into the answer input.
+function revealDrillHint(i) {
+  const d = S.drills[i];
+  if (!d || d.answered) return;
+  const chars = Array.from(d.reading || '');
+  if (!chars.length) return;
+  d.hintLevel = Math.min((d.hintLevel || 0) + 1, chars.length);
+  d.input = chars.slice(0, d.hintLevel).join('');
+  const inputEl = document.getElementById(`ai-${i}`);
+  if (inputEl) {
+    inputEl.value = d.input;
+    inputEl.focus();
+    inputEl.setSelectionRange(d.input.length, d.input.length);
+  }
+  const hintBtn = document.querySelector(`.drill-hint-btn[onclick="revealDrillHint(${i})"]`);
+  if (hintBtn && d.hintLevel >= chars.length) hintBtn.disabled = true;
 }
 
 // Grade a single typed answer against the drill's target: exact match on target,
@@ -4983,7 +5004,7 @@ function pickScenario(id) {
     if (!layout.classList.contains('sidebar-collapsed')) {
       layout.classList.add('sidebar-collapsed');
       const tb = document.getElementById('sidebarToggle');
-      if (tb) tb.innerHTML = IC.chevRR;
+      if (tb) { tb.classList.remove('active'); tb.title = 'Show sidebar'; }
     }
   }
   // Check for saved conversation in favorites
