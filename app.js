@@ -354,6 +354,19 @@ const S = {
   mistakes: JSON.parse(localStorage.getItem('renshuu_mistakes') || '[]'),
   weakPoints: JSON.parse(localStorage.getItem('renshuu_weakpoints') || 'null'),
   analyzing: false,
+  // Leech Fixer — mnemonic-based recovery for troublesome ("leech") cards
+  leech: {
+    phase: 'start',        // 'start' | 'learn' | 'test' | 'done'
+    cards: [],             // leech cards pulled from Anki
+    queue: [],             // session working set (cards being fixed this round)
+    idx: 0,                // current position in queue
+    loading: false,
+    testInput: '',
+    testResult: null,      // null | 'correct' | 'wrong'
+    revealed: false,
+  },
+  // Cached generated mnemonics, keyed by card id → { mnemonics:[{hook,explanation}], jp, en, rd }
+  mnemonics: JSON.parse(localStorage.getItem('renshuu_mnemonics') || '{}'),
 };
 
 
@@ -632,7 +645,7 @@ function logMistake({ src, wrote, fix, note, idea, constraint }) {
 // Pull the log + profile from the gist on startup (authoritative across devices).
 async function loadMistakeData() {
   try {
-    const [m, w] = await Promise.all([gistFetchFile(MISTAKES_FILE), gistFetchFile(WEAK_FILE)]);
+    const [m, w, mn] = await Promise.all([gistFetchFile(MISTAKES_FILE), gistFetchFile(WEAK_FILE), gistFetchFile(MNEMO_FILE)]);
     if (Array.isArray(m)) {
       S.mistakes = m.slice(-MAX_MISTAKES);
       localStorage.setItem('renshuu_mistakes', JSON.stringify(S.mistakes));
@@ -640,6 +653,10 @@ async function loadMistakeData() {
     if (w && w.weakPoints) {
       S.weakPoints = w;
       localStorage.setItem('renshuu_weakpoints', JSON.stringify(w));
+    }
+    if (mn && typeof mn === 'object') {
+      S.mnemonics = { ...S.mnemonics, ...mn };
+      localStorage.setItem('renshuu_mnemonics', JSON.stringify(S.mnemonics));
     }
   } catch (_) {}
   renderFocusSidebar();
@@ -1807,7 +1824,7 @@ function switchMode(m) {
   document.getElementById(`hm-${m}`)?.classList.add('active');
   moveModeIndicator();
   animateMainContent();
-  if (m === 'eng_roleplay' || total() > 0) renderMode();
+  if (m === 'eng_roleplay' || m === 'leech' || total() > 0) renderMode();
 }
 
 // Slide the header toggle's pill indicator under the active mode button.
@@ -1865,6 +1882,7 @@ function renderMode() {
   else if (S.mode === 'compose') renderCompose();
   else if (S.mode === 'roleplay') { renderRoleplay(); markSplashReady(); }
   else if (S.mode === 'eng_roleplay') { renderEngRoleplay(); markSplashReady(); }
+  else if (S.mode === 'leech') { renderLeech(); markSplashReady(); }
 }
 
 // ── Claude ────────────────────────────────────────────────────────────────────
@@ -2265,6 +2283,382 @@ function syncDrillInputs() {
     const d = S.drills[parseInt(el.dataset.dri, 10)];
     if (d) d.draft = el.value;
   });
+}
+
+// ── LEECH FIXER MODE ──────────────────────────────────────────────────────────
+// Pulls "leech" cards (tagged `leech` in Anki — cards you keep forgetting),
+// generates 2–3 memorable mnemonics per card, teaches them one at a time, then
+// tests recall using the mnemonic as the cue. Mnemonics are cached locally and
+// synced to the gist so they persist across sessions/devices.
+const MNEMO_FILE = 'renshuu-mnemonics.json';
+const LEECH_SESSION_SIZE = 10; // cards worked per round
+
+function renderLeech() {
+  const m = document.getElementById('mainContent');
+  const L = S.leech;
+
+  // If no leeches loaded yet, offer to fetch them.
+  if (L.cards.length === 0) {
+    m.innerHTML = `
+      <div class="row-between">
+        <div>
+          <div class="label">Leech Fixer</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:2px">Turn the words you keep forgetting into memorable mnemonics.</div>
+        </div>
+        <button class="btn" id="leechLoadBtn" onclick="loadLeeches()" ${L.loading ? 'disabled' : ''}>${L.loading ? 'loading…' : 'Load leeches →'}</button>
+      </div>
+      <div id="leechZone">
+        <div class="leech-empty">
+          <div class="leech-empty-kanji">虫</div>
+          <span>${L.loading ? 'Finding your leech cards…' : 'Load your <b>leech</b>-tagged cards from Anki to begin.'}</span>
+          ${!L.loading ? `<span style="font-size:11px;color:var(--muted);max-width:340px;text-align:center">Leeches are cards Anki flags as repeatedly forgotten. In Anki they carry the <code>leech</code> tag automatically.</span>` : ''}
+        </div>
+      </div>`;
+    markSplashReady();
+    return;
+  }
+
+  if (L.phase === 'start') return renderLeechStart(m);
+  if (L.phase === 'learn') return renderLeechLearn(m);
+  if (L.phase === 'test')  return renderLeechTest(m);
+  if (L.phase === 'done')  return renderLeechDone(m);
+}
+
+function renderLeechStart(m) {
+  const L = S.leech;
+  const withMnemo = L.cards.filter(c => S.mnemonics[c.id]).length;
+  m.innerHTML = `
+    <div class="row-between">
+      <div>
+        <div class="label">Leech Fixer</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:2px">${L.cards.length} leech ${L.cards.length === 1 ? 'card' : 'cards'} found${withMnemo ? ` · ${withMnemo} already have mnemonics` : ''}.</div>
+      </div>
+      <button class="btn" onclick="reloadLeeches()">${IC.refresh} Reload</button>
+    </div>
+    <div id="leechZone">
+      <div class="leech-start-card">
+        <div class="leech-start-kanji">虫</div>
+        <div class="leech-start-title">Ready to tackle ${Math.min(LEECH_SESSION_SIZE, L.cards.length)} ${L.cards.length === 1 ? 'leech' : 'leeches'}</div>
+        <div class="leech-start-sub">I'll craft 2–3 mnemonics for each word, teach them one at a time, then quiz you.</div>
+        <button class="btn leech-start-btn" onclick="startLeechSession()">Start session →</button>
+      </div>
+      <div class="leech-list">
+        ${L.cards.slice(0, 40).map(c => `
+          <div class="leech-list-row">
+            <span class="leech-list-jp">${escHtml(c.jp)}</span>
+            <span class="leech-list-en">${escHtml(c.en)}</span>
+            ${S.mnemonics[c.id] ? `<span class="leech-list-badge">✓ mnemonic</span>` : ''}
+          </div>`).join('')}
+        ${L.cards.length > 40 ? `<div class="leech-list-more">+${L.cards.length - 40} more…</div>` : ''}
+      </div>
+    </div>`;
+  markSplashReady();
+}
+
+function renderLeechLearn(m) {
+  const L = S.leech;
+  const card = L.queue[L.idx];
+  if (!card) { L.phase = 'done'; return renderLeech(); }
+  const entry = S.mnemonics[card.id];
+  const pos = `${L.idx + 1} / ${L.queue.length}`;
+
+  const body = !entry
+    ? `<div class="loading-row"><span class="spin"></span> crafting mnemonics for ${escHtml(card.jp)}…</div>`
+    : `
+      <div class="leech-word">
+        <div class="leech-word-jp">${escHtml(card.jp)}</div>
+        ${card.rd && card.rd !== card.jp ? `<div class="leech-word-rd">${escHtml(card.rd)}</div>` : ''}
+        <div class="leech-word-en">${escHtml(card.en)}</div>
+        <button class="speak-btn leech-speak" onclick="speakJapanese('${escJsAttr(card.rd || card.jp)}')" title="Listen">${IC.volume}</button>
+      </div>
+      <div class="leech-mnemo-label">Mnemonics — click the one that sticks to pin it</div>
+      <div class="leech-mnemos">
+        ${(entry.mnemonics || []).map((mn, i) => `
+          <div class="leech-mnemo${entry.pinned === i ? ' pinned' : ''}" onclick="pinMnemonic(${i})" title="Click to pin this mnemonic">
+            <div class="leech-mnemo-num">${i + 1}</div>
+            <div class="leech-mnemo-body">
+              <div class="leech-mnemo-hook">${mdBold(mn.hook || '')}</div>
+              ${mn.explanation ? `<div class="leech-mnemo-exp">${mdBold(mn.explanation)}</div>` : ''}
+            </div>
+            <div class="leech-mnemo-pin">${entry.pinned === i ? `${IC.star} pinned` : 'pin'}</div>
+          </div>`).join('')}
+      </div>
+      <div class="leech-actions">
+        <button class="btn leech-regen" onclick="regenMnemonics()">${IC.refresh} New mnemonics</button>
+        <button class="btn leech-next" onclick="leechLearnNext()">${L.idx + 1 < L.queue.length ? 'Got it — next →' : 'Got it — test me →'}</button>
+      </div>`;
+
+  m.innerHTML = `
+    <div class="row-between">
+      <div>
+        <div class="label">Leech Fixer · Learn</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:2px">Study the mnemonic, then you'll be tested.</div>
+      </div>
+      <button class="btn" onclick="quitLeechSession()">${IC.x} End</button>
+    </div>
+    <div class="leech-progress"><div class="leech-progress-bar" style="width:${((L.idx) / L.queue.length) * 100}%"></div></div>
+    <div class="leech-pos">${pos}</div>
+    <div id="leechZone"><div class="leech-card">${body}</div></div>`;
+  markSplashReady();
+
+  if (!entry && !L.loading) genMnemonics(card);
+}
+
+function renderLeechTest(m) {
+  const L = S.leech;
+  const card = L.queue[L.idx];
+  if (!card) { L.phase = 'done'; return renderLeech(); }
+  const entry = S.mnemonics[card.id] || {};
+  // Show the pinned mnemonic (or the first) as the cue; recall the word/reading.
+  const cueIdx = Number.isInteger(entry.pinned) ? entry.pinned : 0;
+  const cue = (entry.mnemonics && entry.mnemonics[cueIdx] && entry.mnemonics[cueIdx].hook) || '';
+  const pos = `${L.idx + 1} / ${L.queue.length}`;
+  const answered = L.testResult !== null;
+
+  m.innerHTML = `
+    <div class="row-between">
+      <div>
+        <div class="label">Leech Fixer · Test</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:2px">Recall the word from its meaning and mnemonic.</div>
+      </div>
+      <button class="btn" onclick="quitLeechSession()">${IC.x} End</button>
+    </div>
+    <div class="leech-progress"><div class="leech-progress-bar" style="width:${(L.idx / L.queue.length) * 100}%"></div></div>
+    <div class="leech-pos">${pos}</div>
+    <div id="leechZone">
+      <div class="leech-card">
+        <div class="leech-test-prompt">
+          <div class="leech-test-en">${escHtml(card.en)}</div>
+          ${cue ? `<div class="leech-test-cue"><span class="leech-test-cue-label">mnemonic</span>${mdBold(cue)}</div>` : ''}
+        </div>
+        <div class="answer-row">
+          <input class="answer-input" id="leechInput" placeholder="type the word (kana or romaji)…"
+            value="${escHtml(L.testInput)}" autocomplete="off" ${answered ? 'disabled' : ''}
+            oninput="S.leech.testInput=this.value"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();checkLeech()}" />
+          ${!answered ? `<button class="btn drill-hint-btn" onclick="revealLeech()" title="Reveal answer">${IC.bulb} Reveal</button>` : ''}
+          ${!answered ? `<button class="btn" onclick="checkLeech()">${IC.send}</button>` : ''}
+        </div>
+        ${answered ? `
+          <div class="feedback ${L.testResult === 'correct' ? 'ok' : 'no'}">
+            ${L.testResult === 'correct' ? '✓ Correct!' : `✗ Answer: <b>${escHtml(card.jp)}</b>${card.rd && card.rd !== card.jp ? `（${escHtml(card.rd)}）` : ''}`}
+            <button class="speak-btn leech-speak" onclick="speakJapanese('${escJsAttr(card.rd || card.jp)}')" title="Listen">${IC.volume}</button>
+            <div class="leech-test-reveal">
+              ${(() => { const mn = (entry.mnemonics || [])[cueIdx]; return mn ? `<div class="leech-mnemo-exp">${mdBold(mn.hook || '')}${mn.explanation ? ' — ' + mdBold(mn.explanation) : ''}</div>` : ''; })()}
+            </div>
+          </div>
+          <div class="leech-actions">
+            ${L.testResult === 'wrong' ? `<button class="btn" onclick="relearnLeech()">${IC.bulb} Review again</button>` : ''}
+            <button class="btn leech-next" onclick="leechTestNext()">${L.idx + 1 < L.queue.length ? 'Next →' : 'Finish →'}</button>
+          </div>` : ''}
+      </div>
+    </div>`;
+  markSplashReady();
+  if (!answered) setTimeout(() => document.getElementById('leechInput')?.focus(), 50);
+}
+
+function renderLeechDone(m) {
+  const L = S.leech;
+  const correct = L.queue.filter(c => c._leechPassed).length;
+  m.innerHTML = `
+    <div class="row-between">
+      <div>
+        <div class="label">Leech Fixer · Done</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:2px">Session complete.</div>
+      </div>
+    </div>
+    <div id="leechZone">
+      <div class="leech-start-card">
+        <div class="leech-start-kanji">${correct === L.queue.length ? '祝' : '虫'}</div>
+        <div class="leech-start-title">${correct} / ${L.queue.length} recalled</div>
+        <div class="leech-start-sub">${correct === L.queue.length ? 'Perfect round! Those leeches are on notice.' : 'Keep at it — the mnemonics get stickier with each pass.'}</div>
+        <div class="leech-actions" style="justify-content:center">
+          <button class="btn leech-start-btn" onclick="startLeechSession()">Another round →</button>
+          <button class="btn" onclick="S.leech.phase='start';renderLeech()">Back to start</button>
+        </div>
+      </div>
+    </div>`;
+  markSplashReady();
+}
+
+// ── Leech data + session flow ─────────────────────────────────────────────────
+
+async function loadLeeches() {
+  const L = S.leech;
+  L.loading = true;
+  renderLeech();
+  try {
+    const df = document.getElementById('deckFilter')?.value.trim() || '';
+    const pfx = df ? `deck:"${df}" ` : '';
+    const ids = await anki('findCards', { query: `${pfx}tag:leech` });
+    const cards = await fetchBatch(ids);
+    L.cards = cards;
+    L.phase = 'start';
+  } catch (e) {
+    L.loading = false;
+    showToast('Could not load leeches: ' + e.message + ' (is Anki running?)', true);
+    renderLeech();
+    return;
+  }
+  L.loading = false;
+  renderLeech();
+}
+
+function reloadLeeches() {
+  S.leech.cards = [];
+  loadLeeches();
+}
+
+function startLeechSession() {
+  const L = S.leech;
+  // Prioritise cards that don't yet have mnemonics, then fill with the rest.
+  const without = L.cards.filter(c => !S.mnemonics[c.id]);
+  const withM   = L.cards.filter(c => S.mnemonics[c.id]);
+  L.queue = shuffle(without).concat(shuffle(withM)).slice(0, LEECH_SESSION_SIZE)
+    .map(c => ({ ...c, _leechPassed: false }));
+  L.idx = 0;
+  L.phase = 'learn';
+  L.testInput = '';
+  L.testResult = null;
+  renderLeech();
+}
+
+function quitLeechSession() {
+  S.leech.phase = 'start';
+  S.leech.queue = [];
+  S.leech.idx = 0;
+  renderLeech();
+}
+
+function leechLearnNext() {
+  const L = S.leech;
+  if (L.idx + 1 < L.queue.length) {
+    L.idx++;
+    renderLeech();
+  } else {
+    // Move to the test phase, starting from the first card.
+    L.idx = 0;
+    L.phase = 'test';
+    L.testInput = '';
+    L.testResult = null;
+    renderLeech();
+  }
+}
+
+function checkLeech() {
+  const L = S.leech;
+  const card = L.queue[L.idx];
+  if (!card || L.testResult !== null) return;
+  const ans = (L.testInput || '').trim();
+  if (!ans) return;
+  const ansLow = ans.toLowerCase();
+  const ansHira = inputToHira(ans);
+  const targets = [card.jp, card.rd].filter(Boolean);
+  const rdRomaji = card.rd ? readingToRomaji(card.rd) : '';
+  const ok =
+    targets.includes(ans) ||
+    (card.rd && ansHira === card.rd) ||
+    (rdRomaji && ansLow === rdRomaji) ||
+    (card.jp && ansLow === card.jp.toLowerCase());
+  L.testResult = ok ? 'correct' : 'wrong';
+  card._leechPassed = ok;
+  renderLeech();
+  speakJapanese(card.rd || card.jp);
+}
+
+function revealLeech() {
+  const L = S.leech;
+  const card = L.queue[L.idx];
+  if (!card) return;
+  L.testResult = 'wrong';
+  card._leechPassed = false;
+  renderLeech();
+}
+
+function relearnLeech() {
+  S.leech.phase = 'learn';
+  renderLeech();
+}
+
+function leechTestNext() {
+  const L = S.leech;
+  L.testInput = '';
+  L.testResult = null;
+  if (L.idx + 1 < L.queue.length) {
+    L.idx++;
+    L.phase = 'test';
+    renderLeech();
+  } else {
+    L.phase = 'done';
+    renderLeech();
+  }
+}
+
+// Generate (or fetch cached) mnemonics for one leech card.
+async function genMnemonics(card) {
+  const L = S.leech;
+  if (S.mnemonics[card.id]) { renderLeech(); return; }
+  L.loading = true;
+  const sys = `You are a creative mnemonics coach for a Japanese learner. Given ONE Japanese word (with reading and meaning), invent 2–3 vivid, memorable mnemonics that link the SOUND of the reading and the MEANING so the learner stops forgetting it.
+Good mnemonics use sound-alike English words, a silly vivid mental image, or a mini story. Keep each hook to one punchy sentence; the explanation adds one sentence of how it maps to sound + meaning.
+Return ONLY strict JSON, no markdown fences:
+{
+  "mnemonics": [
+    { "hook": "one vivid memory sentence", "explanation": "how it maps the reading's sound to the meaning" }
+  ]
+}`;
+  const msg = `Word: ${card.jp}\nReading: ${card.rd || '(same as word)'}\nMeaning: ${card.en}`;
+  try {
+    const raw = await claude([{ role: 'user', content: msg }], sys, 500, 'claude-haiku-4-5-20251001');
+    const parsed = parseLooseJSON(raw);
+    const mnemonics = (Array.isArray(parsed.mnemonics) ? parsed.mnemonics : [])
+      .filter(x => x && x.hook).slice(0, 3);
+    if (!mnemonics.length) throw new Error('no mnemonics returned');
+    S.mnemonics[card.id] = { jp: card.jp, en: card.en, rd: card.rd, mnemonics };
+    localStorage.setItem('renshuu_mnemonics', JSON.stringify(S.mnemonics));
+    gistPushFile(MNEMO_FILE, S.mnemonics); // fire-and-forget cloud sync
+  } catch (e) {
+    showToast('Mnemonic generation failed: ' + e.message, true);
+  } finally {
+    L.loading = false;
+  }
+  renderLeech();
+}
+
+// Pin one mnemonic to the current card so it's the cue reused in future lessons.
+// Clicking the already-pinned one unpins it.
+function pinMnemonic(i) {
+  const L = S.leech;
+  const card = L.queue[L.idx];
+  if (!card) return;
+  const entry = S.mnemonics[card.id];
+  if (!entry || !entry.mnemonics || !entry.mnemonics[i]) return;
+  entry.pinned = entry.pinned === i ? null : i;
+  localStorage.setItem('renshuu_mnemonics', JSON.stringify(S.mnemonics));
+  gistPushFile(MNEMO_FILE, S.mnemonics); // fire-and-forget cloud sync
+  renderLeech();
+}
+
+// Force-regenerate mnemonics for the current learn card.
+async function regenMnemonics() {
+  const L = S.leech;
+  const card = L.queue[L.idx];
+  if (!card || L.loading) return;
+  delete S.mnemonics[card.id];
+  localStorage.setItem('renshuu_mnemonics', JSON.stringify(S.mnemonics));
+  renderLeech();
+  genMnemonics(card);
+}
+
+// Escape a string for safe embedding inside a single-quoted JS attribute handler.
+function escJsAttr(s) {
+  return String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ');
+}
+
+// Escape HTML, then render **bold** markdown as <b> (mnemonics often emphasise
+// the sound-alike syllables with asterisks).
+function mdBold(s) {
+  return escHtml(String(s || '')).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
 }
 
 // ── COMPOSE MODE ──────────────────────────────────────────────────────────────

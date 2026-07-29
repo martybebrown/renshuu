@@ -375,6 +375,87 @@ pre.code {
 .answer-row { display: flex; gap: 8px; }
 .drill-hint-btn { color: var(--muted); font-size: 11px; flex: none; }
 .drill-hint-btn:hover:not(:disabled) { color: var(--text); }
+
+/* ── Leech Fixer ─────────────────────────────────────────────────────────────── */
+.leech-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; padding: 60px 20px; text-align: center; color: var(--muted); font-size: 13px;
+}
+.leech-empty-kanji { font-family: 'Shippori Mincho', serif; font-size: 56px; color: var(--border); }
+.leech-empty code { color: var(--gold); font-size: 11px; }
+.leech-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 24px; margin-top: 14px;
+}
+/* Start / done cards */
+.leech-start-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 32px 24px; margin-top: 14px; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+.leech-start-kanji { font-family: 'Shippori Mincho', serif; font-size: 52px; color: var(--accent, var(--red)); line-height: 1; }
+.leech-start-title { font-size: 18px; font-weight: 700; }
+.leech-start-sub { font-size: 12px; color: var(--muted); max-width: 360px; line-height: 1.5; }
+.leech-start-btn { margin-top: 8px; padding: 9px 20px; }
+/* Leech list preview */
+.leech-list { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
+.leech-list-row { display: flex; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.leech-list-jp { font-family: 'Shippori Mincho', serif; font-size: 15px; min-width: 90px; }
+.leech-list-en { color: var(--muted); flex: 1; }
+.leech-list-badge { font-size: 10px; color: var(--green); }
+.leech-list-more { padding-top: 10px; font-size: 11px; color: var(--muted); text-align: center; }
+/* Progress */
+.leech-progress { height: 4px; background: var(--surface2); border-radius: 999px; margin: 14px 0 4px; overflow: hidden; }
+.leech-progress-bar { height: 100%; background: var(--red); border-radius: 999px; transition: width 0.3s ease; }
+.leech-pos { font-size: 10px; color: var(--muted); text-align: right; letter-spacing: 0.08em; }
+/* Learn: the word */
+.leech-word { position: relative; text-align: center; padding: 8px 0 18px; border-bottom: 1px dashed var(--border); }
+.leech-word-jp { font-family: 'Shippori Mincho', serif; font-size: 40px; line-height: 1.2; }
+.leech-word-rd { font-size: 15px; color: var(--muted); margin-top: 4px; }
+.leech-word-en { font-size: 14px; margin-top: 6px; }
+.leech-speak { vertical-align: middle; margin-left: 6px; }
+/* Learn: mnemonics */
+.leech-mnemo-label { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 18px 0 10px; }
+.leech-mnemos { display: flex; flex-direction: column; gap: 10px; }
+.leech-mnemo {
+  display: flex; gap: 12px; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 14px; cursor: pointer; position: relative;
+  transition: border-color 0.15s, background 0.15s;
+}
+.leech-mnemo:hover { border-color: var(--muted); }
+.leech-mnemo.pinned { border-color: var(--red); background: rgba(201,79,60,0.06); }
+.leech-mnemo-pin {
+  position: absolute; top: 10px; right: 12px; font-size: 10px; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--muted); display: inline-flex; align-items: center; gap: 4px;
+  opacity: 0; transition: opacity 0.15s;
+}
+.leech-mnemo:hover .leech-mnemo-pin { opacity: 0.7; }
+.leech-mnemo.pinned .leech-mnemo-pin { opacity: 1; color: var(--red); }
+.leech-mnemo-pin svg { width: 11px; height: 11px; }
+.leech-mnemo-num {
+  flex: none; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--red); color: #fff; font-size: 12px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.leech-mnemo-body { padding-right: 48px; }
+.leech-mnemo-hook { font-size: 14px; line-height: 1.5; }
+.leech-mnemo-exp { font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 4px; }
+.leech-actions { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+.leech-next { margin-left: auto; }
+.leech-regen { color: var(--muted); font-size: 11px; }
+/* Test */
+.leech-test-prompt { text-align: center; padding: 6px 0 18px; }
+.leech-test-en { font-size: 20px; font-weight: 600; }
+.leech-test-cue {
+  margin-top: 14px; font-size: 13px; line-height: 1.5; color: var(--text);
+  background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 10px 14px; display: inline-block; text-align: left; max-width: 480px;
+}
+.leech-test-cue-label {
+  display: inline-block; font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--muted); margin-right: 8px; padding: 1px 6px; border: 1px solid var(--border); border-radius: 999px;
+}
+.leech-test-reveal { margin-top: 8px; }
 .answer-input {
   flex: 1;
   background: var(--bg);
