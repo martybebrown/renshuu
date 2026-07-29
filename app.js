@@ -2172,7 +2172,7 @@ Otherwise explain in one short sentence what's wrong. Example: {"correct":false,
 Target: ${d.target}（${d.reading}）= ${d.meaning}
 Student answered: "${attempt.input}"`;
   try {
-    const raw = await claude([{ role: 'user', content: msg }], sys, 150);
+    const raw = await claude([{ role: 'user', content: msg }], sys, 150, 'claude-haiku-4-5-20251001');
     // Extract JSON even if Claude wraps it in backticks or adds surrounding text
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const result = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
@@ -2815,7 +2815,7 @@ ${history.map((h, i) => `${i + 1}. Student wrote: "${h.wrote}"
   const msg = `Idea to express (in English): ${p.idea}
 ${p.constraint ? `REQUIRED grammar pattern the answer must use: ${p.constraint}\n` : ''}${hintBlock ? `Suggested vocab (optional): ${hintBlock}\n` : ''}${historyBlock}Student wrote: "${ans}"`;
 
-  const raw = await claude([{ role: 'user', content: msg }], sys, 600);
+  const raw = await claude([{ role: 'user', content: msg }], sys, 600, 'claude-haiku-4-5-20251001');
   const r = parseLooseJSON(raw);
   return {
     verdict: ['correct', 'minor', 'wrong'].includes(r.verdict) ? r.verdict : 'minor',
