@@ -2432,7 +2432,7 @@ function renderLeechTest(m) {
           ${cue ? `<div class="leech-test-cue"><span class="leech-test-cue-label">mnemonic</span>${mdBold(cue)}</div>` : ''}
         </div>
         <div class="answer-row">
-          <input class="answer-input" id="leechInput" placeholder="type the word (kana or romaji)…"
+          <input class="answer-input" id="leechInput" placeholder="type the word (kana/romaji) or its meaning…"
             value="${escHtml(L.testInput)}" autocomplete="off" ${answered ? 'disabled' : ''}
             oninput="S.leech.testInput=this.value"
             onkeydown="if(event.key==='Enter'){event.preventDefault();checkLeech()}" />
@@ -2545,21 +2545,72 @@ function leechLearnNext() {
   }
 }
 
+// Split a meaning string like "pay (money, respect, attention, etc.)" into
+// loose candidate phrases: "pay", "money", "respect", "attention", "etc" —
+// so recalling any one core sense of the word counts as gist-correct.
+function leechEnCandidates(en) {
+  return String(en || '')
+    .replace(/\(([^)]*)\)/g, ', $1') // fold parenthetical notes in as extra candidates
+    .split(/[,;\/]/)
+    .map(s => s.trim().toLowerCase().replace(/^(to|a|an|the)\s+/, '').replace(/\s*etc\.?$/, ''))
+    .filter(s => s.length > 1);
+}
+
+// Japanese-side candidates for a leech card: the word itself, its reading, and
+// either split on alternates (some cards store multiple readings).
+function leechJpCandidates(card) {
+  const base = [card.jp, card.rd].filter(Boolean);
+  const extra = [];
+  base.forEach(s => s.split(/[、,\/]/).forEach(x => { if (x.trim()) extra.push(x.trim()); }));
+  return [...new Set([...base, ...extra])];
+}
+
+// Fuzzy "close enough" check — edit distance tolerance scales with word
+// length so short words still need to be close, longer words forgive more.
+function fuzzyClose(a, b) {
+  if (!a || !b || a.length < 2 || b.length < 2) return false;
+  if (a === b) return true;
+  const maxLen = Math.max(a.length, b.length);
+  const tol = Math.max(1, Math.round(maxLen * 0.34));
+  return levenshtein(a, b) <= tol;
+}
+
+// Recall check: forgiving on BOTH sides of the translation. The prompt cues
+// the English meaning and asks for the Japanese word, but we accept the exact
+// word, its reading (kana or romaji), OR the gist of the English meaning —
+// with fuzzy/partial matching throughout, since the goal is confirming the
+// student has genuinely recalled the concept, not exact-string matching.
 function checkLeech() {
   const L = S.leech;
   const card = L.queue[L.idx];
   if (!card || L.testResult !== null) return;
-  const ans = (L.testInput || '').trim();
-  if (!ans) return;
-  const ansLow = ans.toLowerCase();
-  const ansHira = inputToHira(ans);
-  const targets = [card.jp, card.rd].filter(Boolean);
-  const rdRomaji = card.rd ? readingToRomaji(card.rd) : '';
-  const ok =
-    targets.includes(ans) ||
-    (card.rd && ansHira === card.rd) ||
-    (rdRomaji && ansLow === rdRomaji) ||
-    (card.jp && ansLow === card.jp.toLowerCase());
+  const ansRaw = (L.testInput || '').trim();
+  if (!ansRaw) return;
+  const ansLow  = ansRaw.toLowerCase().replace(/[.,!?"'。、]/g, '').trim()
+    .replace(/^(to|a|an|the)\s+/, '').replace(/\s*etc\.?$/, '');
+  const ansHira = inputToHira(ansRaw);
+  let ansRomaji = '';
+  try { ansRomaji = readingToRomaji(ansHira || ansRaw).toLowerCase(); } catch (_) {}
+
+  // Japanese side: kanji/kana candidates + their romaji forms.
+  const jpCandidates = leechJpCandidates(card);
+  const jpRomajiCandidates = jpCandidates
+    .map(c => { try { return readingToRomaji(c).toLowerCase(); } catch (_) { return ''; } })
+    .filter(Boolean);
+  const jpMatch =
+    jpCandidates.some(c => c === ansRaw || c === ansHira || fuzzyClose(ansHira, c)) ||
+    jpRomajiCandidates.some(c => c === ansLow || fuzzyClose(ansLow, c) || (ansRomaji && (c === ansRomaji || fuzzyClose(ansRomaji, c))));
+
+  // English side: any core sense of the meaning, matched loosely (fuzzy or
+  // one phrase containing the other) so paraphrases still count.
+  const enCandidates = leechEnCandidates(card.en);
+  const enMatch = enCandidates.some(c =>
+    c === ansLow ||
+    fuzzyClose(ansLow, c) ||
+    (c.length > 3 && ansLow.length > 3 && (ansLow.includes(c) || c.includes(ansLow)))
+  );
+
+  const ok = jpMatch || enMatch;
   L.testResult = ok ? 'correct' : 'wrong';
   card._leechPassed = ok;
   renderLeech();
