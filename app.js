@@ -5129,11 +5129,10 @@ function renderScene(sc) {
   const bgType = inferBackground(sc);
   const bg = SCENE_BACKGROUNDS[bgType] || SCENE_BACKGROUNDS.street;
 
-  let svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 50" shape-rendering="crispEdges" preserveAspectRatio="xMidYMid slice">';
-  // Background layers
-  svg += bg.r.map(([x,y,w,h,c]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`).join('');
   // Character sprite (HD 64×64) scaled 0.5 into the scene.
   const charRects = getScenarioSpriteRects(sc);
+  let charX = bg.charX;
+  let charGroup = '';
   if (charRects) {
     // Extend the torso down to the scene floor so the figure stands in the
     // scene rather than floating as a bust. sceneBottom(50) -> localY (50-charY)*2.
@@ -5147,7 +5146,7 @@ function renderScene(sc) {
     let hash = 0;
     for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) & 0x7fffffff;
     const offset = (hash & 1 ? 1 : -1) * (6 + (hash % 4));
-    const charX = Math.max(2, Math.min(46, bg.charX + offset));
+    charX = Math.max(2, Math.min(46, bg.charX + offset));
     let ext = '';
     if (c.torso && localBottom > 64) {
       const t = c.torso, eh = Math.ceil(localBottom) - 62;
@@ -5157,8 +5156,25 @@ function renderScene(sc) {
         [t.x + t.w - 3, 62, 3, eh, t.ocs],
       ]);
     }
-    svg += `<g transform="translate(${charX},${bg.charY}) scale(0.5)">${ext}${charRects}</g>`;
+    charGroup = `<g transform="translate(${charX},${bg.charY}) scale(0.5)">${ext}${charRects}</g>`;
   }
+
+  // Keep the character's face horizontally centred in the visible frame even as
+  // the container's aspect ratio changes (e.g. the breakdown drawer narrowing
+  // the scene panel). "xMidYMid slice" crops evenly around the viewBox's own
+  // midpoint, which is normally the scene's fixed x=40 — that used to push
+  // off-center characters toward (or past) the edge when the panel narrowed.
+  // Shifting the viewBox's x-origin so the sprite's horizontal center sits at
+  // the midpoint instead means the crop always stays centred on the face.
+  const shiftX = charRects ? (charX + 16) - 40 : 0; // sprite is 32 wide (64 HD scaled 0.5)
+  const baseFill = (bg.r[0] && bg.r[0][4]) || '#08080f';
+
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${shiftX} 0 80 50" shape-rendering="crispEdges" preserveAspectRatio="xMidYMid slice">`;
+  // Oversized underlay so re-centering the viewBox never exposes a transparent gap at the edges.
+  svg += `<rect x="${shiftX - 40}" y="0" width="160" height="50" fill="${baseFill}"/>`;
+  // Background layers
+  svg += bg.r.map(([x,y,w,h,c]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`).join('');
+  svg += charGroup;
   svg += '</svg>';
   return svg;
 }
