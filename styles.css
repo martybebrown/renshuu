@@ -211,6 +211,15 @@ select.field:focus { border-color: var(--muted); }
 .btn.red:hover { opacity: 0.85; }
 .btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .btn.w100 { width: 100%; }
+/* Primary action button — the main "generate new content" CTA on a page */
+.btn-primary {
+  background: var(--red); border-color: var(--red); color: #fff;
+  font-weight: 700; padding: 9px 16px;
+  box-shadow: 0 2px 8px rgba(201,79,60,0.28);
+}
+.btn-primary:hover { border-color: var(--red); opacity: 0.92; box-shadow: 0 3px 10px rgba(201,79,60,0.35); }
+.btn-primary:disabled { opacity: 0.45; box-shadow: none; }
+.btn-primary svg { flex-shrink: 0; }
 
 .tabs { display: flex; gap: 4px; }
 .tab {

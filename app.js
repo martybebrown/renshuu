@@ -248,6 +248,7 @@ const IC = {
   bulb:     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>',
   chevD:    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
   mic:      '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>',
+  sparkle:  '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>',
 };
 
 // Lightweight transient toast (uses the .renshuu-toast styles)
@@ -1953,7 +1954,7 @@ function renderDrills() {
         <div class="label">Vocabulary Drills</div>
         <div style="color:var(--muted);font-size:11px;margin-top:2px">Fill in the blank. Young words (若) prioritised.</div>
       </div>
-      <button class="btn" onclick="genDrills()" id="genBtn">New set →</button>
+      <button class="btn btn-primary" onclick="genDrills()" id="genBtn">${IC.sparkle} New set</button>
     </div>
     <div id="drillZone"><div class="loading-row"><span class="spin"></span> generating from your vocab…</div></div>
   `;
@@ -2040,7 +2041,7 @@ function paintDrills() {
 
   const bottomBtn = `
     <div style="text-align:center;margin-top:16px">
-      <button class="btn" onclick="genDrills()">New set →</button>
+      <button class="btn btn-primary" onclick="genDrills()">${IC.sparkle} New set</button>
     </div>`;
 
   zone.innerHTML = S.drills.map(d => drillHTML(d)).join('') + scoreHTML + bottomBtn;
@@ -2737,7 +2738,7 @@ function renderCompose() {
 function composeBatchSplit(mainId) {
   const idAttr = mainId ? ` id="${mainId}"` : '';
   return `<div class="split-btn">
-      <button class="btn split-main"${idAttr} onclick="genComposeBatch()">New batch →</button>
+      <button class="btn btn-primary split-main"${idAttr} onclick="genComposeBatch()">${IC.sparkle} New batch</button>
       <button class="btn split-toggle" onclick="toggleBatchMenu(event, this)" aria-label="Use your own theme" title="Use your own theme">${IC.chevD}</button>
       <div class="split-menu" hidden>
         <button type="button" class="btn smart-batch-btn" onclick="smartBatch()">${IC.bulb} Smart batch — drill my weak points</button>
