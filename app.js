@@ -1887,8 +1887,25 @@ function renderMode() {
 }
 
 // ── Claude ────────────────────────────────────────────────────────────────────
-async function claude(messages, system = '', maxTokens = 1000, model = null) {
-  const body = { messages, system, max_tokens: maxTokens };
+// Long system prompts that stay identical across a burst of calls (roleplay
+// personas carry the persona + vocab list on every single turn) are worth
+// marking cacheable: Anthropic then bills repeat reads at ~10% of the normal
+// input rate for 5 minutes. Below ~1k tokens caching is a no-op, so only opt in
+// for genuinely large prompts.
+const CACHE_MIN_CHARS = 2000;
+
+// Most turns of transcript to replay to the model on each roleplay message.
+const CONVO_WINDOW = 24;
+
+async function claude(messages, system = '', maxTokens = 1000, model = null, opts = {}) {
+  const cacheable = opts.cache && typeof system === 'string' && system.length >= CACHE_MIN_CHARS;
+  const body = {
+    messages,
+    system: cacheable
+      ? [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }]
+      : system,
+    max_tokens: maxTokens,
+  };
   if (model) body.model = model;
   const maxRetries = 3;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -3062,7 +3079,7 @@ function composeCardHTML(p) {
     ? `<div class="compose-hints">${hints}<button class="btn hint-reveal-btn hint-hide-btn" onclick="toggleComposeHint(${p.i})">${IC.x} hide</button></div>`
     : `<button class="btn hint-reveal-btn" onclick="toggleComposeHint(${p.i})">${IC.bulb} Hint</button>`;
   const constraintBlock = p.constraint
-    ? `<div class="compose-constraint">${IC.star} must use: <b>${escHtml(p.constraint)}</b></div>`
+    ? `<div class="compose-constraint">${IC.star} <b>${escHtml(p.constraint)}</b></div>`
     : '';
 
   const verdictClass = p.submitted && p.review
@@ -3458,7 +3475,7 @@ Return ONLY a JSON array (no markdown, no explanation) where each object has:
 
 Think: the opening of a short film. Surprise me.` }],
       'You are a creative scenario designer for a Japanese language learning app. You specialize in creating vivid, culturally authentic scenarios with memorable characters. Output valid JSON only.',
-      2000);
+      2000, 'claude-haiku-4-5-20251001');
 
       const parsed = JSON.parse(reply.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
       if (!Array.isArray(parsed) || parsed.length < 1) throw new Error('Bad format');
@@ -3509,7 +3526,7 @@ Return ONLY a JSON array (no markdown, no explanation) where each object has:
 
 Think: the opening of a short film. Surprise me.` }],
     'You are a creative scenario designer for a Japanese language learning app. You specialize in creating vivid, culturally authentic scenarios with memorable characters. Output valid JSON only.',
-    2000);
+    2000, 'claude-haiku-4-5-20251001');
 
     const parsed = JSON.parse(reply.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
     if (Array.isArray(parsed) && parsed.length >= 1) {
@@ -5524,21 +5541,41 @@ function setVocabLevel(v) {
   if (descEl) descEl.textContent = info.desc;
 }
 
+// Anki decks accumulate sentence cards and English-prompt cards alongside real
+// vocabulary. In a known-words list they cost a lot of tokens and teach the
+// model nothing, so keep only short, genuinely Japanese entries.
+function isVocabWord(s) {
+  return !!s && s.length <= 12
+    && /[\u3040-\u30ff\u4e00-\u9fff]/.test(s)
+    && !/[A-Za-z]{4}/.test(s);
+}
+
+// How many known words to send per vocab level. The list is re-sent on every
+// roleplay turn, so a full 2000-word deck (~50k characters) dwarfs everything
+// else in the request. A few hundred least-mastered words conveys the student's
+// level just as well, and at "Relaxed" the model is told to use new words
+// freely — the list earns nothing there, so send none.
+const KNOWN_LIST_CAP = [800, 600, 350, 0];
+
 function buildSysPrompt(sc) {
   const words = pickWords(12);
   S.sessionWords = words;
   const youngList = words.filter(w => w.tier === 'y').map(w => `${w.jp}（${w.en}）`).join('、');
   const allList  = words.map(w => `${w.jp} = ${w.en}`).join(', ');
   S.usedWords = new Set();
-  // Build compact known-words list from entire Anki deck, scaled by the vocab-level slider.
+  // Build compact known-words list from the Anki deck, scaled by the vocab-level
+  // slider. New/young come first so the cap keeps the least-mastered words.
   const vocabLevel = getVocabLevel();
-  const allKnown = [...S.cards.new, ...S.cards.young, ...S.cards.mature].map(c => c.jp);
+  const allKnown = [...S.cards.new, ...S.cards.young, ...S.cards.mature]
+    .map(c => c.jp)
+    .filter(isVocabWord)
+    .slice(0, KNOWN_LIST_CAP[vocabLevel]);
   const knownList = allKnown.length ? allKnown.join('、') : '';
   S.sysPrompt = `You are playing the role of ${sc.char}. Scenario: ${sc.en}. ${sc.ctx}
 
 VOCABULARY TO USE NATURALLY: ${allList}
 PRIORITY — embed these YOUNG words (studied but not yet mastered) whenever natural: ${youngList || '(none this session)'}
-${knownList ? `\nSTUDENT'S KNOWN VOCABULARY (their full Anki deck): ${knownList}\nIMPORTANT: ${VOCAB_DIRECTIVES[vocabLevel]}\n` : ''}
+${knownList ? `\nSTUDENT'S KNOWN VOCABULARY (from their Anki deck, least-mastered first): ${knownList}\nIMPORTANT: ${VOCAB_DIRECTIVES[vocabLevel]}\n` : ''}
 Rules:
 1. Respond in Japanese only. STRICT LIMIT: 1–3 sentences. Most replies should be 1–2 sentences — like a real conversation, not a monologue. One-word or one-phrase reactions (え？本当？ / そうだね / いいね！) are great. NEVER write 4+ sentences. This is a back-and-forth dialogue, not a speech.
 2. Weave in vocab from the list, especially the priority young words.
@@ -5653,7 +5690,7 @@ async function startChat() {
   try {
     const opening = await claude(
       [{ role: 'user', content: '[Open the scenario with a natural, brief Japanese greeting or question — 1–2 sentences only.]' }],
-      S.sysPrompt
+      S.sysPrompt, 1000, null, { cache: true }
     );
     S.convo = [{ role: 'assistant', content: opening, _id: msgId() }];
     updateChat();
@@ -5692,8 +5729,12 @@ async function sendMsg() {
   updateChat();
 
   try {
+    // Every turn re-sends the whole transcript, so an open-ended chat grows more
+    // expensive without end. The last dozen exchanges carry all the context the
+    // model actually uses; older turns are covered by fast-forward summaries.
     const msgs = S.convo
       .filter(m => m.content !== '…' && !m.divider)
+      .slice(-CONVO_WINDOW)
       .map(m => ({ role: m.role, content: m.content }));
 
     // Vocab reinforcement: track used words and remind about unused ones
@@ -5716,7 +5757,7 @@ async function sendMsg() {
     // bug) just repeats old feedback. Quote the target so it's unambiguous.
     msgs.push({ role: 'user', content: `[System: For the [Correction: ...] block, evaluate ONLY the student's newest message, quoted here: "${text}". Every earlier student message has ALREADY been reviewed in previous turns — do NOT correct, re-correct, or even mention them. If this newest message alone has no real errors, omit the [Correction] block entirely.]` });
 
-    const reply = await claude(msgs, S.sysPrompt, 500);
+    const reply = await claude(msgs, S.sysPrompt, 500, null, { cache: true });
 
     // parse optional [Correction: ...] — greedy match to final ] since corrections may contain ]] annotation markers
     const corrRx = /\[Corrections?:\s*([\s\S]*?)\]?\s*$/i;
@@ -5927,7 +5968,7 @@ async function generateEngScenarios() {
     try {
       const reply = await claude([{ role: 'user', content: buildEngGenPrompt(theme) }],
       'You are a creative scenario designer for an English learning app aimed at Japanese speakers. You specialize in vivid, culturally rich scenarios with memorable characters. Output valid JSON only.',
-      2000);
+      2000, 'claude-haiku-4-5-20251001');
 
       const parsed = JSON.parse(reply.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
       if (!Array.isArray(parsed) || parsed.length < 1) throw new Error('Bad format');
@@ -5956,7 +5997,7 @@ async function generateAndCacheEngScenarios() {
     const theme = pickEngTheme();
     const reply = await claude([{ role: 'user', content: buildEngGenPrompt(theme) }],
     'You are a creative scenario designer for an English learning app aimed at Japanese speakers. You specialize in vivid, culturally rich scenarios with memorable characters. Output valid JSON only.',
-    2000);
+    2000, 'claude-haiku-4-5-20251001');
 
     const parsed = JSON.parse(reply.replace(/```json?\n?/g, '').replace(/```/g, '').trim());
     if (Array.isArray(parsed) && parsed.length >= 1) {
@@ -6225,7 +6266,7 @@ async function startEngChat() {
   try {
     const opening = await claude(
       [{ role: 'user', content: '[Open the scenario with a natural, brief English greeting or question — 1–2 sentences only. Remember to annotate every English word with [[word|katakana|japanese]] markers.]' }],
-      S.engSysPrompt
+      S.engSysPrompt, 1000, null, { cache: true }
     );
     S.engConvo = [{ role: 'assistant', content: opening, _id: msgId() }];
     updateEngChat();
@@ -6260,13 +6301,14 @@ async function sendEngMsg() {
   try {
     const msgs = S.engConvo
       .filter(m => m.content !== '…')
+      .slice(-CONVO_WINDOW)
       .map(m => ({ role: m.role, content: m.content }));
 
     // Pin the correction scope to the newest message so earlier turns (already
     // reviewed in prior turns) aren't re-corrected.
     msgs.push({ role: 'user', content: `[System: For the [Correction: ...] block, evaluate ONLY the student's newest message, quoted here: "${raw}". Every earlier student message has ALREADY been reviewed in previous turns — do NOT correct, re-correct, or even mention them. If this newest message alone has no real errors, omit the [Correction] block entirely.]` });
 
-    const reply = await claude(msgs, S.engSysPrompt);
+    const reply = await claude(msgs, S.engSysPrompt, 1000, null, { cache: true });
 
     // Parse optional [Correction: ...] — greedy match to final ]
     const corrRx = /\[Corrections?:\s*([\s\S]*?)\]?\s*$/i;
@@ -6460,7 +6502,7 @@ async function breakdownEngMessage(msg, btn, mi) {
 
 簡潔にまとめてください。メッセージ:
 ${plain}` }
-    ], 'あなたは英語教師です。日本語話者の生徒に向けて、英語の文法や表現を日本語でわかりやすく説明してください。', 1500);
+    ], 'あなたは英語教師です。日本語話者の生徒に向けて、英語の文法や表現を日本語でわかりやすく説明してください。', 1500, 'claude-haiku-4-5-20251001');
 
     const html = formatEngBreakdown(reply);
     msg.breakdown = html;
