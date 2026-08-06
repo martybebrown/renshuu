@@ -2718,7 +2718,7 @@ function mdBold(s) {
 function renderCompose() {
   const m = document.getElementById('mainContent');
   m.innerHTML = `
-    <div class="row-between">
+    <div class="row-between compose-header">
       <div>
         <div class="label">Sentence Composition</div>
         <div style="color:var(--muted);font-size:11px;margin-top:2px">Write a sentence expressing each idea — your structure, your words. Romaji or kana. Submit for review.</div>

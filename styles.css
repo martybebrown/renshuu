@@ -1637,6 +1637,15 @@ pre.code {
   /* Header compact */
   header { padding: 12px 14px; }
 
+  /* Compose header: stack the "New batch" action under the title/description
+     instead of squeezing it onto the same row as the heading. */
+  .compose-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .compose-header .split-btn { align-self: flex-start; }
+
   /* Layout: single column, no sidebar by default */
   .layout {
     grid-template-columns: 1fr;
