@@ -5237,7 +5237,13 @@ function renderScene(sc) {
         [t.x + t.w - 3, 62, 3, eh, t.ocs],
       ]);
     }
-    charGroup = `<g transform="translate(${charX},${bg.charY}) scale(0.5)">${ext}${charRects}</g>`;
+    // Blink + a slow idle sway so the figure reads as alive rather than a still
+    // image. Both are SMIL so they survive the innerHTML re-render that every
+    // new message triggers, and the sway lives on an inner group so it can't
+    // clash with the positioning transform on the outer one.
+    const blink = c.sk ? blinkGroup(c.sk, _hdFxSeed++) : '';
+    const idle = `<animateTransform attributeName="transform" type="translate" values="0 0;0 -1.2;0 0" keyTimes="0;0.5;1" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1" dur="4.6s" repeatCount="indefinite"/>`;
+    charGroup = `<g transform="translate(${charX},${bg.charY}) scale(0.5)"><g>${ext}${charRects}${blink}${idle}</g></g>`;
   }
 
   // Keep the character's face horizontally centred in the visible frame even as
@@ -5264,7 +5270,10 @@ function renderScene(sc) {
 function renderPortrait(sc) {
   if (!sc?.voice) return '';
   const rects = getScenarioSpriteRects(sc);
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="4 0 56 48" shape-rendering="crispEdges" preserveAspectRatio="xMidYMin meet">${rects}</svg>`;
+  const baseType = VOICE_SPRITE_MAP[sc.voice] || 'salaryman';
+  const c = CHAR_SPRITES_HD[baseType] || CHAR_SPRITES_HD.salaryman;
+  const blink = c.sk ? blinkGroup(c.sk, _hdFxSeed++) : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="4 0 56 48" shape-rendering="crispEdges" preserveAspectRatio="xMidYMin meet">${rects}${blink}</svg>`;
 }
 
 function getScenarioSprite(sc, px) {
