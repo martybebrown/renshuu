@@ -392,6 +392,60 @@ function stripHtml(s) {
   return d.textContent.trim();
 }
 
+const JP_CHAR_RX = /[\u3040-\u30ff\u4e00-\u9fff]/;
+
+// "だれが新宿に行きましたか (dare ga Shinjuku ni ikimashita ka)." → drop the romaji gloss.
+function stripRomajiGloss(s) {
+  return s.replace(/\s*[（(][^（）()]*[A-Za-z][^（）()]*[)）][\s.。]*$/, '').trim();
+}
+
+// Recover the plain meaning from an exam-style question:
+//   "Translate the phrase: 'Who went to Shinjuku?'" → "Who went to Shinjuku?"
+//   "What is an architect called in Japanese?"      → "an architect"
+//   "What is the Japanese word for the equator?"    → "the equator"
+function cleanQuizPrompt(s) {
+  let t = (s || '').trim();
+  const afterColon = t.match(/^(?:translate|say|write|give)\b[^:]{0,40}:\s*(.+)$/is);
+  if (afterColon) t = afterColon[1];
+  const asked =
+    t.match(/^what (?:is|are)\s+(.+?)(?:\s+called)?\s+in japanese\s*[?.]?$/i) ||
+    t.match(/^what (?:is|are)\s+the\s+(?:\w+\s+)?japanese\s+(?:word|term|name)\s+for\s+(.+?)\s*[?.]?$/i);
+  if (asked) t = asked[1];
+  return t.replace(/^['"“‘]+|['"”’]+$/g, '').trim();
+}
+
+// Anki decks mix several card shapes. Two of them look like junk but hold real
+// vocabulary: quiz prompts that bury the word in brackets ("What is 'masui'
+// (麻酔)?"), and reversed cards where the Japanese sits on the answer side.
+// Left unrepaired these would blank out an English exam question in a drill and
+// bloat the roleplay vocab list, so recover the underlying word or sentence and
+// tag what we ended up with.
+function salvageCard(c) {
+  let { jp, en } = c;
+
+  // Reversed card: the question is English and the answer holds the Japanese.
+  if (!JP_CHAR_RX.test(jp) && JP_CHAR_RX.test(en)) {
+    const question = jp;
+    jp = en;
+    en = cleanQuizPrompt(question) || question;
+  }
+
+  // The Japanese side may still be wrapped as "kenchikuka (建築家)",
+  // "建築家 (kenchikuka)." or "What is 'masui' (麻酔)?" — reduce it to the word.
+  if (JP_CHAR_RX.test(jp) && /[A-Za-z]/.test(jp)) {
+    const bracketedJp = jp.match(/[（(]\s*([^（）()]*[\u3040-\u30ff\u4e00-\u9fff][^（）()]*?)\s*[)）]/);
+    jp = bracketedJp ? bracketedJp[1].trim() : stripRomajiGloss(jp);
+    if (en === c.en) en = cleanQuizPrompt(c.en) || c.en;
+  }
+  // "イノシシ／猪" — keep the first spelling.
+  jp = jp.split(/[／/]/)[0].trim().replace(/[。.]+$/, '');
+
+  // 'word' entries are safe to drill and to list as known vocabulary; 'phrase'
+  // entries are full sentences, useful as grammar patterns but not as answers.
+  const kind = JP_CHAR_RX.test(jp) && jp.length <= 12 && !/[A-Za-z]{4}/.test(jp) ? 'word' : 'phrase';
+  return { ...c, jp, en, kind };
+}
+
 function parseCard(info) {
   const f = info.fields;
   const keys = Object.keys(f);
@@ -401,12 +455,12 @@ function parseCard(info) {
   const jk = JP.find(k => f[k]?.value) || keys[0];
   const ek = EN.find(k => f[k]?.value) || keys[Math.min(1, keys.length - 1)];
   const rk = RD.find(k => f[k]?.value);
-  return {
+  return salvageCard({
     id: info.cardId,
     jp: stripHtml(f[jk]?.value),
     en: stripHtml(f[ek]?.value),
     rd: rk ? stripHtml(f[rk]?.value) : '',
-  };
+  });
 }
 
 async function fetchBatch(ids) {
@@ -1737,7 +1791,16 @@ function shuffle(a) {
 }
 
 function pickWords(n = 10) {
-  const { new: nw, young: yw, mature: mw } = S.cards;
+  // Drills and compose prompts blank out a single target, so sentence cards
+  // can't serve as answers — draw from the word-shaped entries only. Fall back
+  // to the raw tier if a deck happens to be all sentences.
+  const wordsOf = list => {
+    const w = list.filter(c => c.kind !== 'phrase');
+    return w.length ? w : list;
+  };
+  const nw = wordsOf(S.cards.new);
+  const yw = wordsOf(S.cards.young);
+  const mw = wordsOf(S.cards.mature);
   const f = S.focus;
   // Build pool from all active tiers
   const parts = [];
@@ -5541,21 +5604,15 @@ function setVocabLevel(v) {
   if (descEl) descEl.textContent = info.desc;
 }
 
-// Anki decks accumulate sentence cards and English-prompt cards alongside real
-// vocabulary. In a known-words list they cost a lot of tokens and teach the
-// model nothing, so keep only short, genuinely Japanese entries.
-function isVocabWord(s) {
-  return !!s && s.length <= 12
-    && /[\u3040-\u30ff\u4e00-\u9fff]/.test(s)
-    && !/[A-Za-z]{4}/.test(s);
-}
-
 // How many known words to send per vocab level. The list is re-sent on every
 // roleplay turn, so a full 2000-word deck (~50k characters) dwarfs everything
 // else in the request. A few hundred least-mastered words conveys the student's
 // level just as well, and at "Relaxed" the model is told to use new words
 // freely — the list earns nothing there, so send none.
 const KNOWN_LIST_CAP = [800, 600, 350, 0];
+// Sentence cards are longer, so a smaller sample is enough to show the grammar
+// the student has met.
+const PHRASE_LIST_CAP = [40, 30, 20, 0];
 
 function buildSysPrompt(sc) {
   const words = pickWords(12);
@@ -5566,16 +5623,24 @@ function buildSysPrompt(sc) {
   // Build compact known-words list from the Anki deck, scaled by the vocab-level
   // slider. New/young come first so the cap keeps the least-mastered words.
   const vocabLevel = getVocabLevel();
-  const allKnown = [...S.cards.new, ...S.cards.young, ...S.cards.mature]
+  const deck = [...S.cards.new, ...S.cards.young, ...S.cards.mature];
+  const allKnown = deck
+    .filter(c => c.kind !== 'phrase')
     .map(c => c.jp)
-    .filter(isVocabWord)
     .slice(0, KNOWN_LIST_CAP[vocabLevel]);
   const knownList = allKnown.length ? allKnown.join('、') : '';
+  // Sentence cards show which grammar the student has actually studied — worth
+  // a small sample so the model pitches structures they've seen before.
+  const phraseList = deck
+    .filter(c => c.kind === 'phrase' && JP_CHAR_RX.test(c.jp))
+    .slice(0, PHRASE_LIST_CAP[vocabLevel])
+    .map(c => c.jp)
+    .join('、');
   S.sysPrompt = `You are playing the role of ${sc.char}. Scenario: ${sc.en}. ${sc.ctx}
 
 VOCABULARY TO USE NATURALLY: ${allList}
 PRIORITY — embed these YOUNG words (studied but not yet mastered) whenever natural: ${youngList || '(none this session)'}
-${knownList ? `\nSTUDENT'S KNOWN VOCABULARY (from their Anki deck, least-mastered first): ${knownList}\nIMPORTANT: ${VOCAB_DIRECTIVES[vocabLevel]}\n` : ''}
+${knownList ? `\nSTUDENT'S KNOWN VOCABULARY (from their Anki deck, least-mastered first): ${knownList}\nIMPORTANT: ${VOCAB_DIRECTIVES[vocabLevel]}\n` : ''}${phraseList ? `\nSENTENCE PATTERNS THE STUDENT HAS STUDIED (mirror these structures where they fit naturally): ${phraseList}\n` : ''}
 Rules:
 1. Respond in Japanese only. STRICT LIMIT: 1–3 sentences. Most replies should be 1–2 sentences — like a real conversation, not a monologue. One-word or one-phrase reactions (え？本当？ / そうだね / いいね！) are great. NEVER write 4+ sentences. This is a back-and-forth dialogue, not a speech.
 2. Weave in vocab from the list, especially the priority young words.
