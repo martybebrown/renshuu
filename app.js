@@ -5204,6 +5204,11 @@ function getScenarioSpriteRects(sc) {
   return buildHdRects(baseType, mod);
 }
 
+// Vertical travel of the character's idle sway, in HD sprite units (halved once
+// the sprite is scaled into the scene). The torso extension overshoots the
+// floor by this much so the lift never exposes a gap beneath the figure.
+const IDLE_SWAY_HD = 1.2;
+
 // Full scene SVG: background + character positioned in the scene
 function renderScene(sc) {
   if (!sc) return '';
@@ -5230,7 +5235,9 @@ function renderScene(sc) {
     charX = Math.max(2, Math.min(46, bg.charX + offset));
     let ext = '';
     if (c.torso && localBottom > 64) {
-      const t = c.torso, eh = Math.ceil(localBottom) - 62;
+      // Overshoot the floor by the sway amplitude (plus a rounding margin) so
+      // lifting the figure never opens a gap under its feet.
+      const t = c.torso, eh = Math.ceil(localBottom) - 62 + Math.ceil(IDLE_SWAY_HD) + 1;
       ext = _hdRects([
         [t.x, 62, t.w, eh, t.ocb],
         [t.x, 62, 3, eh, t.ocs],
@@ -5242,7 +5249,7 @@ function renderScene(sc) {
     // new message triggers, and the sway lives on an inner group so it can't
     // clash with the positioning transform on the outer one.
     const blink = c.sk ? blinkGroup(c.sk, _hdFxSeed++) : '';
-    const idle = `<animateTransform attributeName="transform" type="translate" values="0 0;0 -1.2;0 0" keyTimes="0;0.5;1" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1" dur="4.6s" repeatCount="indefinite"/>`;
+    const idle = `<animateTransform attributeName="transform" type="translate" values="0 0;0 -${IDLE_SWAY_HD};0 0" keyTimes="0;0.5;1" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1" dur="4.6s" repeatCount="indefinite"/>`;
     charGroup = `<g transform="translate(${charX},${bg.charY}) scale(0.5)"><g>${ext}${charRects}${blink}${idle}</g></g>`;
   }
 
