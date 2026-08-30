@@ -5234,7 +5234,10 @@ function renderScene(sc) {
     const offset = (hash & 1 ? 1 : -1) * (6 + (hash % 4));
     charX = Math.max(2, Math.min(46, bg.charX + offset));
     let ext = '';
-    if (c.torso && localBottom > 64) {
+    // Extend when the sprite would otherwise stop at or just above the floor —
+    // scenes whose sprite lands exactly on it (localBottom 64) still need the
+    // overshoot, or the sway would lift the feet clear of the ground.
+    if (c.torso && localBottom + IDLE_SWAY_HD + 1 > 64) {
       // Overshoot the floor by the sway amplitude (plus a rounding margin) so
       // lifting the figure never opens a gap under its feet.
       const t = c.torso, eh = Math.ceil(localBottom) - 62 + Math.ceil(IDLE_SWAY_HD) + 1;
