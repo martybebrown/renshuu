@@ -272,6 +272,17 @@ const Mic = (() => {
   const supported = !!SR;
   let active = null; // { rec, btn, target, base }
 
+  // Web Speech returns no punctuation, but it only marks a result final once the
+  // speaker pauses — so each final chunk is effectively one sentence and gets a
+  // full stop. Interim chunks are left bare until they settle.
+  const SENTENCE_END = /[。．.!?！？…]["'”’)）」』]*$/;
+
+  function terminate(chunk, lang) {
+    const t = chunk.trim();
+    if (!t) return '';
+    return SENTENCE_END.test(t) ? t : t + (/^ja/i.test(lang) ? '。' : '.');
+  }
+
   function cleanup() {
     if (active && active.btn) active.btn.classList.remove('recording');
     active = null;
@@ -294,8 +305,16 @@ const Mic = (() => {
 
     rec.onresult = (e) => {
       if (!target.isConnected) { stop(); return; }
+      // Japanese runs sentences together; Latin scripts need a space between.
+      const spaced = !/^ja/i.test(rec.lang);
       let txt = '';
-      for (let i = 0; i < e.results.length; i++) txt += e.results[i][0].transcript;
+      for (let i = 0; i < e.results.length; i++) {
+        const r = e.results[i];
+        const chunk = r.isFinal ? terminate(r[0].transcript, rec.lang) : r[0].transcript.trim();
+        if (!chunk) continue;
+        if (txt && spaced) txt += ' ';
+        txt += chunk;
+      }
       target.value = active.base + txt;
       target.dispatchEvent(new Event('input', { bubbles: true }));
     };
