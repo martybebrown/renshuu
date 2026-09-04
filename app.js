@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (vocabReinforce === '0') document.getElementById('vocabReinforce').checked = false;
   const vLvlSlider = document.getElementById('vocabLevel');
   if (vLvlSlider) { const vLvl = getVocabLevel(); vLvlSlider.value = String(vLvl); setVocabLevel(vLvl); }
+  syncRandomMixUI();
   // Migrate old favorites format (array of IDs → array of objects)
   if (S.favorites.length && typeof S.favorites[0] === 'string') {
     S.favorites = S.favorites.map(id => SCENARIO_POOL.find(s => s.id === id)).filter(Boolean);
@@ -335,6 +336,9 @@ function micButtonHTML(targetId, lang = 'ja-JP') {
 const S = {
   mode: 'drill',
   focus: new Set(['n', 'y', 'm']),
+  // When on, pickWords samples uniformly across the active tiers instead of
+  // skewing the draw towards young and new vocabulary.
+  randomMix: localStorage.getItem('renshuu_random_mix') === '1',
   cards: { new: [], young: [], mature: [] },
   drills: [],
   compose: { theme: '', themeJp: '', prompts: [], pendingTheme: '' },
@@ -1808,8 +1812,9 @@ function pickWords(n = 10) {
   if (f.has('y')) parts.push(...shuffle(yw).map(c => ({ ...c, tier: 'y' })));
   if (f.has('m')) parts.push(...shuffle(mw).map(c => ({ ...c, tier: 'm' })));
   // If multiple tiers active, weight towards YOUNG words — vocab the student has
-  // studied but not yet mastered (the highest-value words to reinforce).
-  if (f.size > 1 && parts.length > n) {
+  // studied but not yet mastered (the highest-value words to reinforce). Random
+  // mix opts out, falling through to a flat shuffle of the whole pool.
+  if (!S.randomMix && f.size > 1 && parts.length > n) {
     const weighted = [];
     if (f.has('y')) weighted.push(...shuffle(yw).slice(0, Math.ceil(n * 0.55)).map(c => ({ ...c, tier: 'y' })));
     if (f.has('n')) weighted.push(...shuffle(nw).slice(0, Math.ceil(n * 0.35)).map(c => ({ ...c, tier: 'n' })));
@@ -1835,6 +1840,24 @@ function toggleFocus(tier) {
   S.drills = [];
   S.convo = [];
   if (total() > 0) renderMode();
+}
+
+function setRandomMix(on) {
+  closeMenu();
+  S.randomMix = !!on;
+  localStorage.setItem('renshuu_random_mix', S.randomMix ? '1' : '0');
+  syncRandomMixUI();
+  // Same reset as a focus change — the current set was drawn under the old rule.
+  S.drills = [];
+  S.convo = [];
+  if (total() > 0) renderMode();
+}
+
+function syncRandomMixUI() {
+  const row = document.getElementById('focus-mix');
+  if (!row) return;
+  row.classList.toggle('active', S.randomMix);
+  row.setAttribute('aria-checked', String(S.randomMix));
 }
 
 function total() { return S.cards.new.length + S.cards.young.length + S.cards.mature.length; }
@@ -2032,7 +2055,7 @@ function renderDrills() {
     <div class="row-between">
       <div>
         <div class="label">Vocabulary Drills</div>
-        <div style="color:var(--muted);font-size:11px;margin-top:2px">Fill in the blank. Young words (若) prioritised.</div>
+        <div style="color:var(--muted);font-size:11px;margin-top:2px">Fill in the blank. ${S.randomMix ? 'Random mix across all tiers.' : 'Young words (若) prioritised.'}</div>
       </div>
       <button class="btn btn-primary" onclick="genDrills()" id="genBtn">${IC.sparkle} New set</button>
     </div>
