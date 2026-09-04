@@ -272,15 +272,26 @@ const Mic = (() => {
   const supported = !!SR;
   let active = null; // { rec, btn, target, base }
 
-  // Web Speech returns no punctuation, but it only marks a result final once the
-  // speaker pauses — so each final chunk is effectively one sentence and gets a
-  // full stop. Interim chunks are left bare until they settle.
+  // Web Speech returns no punctuation, and it settles a result whenever the
+  // speaker pauses — so a chunk boundary is a breath, not a sentence. Closing
+  // every chunk planted full stops mid-clause, so instead a chunk is only ended
+  // when it reads like the end of a sentence. A missing full stop is far less
+  // disruptive than one in the wrong place, so the rules stay conservative.
   const SENTENCE_END = /[。．.!?！？…]["'”’)）」』]*$/;
 
-  function terminate(chunk, lang) {
-    const t = chunk.trim();
-    if (!t) return '';
-    return SENTENCE_END.test(t) ? t : t + (/^ja/i.test(lang) ? '。' : '.');
+  // Endings that keep a clause open: particles, te-form, connectives. Tested
+  // first, so 「行くから」 runs on into the next chunk while 「行く」 stops.
+  const JA_OPEN = /(?:から|まで|より|けど|けれど|ので|のに|たら|なら|れば|ながら|[はがをにへとやものでてし])$/;
+
+  // Endings that close one: polite forms, plain verbs, い-adjectives and the
+  // past た/だ, each optionally trailed by a final particle (ね / よ / かな…).
+  const JA_CLOSE = /(?:ません|ください|なさい|[ぁ-んァ-ヶー一-龥][いうくぐすつぬぶむるただ])(?:[ねよなかわぞぜさ]|かな|かね|よね)?$/;
+
+  // Japanese only. English chunks carry no reliable cue mid-stream, so they are
+  // left bare and closed once when dictation stops.
+  function closeSentence(chunk, ja) {
+    if (!ja || SENTENCE_END.test(chunk) || JA_OPEN.test(chunk)) return chunk;
+    return JA_CLOSE.test(chunk) ? chunk + '。' : chunk;
   }
 
   function cleanup() {
@@ -306,19 +317,31 @@ const Mic = (() => {
     rec.onresult = (e) => {
       if (!target.isConnected) { stop(); return; }
       // Japanese runs sentences together; Latin scripts need a space between.
-      const spaced = !/^ja/i.test(rec.lang);
+      const ja = /^ja/i.test(rec.lang);
       let txt = '';
       for (let i = 0; i < e.results.length; i++) {
         const r = e.results[i];
-        const chunk = r.isFinal ? terminate(r[0].transcript, rec.lang) : r[0].transcript.trim();
+        let chunk = r[0].transcript.trim();
         if (!chunk) continue;
-        if (txt && spaced) txt += ' ';
+        if (r.isFinal) chunk = closeSentence(chunk, ja);
+        if (txt && !ja) txt += ' ';
         txt += chunk;
       }
       target.value = active.base + txt;
       target.dispatchEvent(new Event('input', { bubbles: true }));
     };
-    rec.onend = () => { cleanup(); try { target.focus(); } catch (_) {} };
+    rec.onend = () => {
+      // The speaker has stopped, so the trailing chunk really is the end —
+      // unless it runs on into a clause that never arrived.
+      const ja = /^ja/i.test(rec.lang);
+      const tail = (target.value || '').slice(base.length).trim();
+      if (tail && !SENTENCE_END.test(tail) && !(ja && JA_OPEN.test(tail))) {
+        target.value = base + tail + (ja ? '。' : '.');
+        target.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      cleanup();
+      try { target.focus(); } catch (_) {}
+    };
     rec.onerror = (ev) => {
       cleanup();
       if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
@@ -2100,12 +2123,15 @@ async function genDrills(append = false) {
   if (append) { syncDrillInputs(); more.innerHTML = spinner; }
   else zone.innerHTML = spinner;
 
-  // Drawing from a wider pool lets us skip words already drilled this session,
-  // so an appended batch doesn't repeat targets the student just saw.
-  const used = new Set(S.drills.map(d => d.target));
-  const pool = pickWords(used.size ? 30 : 9);
-  const fresh = pool.filter(w => !used.has(w.jp));
+  // Skip words already drilled this session. Tracked as we hand them to the
+  // model, not from d.target — target holds the inflected surface form
+  // (おくっていきます for 送る), so it can't be matched back to a dictionary entry.
+  if (!append || !S.drillWords) S.drillWords = new Set();
+  const seenWords = S.drillWords;
+  const pool = pickWords(seenWords.size ? 30 : 9);
+  const fresh = pool.filter(w => !seenWords.has(w.jp));
   const words = (fresh.length >= 5 ? fresh : pool).slice(0, 9);
+  words.forEach(w => seenWords.add(w.jp));
   S.sessionWords = words;
 
   const wordBlock = words.map(w =>
@@ -2136,6 +2162,7 @@ Schema:
 Rules:
 - Generate exactly 5 drills
 - Each drill uses ONE word from the list as the target (to be blanked)
+- Every drill must target a DIFFERENT word — never reuse a word across drills
 - Prioritise YOUNG words (studied but not yet mastered) — use as many as possible
 - Sentences should be natural, N4-N3 level, 8-20 characters
 - 'target' must appear verbatim in 'sentence'
@@ -2148,8 +2175,18 @@ Rules:
     );
     const clean = raw.replace(/```json|```/g, '').trim();
     const { drills } = JSON.parse(clean);
+    // The model still occasionally targets one word twice, so drop repeats
+    // rather than showing the student the same blank again.
+    const seen = new Set();
+    if (append) S.drills.forEach(d => { seen.add(d.target); seen.add(d.meaning); });
+    const unique = drills.filter(d => {
+      if (seen.has(d.target) || seen.has(d.meaning)) return false;
+      seen.add(d.target); seen.add(d.meaning);
+      return true;
+    });
     const start = append ? S.drills.length : 0;
-    const made = drills.map((d, k) => ({ ...d, i: start + k, answered: false, correct: null, input: '', revisions: [], draft: '', hintLevel: 0 }));
+    const made = unique.map((d, k) => ({ ...d, i: start + k, answered: false, correct: null, input: '', revisions: [], draft: '', hintLevel: 0 }));
+    if (!made.length) throw new Error('no new drills came back — try again');
     if (append) {
       S.drills = S.drills.concat(made);
       list.insertAdjacentHTML('beforeend', made.map(d => drillHTML(d)).join(''));
