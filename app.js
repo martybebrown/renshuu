@@ -2057,7 +2057,7 @@ function renderDrills() {
         <div class="label">Vocabulary Drills</div>
         <div style="color:var(--muted);font-size:11px;margin-top:2px">Fill in the blank. ${S.randomMix ? 'Random mix across all tiers.' : 'Young words (若) prioritised.'}</div>
       </div>
-      <button class="btn btn-primary" onclick="genDrills()" id="genBtn">${IC.sparkle} New set</button>
+      <button class="btn btn-primary" onclick="genDrills(true)" id="genBtn">${IC.sparkle} New set</button>
     </div>
     <div id="drillZone"><div class="loading-row"><span class="spin"></span> generating from your vocab…</div></div>
   `;
@@ -2068,13 +2068,25 @@ function renderDrills() {
   }
 }
 
-async function genDrills() {
+async function genDrills(append = false) {
   const zone = document.getElementById('drillZone');
+  const list = document.getElementById('drillList');
+  const more = document.getElementById('drillMore');
   const btn = document.getElementById('genBtn');
+  // Appending keeps answered cards and half-typed answers on screen; a cold
+  // start has nothing to preserve, so it still replaces the whole zone.
+  append = append && !!list && !!more;
   if (btn) btn.disabled = true;
-  zone.innerHTML = '<div class="loading-row"><span class="spin"></span> building sentences…</div>';
+  const spinner = '<div class="loading-row"><span class="spin"></span> building sentences…</div>';
+  if (append) { syncDrillInputs(); more.innerHTML = spinner; }
+  else zone.innerHTML = spinner;
 
-  const words = pickWords(9);
+  // Drawing from a wider pool lets us skip words already drilled this session,
+  // so an appended batch doesn't repeat targets the student just saw.
+  const used = new Set(S.drills.map(d => d.target));
+  const pool = pickWords(used.size ? 30 : 9);
+  const fresh = pool.filter(w => !used.has(w.jp));
+  const words = (fresh.length >= 5 ? fresh : pool).slice(0, 9);
   S.sessionWords = words;
 
   const wordBlock = words.map(w =>
@@ -2117,37 +2129,56 @@ Rules:
     );
     const clean = raw.replace(/```json|```/g, '').trim();
     const { drills } = JSON.parse(clean);
-    S.drills = drills.map((d, i) => ({ ...d, i, answered: false, correct: null, input: '', revisions: [], draft: '', hintLevel: 0 }));
-    paintDrills();
+    const start = append ? S.drills.length : 0;
+    const made = drills.map((d, k) => ({ ...d, i: start + k, answered: false, correct: null, input: '', revisions: [], draft: '', hintLevel: 0 }));
+    if (append) {
+      S.drills = S.drills.concat(made);
+      list.insertAdjacentHTML('beforeend', made.map(d => drillHTML(d)).join(''));
+      // Every card header reads "n / total", so the existing ones go stale.
+      list.querySelectorAll('.drill-card .num').forEach((el, k) => {
+        el.textContent = `${k + 1} / ${S.drills.length}`;
+      });
+      document.getElementById('drillScore').innerHTML = drillScoreHTML();
+      more.innerHTML = newSetBtnHTML();
+      document.getElementById(`dc-${start}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      S.drills = made;
+      paintDrills();
+    }
   } catch (e) {
-    zone.innerHTML = `<div style="color:var(--red);font-size:12px">Error: ${e.message}</div>`;
+    const msg = `<div style="color:var(--red);font-size:12px">Error: ${escHtml(e.message)}</div>`;
+    if (append) more.innerHTML = msg + newSetBtnHTML();
+    else zone.innerHTML = msg;
     markSplashReady();
   }
   if (btn) btn.disabled = false;
 }
 
-function paintDrills() {
-  const zone = document.getElementById('drillZone');
-  const answered = S.drills.filter(d => d.answered);
-  const correct  = answered.filter(d => d.correct && !d.partial).length;
-  const close    = answered.filter(d => d.partial).length;
-  const wrong    = answered.filter(d => !d.correct).length;
-  const total    = S.drills.length;
+function newSetBtnHTML() {
+  return `<button class="btn btn-primary" onclick="genDrills(true)">${IC.sparkle} New set</button>`;
+}
 
-  const scoreHTML = answered.length > 0 ? `
+function drillScoreHTML() {
+  const answered = S.drills.filter(d => d.answered);
+  if (!answered.length) return '';
+  const correct = answered.filter(d => d.correct && !d.partial).length;
+  const close   = answered.filter(d => d.partial).length;
+  const wrong   = answered.filter(d => !d.correct).length;
+  return `
     <div class="drill-score-row">
       <span class="score-chip score-correct">✓ ${correct}</span>
       <span class="score-chip score-close">△ ${close}</span>
       <span class="score-chip score-wrong">✗ ${wrong}</span>
-      <span class="score-total">${answered.length} / ${total} answered</span>
-    </div>` : '';
-
-  const bottomBtn = `
-    <div style="text-align:center;margin-top:16px">
-      <button class="btn btn-primary" onclick="genDrills()">${IC.sparkle} New set</button>
+      <span class="score-total">${answered.length} / ${S.drills.length} answered</span>
     </div>`;
+}
 
-  zone.innerHTML = S.drills.map(d => drillHTML(d)).join('') + scoreHTML + bottomBtn;
+function paintDrills() {
+  const zone = document.getElementById('drillZone');
+  zone.innerHTML = `
+    <div id="drillList">${S.drills.map(d => drillHTML(d)).join('')}</div>
+    <div id="drillScore">${drillScoreHTML()}</div>
+    <div id="drillMore" style="text-align:center;margin-top:16px">${newSetBtnHTML()}</div>`;
   markSplashReady();
 }
 
